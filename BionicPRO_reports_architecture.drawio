@@ -1,0 +1,59 @@
+<mxfile host="app.diagrams.net" modified="2025-12-08T00:00:00.000Z" agent="7.0 (linux)" version="20.8.22" type="device">
+  <diagram id="reports-arch" name="Reports Architecture">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <mxCell id="note" value="Airflow ETL объединяет телеметрию (DB) и CRM, формирует витрину в OLAP (ClickHouse). API /reports читает витрину, доступ только своему user_id, UI кнопка вызывает /reports. Период данных ограничен обработанными DAG ранами." style="shape=note;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="200" y="80" width="1000" height="120" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="crm" value="CRM DB" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;fillColor=#23A2D9;fontColor=#ffffff;strokeColor=#0E7DAD;" vertex="1" parent="1">
+          <mxGeometry x="150" y="260" width="160" height="120" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="telemetry" value="Telemetry DB (raw)" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;fillColor=#23A2D9;fontColor=#ffffff;strokeColor=#0E7DAD;" vertex="1" parent="1">
+          <mxGeometry x="150" y="430" width="160" height="120" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="airflow" value="Airflow DAGs&#xa;- extract CRM&#xa;- aggregate telemetry per user&#xa;- join -> vitrina&#xa;- schedule (hourly/daily)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="380" y="330" width="220" height="180" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="olap" value="OLAP (ClickHouse)&#xa;Reporting mart&#xa;user_id, period, metrics&#xa;pre-aggregated" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="640" y="350" width="200" height="160" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="api" value="Reports API Service&#xa;/reports?user_id=self&#xa;RBAC: only self" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="900" y="360" width="200" height="120" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="ui" value="Frontend / Mobile&#xa;Button: Get report&#xa;calls /reports (cookie auth)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="1130" y="360" width="200" height="120" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="edge-crm-airflow" style="endArrow=block;html=1;strokeWidth=2;" edge="1" parent="1" source="crm" target="airflow">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-telemetry-airflow" style="endArrow=block;html=1;strokeWidth=2;" edge="1" parent="1" source="telemetry" target="airflow">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="edge-airflow-olap" value="ETL load" style="endArrow=block;html=1;strokeWidth=2;" edge="1" parent="1" source="airflow" target="olap">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="edge-api-olap" value="SQL to mart" style="endArrow=block;html=1;strokeWidth=2;" edge="1" parent="1" source="api" target="olap">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="edge-ui-api" value="/reports (auth cookie)" style="endArrow=block;html=1;strokeWidth=2;" edge="1" parent="1" source="ui" target="api">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
+

@@ -1,2 +1,8 @@
 /postgres-keycloak-data
+/postgres-keycloak-data2
+/postgres-keycloak-data3
+/clickhouse-data
+/nginx/cache
+/minio-data
+/Cursor-1.2.1-x86_64.AppImage
 2024__yandex-architecture-sso.code-workspace

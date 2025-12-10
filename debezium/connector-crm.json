@@ -1,0 +1,22 @@
+{
+  "name": "crm-connector",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "tasks.max": "1",
+    "database.hostname": "keycloak_db",
+    "database.port": "5432",
+    "database.user": "keycloak_user",
+    "database.password": "keycloak_password",
+    "database.dbname": "keycloak_db",
+    "database.server.name": "crmdb",
+    "topic.prefix": "crmdb",
+    "plugin.name": "pgoutput",
+    "slot.name": "crm_slot",
+    "publication.autocreate.mode": "filtered",
+    "table.include.list": "public.user_entity",
+    "tombstones.on.delete": "false",
+    "snapshot.mode": "initial"
+  }
+}
+
+

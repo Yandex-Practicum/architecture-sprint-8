@@ -1,18 +1,80 @@
-version: '3.8'
-
 services:
+  # PostgreSQL для Keycloak
   keycloak_db:
     image: postgres:14
+    container_name: bionicpro-keycloak-db
     environment:
       POSTGRES_DB: keycloak_db
       POSTGRES_USER: keycloak_user
       POSTGRES_PASSWORD: keycloak_password
     volumes:
-      - ./postgres-keycloak-data:/var/lib/postgresql/data
+      - postgres-keycloak-data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bionicpro-network
+
+  # PostgreSQL для телеметрии
+  postgres:
+    image: postgres:14
+    container_name: bionicpro-postgres
+    environment:
+      POSTGRES_DB: bionicpro
+      POSTGRES_USER: bionicpro_user
+      POSTGRES_PASSWORD: bionicpro_password
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bionicpro_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bionicpro-network
+
+  # ClickHouse для витрины отчётности
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: bionicpro-clickhouse
+    environment:
+      CLICKHOUSE_DB: bionicpro_reports
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - ./task2/airflow/scripts/create_data_mart.sql:/docker-entrypoint-initdb.d/create_data_mart.sql
+      - ./clickhouse-config/users.xml:/etc/clickhouse-server/users.d/no-password.xml
+    ports:
+      - "8123:8123"  # HTTP
+      - "9000:9000"  # Native
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    # Ограничения памяти для предотвращения OOM
+    mem_limit: 2g
+    mem_reservation: 1g
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - bionicpro-network
+
+  # Keycloak для аутентификации
   keycloak:
     image: quay.io/keycloak/keycloak:21.1
+    container_name: bionicpro-keycloak
     environment:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
@@ -20,6 +82,7 @@ services:
       KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
       KC_DB_USERNAME: keycloak_user
       KC_DB_PASSWORD: keycloak_password
+      KC_HTTP_RELATIVE_PATH: /
     command: 
       - start-dev
       - --import-realm
@@ -28,15 +91,187 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      - keycloak_db
+      keycloak_db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - bionicpro-network
+
+  # Backend API (Java Spring Boot)
+  backend:
+    build:
+      context: ./task2/backend
+      dockerfile: Dockerfile
+    container_name: bionicpro-backend
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      CLICKHOUSE_URL: jdbc:clickhouse://clickhouse:8123/bionicpro_reports
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+      SERVER_PORT: 8000
+      SPRING_DATASOURCE_URL: jdbc:clickhouse://clickhouse:8123/bionicpro_reports
+    ports:
+      - "8000:8000"
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+    networks:
+      - bionicpro-network
+
+  # Frontend (React)
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
+    container_name: bionicpro-frontend
     environment:
       REACT_APP_API_URL: http://localhost:8000
       REACT_APP_KEYCLOAK_URL: http://localhost:8080
       REACT_APP_KEYCLOAK_REALM: reports-realm
       REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    networks:
+      - bionicpro-network
+
+
+  # PostgreSQL для Airflow метаданных
+  airflow_db:
+    image: postgres:14
+    container_name: bionicpro-airflow-db
+    environment:
+      POSTGRES_DB: airflow
+      POSTGRES_USER: airflow_user
+      POSTGRES_PASSWORD: airflow_password
+    volumes:
+      - postgres-airflow-data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bionicpro-network
+
+  # Airflow Webserver
+  airflow-webserver:
+    build:
+      context: ./task2/airflow
+      dockerfile: Dockerfile
+    container_name: bionicpro-airflow-webserver
+    user: "${AIRFLOW_UID:-50000}:0"
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow_user:airflow_password@airflow_db:5432/airflow
+      AIRFLOW__CORE__FERNET_KEY: ''
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth'
+      AIRFLOW__CORE__ENABLE_XCOM_PICKLING: 'true'
+      _AIRFLOW_DB_UPGRADE: 'true'
+      _AIRFLOW_WWW_USER_CREATE: 'true'
+      _AIRFLOW_WWW_USER_USERNAME: admin
+      _AIRFLOW_WWW_USER_PASSWORD: admin
+      # Переменные для подключения к источникам данных
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: bionicpro
+      POSTGRES_USER: bionicpro_user
+      POSTGRES_PASSWORD: bionicpro_password
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: 8123
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+      CLICKHOUSE_DATABASE: bionicpro_reports
+    volumes:
+      - ./task2/airflow/dags:/opt/airflow/dags
+      - ./task2/airflow/logs:/opt/airflow/logs
+      - ./task2/airflow/plugins:/opt/airflow/plugins
+    ports:
+      - "8081:8080"
+    command: webserver
+    depends_on:
+      airflow_db:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    networks:
+      - bionicpro-network
+
+  # Airflow Scheduler
+  airflow-scheduler:
+    build:
+      context: ./task2/airflow
+      dockerfile: Dockerfile
+    container_name: bionicpro-airflow-scheduler
+    user: "${AIRFLOW_UID:-50000}:0"
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow_user:airflow_password@airflow_db:5432/airflow
+      AIRFLOW__CORE__FERNET_KEY: ''
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth'
+      AIRFLOW__CORE__ENABLE_XCOM_PICKLING: 'true'
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: bionicpro
+      POSTGRES_USER: bionicpro_user
+      POSTGRES_PASSWORD: bionicpro_password
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: 8123
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+      CLICKHOUSE_DATABASE: bionicpro_reports
+    volumes:
+      - ./task2/airflow/dags:/opt/airflow/dags
+      - ./task2/airflow/logs:/opt/airflow/logs
+      - ./task2/airflow/plugins:/opt/airflow/plugins
+    command: scheduler
+    depends_on:
+      airflow_db:
+        condition: service_healthy
+      airflow-webserver:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    networks:
+      - bionicpro-network
+
+networks:
+  bionicpro-network:
+    driver: bridge
+
+volumes:
+  postgres-keycloak-data:
+  postgres-data:
+  postgres-airflow-data:
+  clickhouse-data:

@@ -1,0 +1,29 @@
+server:
+  port: 8000
+
+spring:
+  application:
+    name: reports-api
+
+clickhouse:
+  url: ${CLICKHOUSE_URL:jdbc:clickhouse://clickhouse:8123/bionicpro_reports}
+  user: ${CLICKHOUSE_USER:default}
+  password: ${CLICKHOUSE_PASSWORD:}
+
+logging:
+  level:
+    com.bionicpro.reports: DEBUG
+    org.springframework.security: INFO
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized
+  health:
+    db:
+      enabled: false
+

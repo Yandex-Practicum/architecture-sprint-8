@@ -47,6 +47,10 @@ const ReportPage: React.FC = () => {
     );
   }
 
+  if (!keycloak.hasRealmRole('prothetic_user')) {
+    return <div className="p-8">У вас нет доступа к отчетам.</div>;
+  }
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
       <div className="p-8 bg-white rounded-lg shadow-md">

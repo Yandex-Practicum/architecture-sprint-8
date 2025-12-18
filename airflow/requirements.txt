@@ -1,0 +1,15 @@
+# Основные зависимости для DAG
+apache-airflow-providers-postgres
+airflow-clickhouse-plugin[pandas]
+# Для обработки данных
+pandas>=1.5.0
+numpy>=1.21.0
+
+# Драйверы (указываются явно на всякий случай)
+psycopg2-binary>=2.9.0
+
+# Для работы с JSON и типами (входит в стандартную библиотеку, но на всякий случай)
+python-dateutil>=2.8.0
+
+# ClickHouse HTTP клиент (опционально, если используется не только через hook)
+clickhouse-connect>=0.6.0

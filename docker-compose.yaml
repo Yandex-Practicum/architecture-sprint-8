@@ -8,7 +8,7 @@ services:
       POSTGRES_USER: keycloak_user
       POSTGRES_PASSWORD: keycloak_password
     volumes:
-      - ./postgres-keycloak-data:/var/lib/postgresql/data
+      - keycloak_db_data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
   keycloak:
@@ -29,6 +29,17 @@ services:
       - "8080:8080"
     depends_on:
       - keycloak_db
+  keycloak-yandex-proxy:
+    build:
+      context: ./keycloak-yandex-proxy
+      dockerfile: Dockerfile
+    ports:
+      - "8004:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
   frontend:
     build:
       context: ./frontend
@@ -40,3 +51,303 @@ services:
       REACT_APP_KEYCLOAK_URL: http://localhost:8080
       REACT_APP_KEYCLOAK_REALM: reports-realm
       REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+      REACT_APP_BACKEND_AUTH_URL: http://localhost:5001/auth
+      REACT_APP_BFF_URL: http://localhost:5001
+      REACT_APP_REDIRECT_URI: http://localhost:5001/signin-oidc
+  openldap:
+    image: osixia/openldap:1.5.0
+    command: --copy-service
+    volumes:
+      - ./ldap/config.ldif:/container/service/slapd/assets/config/bootstrap/ldif/50-bootstrap.ldif
+    environment:
+      - LDAP_ORGANISATION=example-com
+      - LDAP_DOMAIN=example.com
+      - LDAP_ADMIN_PASSWORD=admin
+    ports:
+      - "389:389"
+      - "636:636"
+  crm_db: 
+    image: postgres:14
+    environment:
+      POSTGRES_DB: crm_db
+      POSTGRES_USER: crm_user
+      POSTGRES_PASSWORD: crm_password
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+        - ./crm-db:/docker-entrypoint-initdb.d
+        - postgres-crm-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crm_user -d crm_db"]
+      interval: 10s
+      timeout: 30s
+      retries: 3
+    ports:
+      - "5444:5432"
+    command: >
+      -c wal_level=logical
+      -c max_wal_senders=1
+      -c max_replication_slots=1
+  olap_db:
+    image: clickhouse/clickhouse-server:latest
+    ports:
+      - "8123:8123"
+      - "9431:9000"
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - ./olap-db:/docker-entrypoint-initdb.d
+      - ./materialized-view-reports.sql:/docker-entrypoint-initdb.d/materialized-view-reports.sql
+      - ./olap-db:/var/lib/clickhouse/user_files
+      - ./olap-db/users.xml:/etc/clickhouse-server/users.d/users.xml
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --query 'SELECT 1'"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+
+  minio:
+    image: minio/minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_storage:/data
+    environment:
+      MINIO_ROOT_USER: minio_user
+      MINIO_ROOT_PASSWORD: minio_password
+    command: server --console-address ":9001" /data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/ready"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+
+  # Создать bucket по умолчанию
+  minio-setup:
+    image: minio/mc
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: /bin/sh
+    command: >
+      -c "
+        echo 'Настройка MinIO...';
+        mc alias set myminio http://minio:9000 minio_user minio_password;
+        mc mb --ignore-existing myminio/reports || true;
+        # Делаем бакет публичным (только на чтение)
+
+        mc anonymous set download myminio/reports
+        echo 'Bucket 'reports' created';
+      "
+
+  nginx:
+    image: emcniece/nginx-cache-purge
+    platform: linux/amd64
+    ports:
+      - "8888:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/logs:/var/log/nginx  
+      - minio_cache:/var/cache/nginx
+    depends_on:
+      - minio
+
+  redis:
+    image: redis:7.2-alpine
+    restart: unless-stopped
+    ports:
+      - 6379:6379
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  bionicpro-auth:
+    build:
+      context: ./backend/bionicpro-auth
+      dockerfile: Dockerfile
+    ports: 
+      - 5001:5001
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_CLIENT_ID: backend-auth
+      KEYCLOAK_SECRET: Y2MCU5BjY8tzCajrWtFLKTINH7kffiHG
+      KEYCLOAK_REALM: reports-realm
+    depends_on:
+      - redis
+      - keycloak
+  reports-api:
+    build:
+      context: ./backend/reports-service
+      dockerfile: Dockerfile
+    ports: 
+      - 5003:5003
+    environment:
+      CLICKHOUSE_HOST: olap_db
+      CLICKHOUSE_PORT: 9000
+      CLICKHOUSE_DATABASE: default
+      CLICKHOUSE_USERNAME: default
+      CLICKHOUSE_PASSWORD: ""
+      S3_ENDPOINT: minio:9000
+      S3_ACCESS_KEY_ID: minio_user
+      S3_SECRET_ACCESS_KEY: minio_password
+      S3_BUCKET_NAME: reports
+      S3_REGION: us-east-1
+      S3_USE_SSL: false
+      CDN_HOST: localhost:8888
+    depends_on:
+      - olap_db
+      - minio
+ 
+  x-airflow-common: &airflow-common
+    build: ./airflow
+    user: "50000:0"
+    environment: &airflow-common-env
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
+      AIRFLOW__CORE__FERNET_KEY: VEqgAYAX-MvwPbfVUyAUqW5Lt2EzXQ93hs1ujZ7ocZg=
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__WEBSERVER__SECRET_KEY: mysecretkey
+      AIRFLOW__LOGGING__LOGGING_LEVEL: INFO
+      AIRFLOW_CONN_CRM_DB_CONN: postgresql://crm_user:crm_password@crm_db:5432/crm_db
+      AIRFLOW_CONN_CLICKHOUSE_CONN: clickhouse://default:@olap_db:9000/default
+      AIRFLOW__CORE__TEST_CONNECTION: Enabled
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - airflow_logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+  airflow-init:
+    <<: *airflow-common
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+      crm_db:
+        condition: service_healthy
+      olap_db:
+        condition: service_healthy
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+    command: >
+      bash -c "
+      set -euo pipefail;
+      echo 'Миграция БД Airflow...';
+      airflow db migrate;
+      echo 'Создание пользователя admin...';
+      airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com || true;
+      echo 'Инициализация Airflow завершена.';
+      "
+  airflow-db:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: airflow
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+    volumes:
+      - airflow_postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 10s
+      timeout: 30s
+      retries: 3
+  airflow-webserver:
+    <<: *airflow-common
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    ports:
+      - "8083:8080"
+    command: webserver
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:8080/health || exit 1" ]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+  airflow-scheduler:
+    <<: *airflow-common
+    depends_on:
+      airflow-webserver:
+        condition: service_healthy
+    command: scheduler
+    healthcheck:
+      test: [ "CMD-SHELL", "airflow jobs check --job-type SchedulerJob --hostname $(hostname)" ]
+      interval: 30s
+      timeout: 30s
+      retries: 5
+
+  # Авто-распаузить и триггернуть DAG ПОСЛЕ того как webserver+scheduler поднялись
+  airflow-bootstrap:
+    <<: *airflow-common
+    depends_on:
+      airflow-webserver:
+        condition: service_healthy
+      airflow-scheduler:
+        condition: service_healthy
+    command: >
+      bash -c "
+      set -euo pipefail;
+      echo 'Bootstrap: unpause and trigger crm_to_clickhouse_mart_dag...';
+      airflow dags unpause crm_to_clickhouse_mart_dag || true;
+      airflow dags trigger crm_to_clickhouse_mart_dag || true;
+      echo 'Bootstrap done.';
+      "
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    ports:
+      - "19092:19092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:9093'
+      KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,PLAINTEXT_HOST://0.0.0.0:19092'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:19092'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_CFG_LOG_DIRS: /tmp/kraft-combined-logs
+      CLUSTER_ID: "4L6g3nYRQZiHvP7jJmXZ2w"
+    volumes:
+      - logs_kafka:/tmp/kraft-combined-logs
+  debezium:
+    image: debezium/connect:2.3
+    depends_on:
+      - kafka
+      - crm_db
+    ports:
+      - "8084:8083"
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: connect-cluster
+      CONFIG_STORAGE_TOPIC: connect-configs
+      OFFSET_STORAGE_TOPIC: connect-offsets
+      STATUS_STORAGE_TOPIC: connect-status
+      KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      INTERNAL_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      INTERNAL_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      REST_ADVERTISED_HOST_NAME: debezium
+      CONNECT_PLUGIN_PATH: /kafka/connect,/kafka/libs
+      CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE: "false"
+      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+    volumes:
+      - ./debezium/connectors:/etc/kafka-connect/connectors
+
+volumes:
+  minio_storage:
+  redis_data:
+  clickhouse-data:
+  airflow_postgres_data:
+  airflow_logs:
+  postgres-crm-data:
+  minio_cache:
+  logs_kafka:
+  keycloak_db_data:

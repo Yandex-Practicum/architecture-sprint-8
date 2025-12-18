@@ -1,0 +1,30 @@
+{
+  "name": "crm-connector",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "database.hostname": "crm_db",
+    "database.port": "5432",
+    "database.user": "crm_user",
+    "database.password": "crm_password",
+    "database.dbname": "crm_db",
+    "database.server.name": "crm-postgres",
+    "table.include.list": "public.customers,public.orders",
+    "plugin.name": "pgoutput",
+    "slot.name": "debezium_slot",
+    "publication.name": "debezium_publication",
+    "database.history.kafka.bootstrap.servers": "kafka:9092",
+    "database.history.kafka.topic": "schema-changes.crm",
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter.schemas.enable": false,
+    "value.converter.schemas.enable": false,
+    "internal.key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "internal.value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "internal.key.converter.schemas.enable": false,
+    "internal.value.converter.schemas.enable": false,
+    "transforms": "unwrap",
+    "transforms.unwrap.type": "io.debezium.transforms.ExtractNewRecordState",
+    "transforms.unwrap.delete.handling.mode": "rewrite",
+    "topic.prefix": "dbz"
+  }
+}

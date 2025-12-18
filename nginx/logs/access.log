@@ -1,0 +1,4 @@
+178.128.69.202 - - [15/Dec/2025:22:07:37 +0000] "GET /reports/report_2.json HTTP/1.1" 200 556 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
+178.128.69.202 - - [15/Dec/2025:22:07:37 +0000] "GET /favicon.ico HTTP/1.1" 404 571 "http://localhost:8888/reports/report_2.json" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
+192.168.65.1 - - [17/Dec/2025:16:53:04 +0000] "GET /reports/report_1.json HTTP/1.1" 200 547 "http://localhost:3000/" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
+192.168.65.1 - - [17/Dec/2025:16:53:04 +0000] "GET /favicon.ico HTTP/1.1" 404 571 "http://localhost:8888/reports/report_1.json" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"

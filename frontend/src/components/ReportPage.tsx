@@ -22,6 +22,18 @@ const ReportPage: React.FC = () => {
         }
       });
 
+      if (response.ok) {
+          const blob = await response.blob();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'report.txt';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+      } else {
+          setError('Failed to download report');
+      }
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');

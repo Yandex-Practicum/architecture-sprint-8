@@ -20,7 +20,7 @@ services:
       KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
       KC_DB_USERNAME: keycloak_user
       KC_DB_PASSWORD: keycloak_password
-    command: 
+    command:
       - start-dev
       - --import-realm
     volumes:
@@ -40,3 +40,20 @@ services:
       REACT_APP_KEYCLOAK_URL: http://localhost:8080
       REACT_APP_KEYCLOAK_REALM: reports-realm
       REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    depends_on:
+      - keycloak
+    environment:
+      API_KEYCLOAK_ADDR: http://keycloak:8080
+      API_KEYCLOAK_REALM: reports-realm
+      API_APP_ADDR: 0.0.0.0:8000
+    restart: on-failure
+
+networks:
+  app-net:
+    driver: bridge

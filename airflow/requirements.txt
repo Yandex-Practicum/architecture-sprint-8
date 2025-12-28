@@ -1,0 +1,7 @@
+apache-airflow==2.7.3
+apache-airflow-providers-postgres==5.7.1
+apache-airflow-providers-http==4.6.0
+clickhouse-connect==0.6.22
+psycopg2-binary==2.9.9
+requests==2.31.0
+

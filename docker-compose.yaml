@@ -36,7 +36,19 @@ services:
     ports:
       - "3000:3000"
     environment:
-      REACT_APP_API_URL: http://localhost:8000
-      REACT_APP_KEYCLOAK_URL: http://localhost:8080
+      REACT_APP_API_URL: http://keycloak:8000
+      REACT_APP_KEYCLOAK_URL: http://keycloak:8080
       REACT_APP_KEYCLOAK_REALM: reports-realm
       REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+  backend:
+    build:
+      context: ./API
+      dockerfile: Dockerfile
+    ports:
+      - "8090:8090"
+    environment:
+      keycloak_url: http://keycloak:8080
+      keycloak_realm: reports-realm
+      keycloak_client: reports-api
+      allow_role: prothetic_user
+      port: 8090

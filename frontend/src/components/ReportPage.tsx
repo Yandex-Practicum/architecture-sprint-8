@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useKeycloak } from '@react-keycloak/web';
 
 const ReportPage: React.FC = () => {
@@ -13,6 +13,12 @@ const ReportPage: React.FC = () => {
     }
 
     try {
+      // Обновляем токен, если он устарел
+      const refreshed = await keycloak.updateToken(70); // Обновляем токен, если до истечения осталось меньше 70 секунд
+      if (refreshed) {
+        console.log('Token was successfully refreshed');
+      }
+
       setLoading(true);
       setError(null);
 
@@ -22,7 +28,11 @@ const ReportPage: React.FC = () => {
         }
       });
 
-      
+      if (!response.ok) {
+        throw new Error('Failed to fetch report');
+      }
+
+
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -51,7 +61,7 @@ const ReportPage: React.FC = () => {
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
       <div className="p-8 bg-white rounded-lg shadow-md">
         <h1 className="text-2xl font-bold mb-6">Usage Reports</h1>
-        
+
         <button
           onClick={downloadReport}
           disabled={loading}

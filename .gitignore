@@ -1,2 +1,12 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+env/
+.git
+__pycache__
+*.log
+*.env
+
 /postgres-keycloak-data
 2024__yandex-architecture-sso.code-workspace

@@ -1,0 +1,5 @@
+fastapi
+uvicorn
+fastapi-keycloak
+python-dotenv
+python-keycloak

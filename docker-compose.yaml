@@ -20,11 +20,20 @@ services:
       KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
       KC_DB_USERNAME: keycloak_user
       KC_DB_PASSWORD: keycloak_password
-    command: 
+      KC_HEALTH_ENABLED: "true"
+    command:
       - start-dev
       - --import-realm
-    volumes:
-      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
+
+    healthcheck:
+      test: [ "CMD-SHELL",
+        "bash -c 'exec 3<>/dev/tcp/localhost/8080 && \
+                      printf \"GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n\" >&3 && \
+                      head -n1 <&3 | grep -q \" 200 \"'" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     ports:
       - "8080:8080"
     depends_on:
@@ -40,3 +49,16 @@ services:
       REACT_APP_KEYCLOAK_URL: http://localhost:8080
       REACT_APP_KEYCLOAK_REALM: reports-realm
       REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    extra_hosts:
+      - "localhost:host-gateway"
+    environment:
+      ISSUER: http://localhost:8080/realms/reports-realm
+    depends_on:
+      keycloak:
+        condition: service_healthy

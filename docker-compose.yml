@@ -1,0 +1,17 @@
+services:
+  keycloak_db:
+    image: postgres:14
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:21.1
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+  
+  webapplication1:
+    image: ${DOCKER_REGISTRY-}webapplication1
+    build:
+      context: .
+      dockerfile: backend/WebApplication1/Dockerfile

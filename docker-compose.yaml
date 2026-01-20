@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   keycloak_db:
-    image: postgres:14
+    image: cr.yandex/mirror/library/postgres:14
     environment:
       POSTGRES_DB: keycloak_db
       POSTGRES_USER: keycloak_user
@@ -40,3 +40,13 @@ services:
       REACT_APP_KEYCLOAK_URL: http://localhost:8080
       REACT_APP_KEYCLOAK_REALM: reports-realm
       REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    depends_on:
+      - keycloak_db
+      - keycloak
+

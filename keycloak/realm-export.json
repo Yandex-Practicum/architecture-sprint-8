@@ -1,6 +1,27 @@
 {
     "realm": "reports-realm",
     "enabled": true,
+    "clients": [
+        {
+            "clientId": "reports-frontend",
+            "enabled": true,
+            "publicClient": true,
+            "protocol": "openid-connect",
+            "redirectUris": ["http://localhost:3000/*"],
+            "webOrigins": ["http://localhost:3000"],
+            "defaultRoles": ["prothetic_user"]
+        },
+        {
+            "clientId": "backend",
+            "enabled": true,
+            "publicClient": false,
+            "protocol": "openid-connect",
+            "redirectUris": ["http://localhost:8000/*"],
+            "webOrigins": ["http://localhost:8000"],
+            "serviceAccountsEnabled": true,
+            "defaultRoles": ["prothetic_user"]
+        }
+    ],
     "roles": {
       "realm": [
         {

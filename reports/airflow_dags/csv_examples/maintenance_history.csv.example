@@ -1,0 +1,5 @@
+user_id,maintenance_date,maintenance_type,maintenance_status
+12345,2023-06-01,repair,completed
+12345,2023-09-15,service,completed
+12346,2023-07-10,repair,completed
+12347,2023-08-20,service,completed

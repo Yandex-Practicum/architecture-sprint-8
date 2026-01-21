@@ -1,0 +1,12 @@
+# Зависимости для Airflow DAG системы отчётов BionicPRO
+
+# Обработка данных
+pandas>=2.0.0
+pyarrow>=12.0.0  # Для работы с Parquet файлами
+
+# Подключение к базам данных
+psycopg2-binary>=2.9.0  # PostgreSQL
+clickhouse-driver>=0.2.6  # ClickHouse
+
+# Airflow (обычно устанавливается отдельно)
+# apache-airflow>=2.5.0

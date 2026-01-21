@@ -28,11 +28,19 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 const App: React.FC = () => {
+  // Логирование конфигурации для отладки
+  console.log('Keycloak Configuration:', {
+    url: keycloakConfig.url,
+    realm: keycloakConfig.realm,
+    clientId: keycloakConfig.clientId
+  });
+
   return (
     <ReactKeycloakProvider 
       authClient={keycloak}
       initOptions={keycloakInitOpt}
       onEvent={(eventType, error) => {
+        console.log('Keycloak Event:', eventType, error);
         if (eventType === 'onReady') {
           console.log('Keycloak PKCE Configuration:', {
             pkceMethod: keycloakInitOpt.pkceMethod,
@@ -40,6 +48,9 @@ const App: React.FC = () => {
             clientId: keycloakConfig.clientId
           });
           console.log('PKCE is enabled!');
+        }
+        if (eventType === 'onInitError' || eventType === 'onAuthError') {
+          console.error('Keycloak Error:', error);
         }
       }}
     >

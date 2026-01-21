@@ -1,2 +1,15 @@
 /postgres-keycloak-data
 2024__yandex-architecture-sso.code-workspace
+
+# Docker volumes data
+data/
+
+# CSV data (можно добавить примеры, но не реальные данные)
+data/crm/*.csv
+!data/crm/*.example
+!data/crm/*.csv.example
+
+# Temporary files
+*.parquet
+*.tmp
+/tmp/

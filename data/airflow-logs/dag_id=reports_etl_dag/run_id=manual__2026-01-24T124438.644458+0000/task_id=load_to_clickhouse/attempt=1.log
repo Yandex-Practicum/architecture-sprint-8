@@ -1,0 +1,96 @@
+[2026-01-24T12:44:41.755+0000] {local_task_job_runner.py:120} INFO - ::group::Pre task execution logs
+[2026-01-24T12:44:41.796+0000] {taskinstance.py:2076} INFO - Dependencies all met for dep_context=non-requeueable deps ti=<TaskInstance: reports_etl_dag.load_to_clickhouse manual__2026-01-24T12:44:38.644458+00:00 [queued]>
+[2026-01-24T12:44:41.804+0000] {taskinstance.py:2076} INFO - Dependencies all met for dep_context=requeueable deps ti=<TaskInstance: reports_etl_dag.load_to_clickhouse manual__2026-01-24T12:44:38.644458+00:00 [queued]>
+[2026-01-24T12:44:41.804+0000] {taskinstance.py:2306} INFO - Starting attempt 1 of 3
+[2026-01-24T12:44:41.817+0000] {taskinstance.py:2330} INFO - Executing <Task(PythonOperator): load_to_clickhouse> on 2026-01-24 12:44:38.644458+00:00
+[2026-01-24T12:44:41.822+0000] {standard_task_runner.py:63} INFO - Started process 361 to run task
+[2026-01-24T12:44:41.824+0000] {standard_task_runner.py:90} INFO - Running: ['***', 'tasks', 'run', 'reports_etl_dag', 'load_to_clickhouse', 'manual__2026-01-24T12:44:38.644458+00:00', '--job-id', '228', '--raw', '--subdir', 'DAGS_FOLDER/reports_etl_dag.py', '--cfg-path', '/tmp/tmpf9_uy9km']
+[2026-01-24T12:44:41.826+0000] {standard_task_runner.py:91} INFO - Job 228: Subtask load_to_clickhouse
+[2026-01-24T12:44:41.926+0000] {task_command.py:426} INFO - Running <TaskInstance: reports_etl_dag.load_to_clickhouse manual__2026-01-24T12:44:38.644458+00:00 [running]> on host 616c3cccc8fa
+[2026-01-24T12:44:42.058+0000] {taskinstance.py:2648} INFO - Exporting env vars: AIRFLOW_CTX_DAG_OWNER='bionicpro' AIRFLOW_CTX_DAG_ID='reports_etl_dag' AIRFLOW_CTX_TASK_ID='load_to_clickhouse' AIRFLOW_CTX_EXECUTION_DATE='2026-01-24T12:44:38.644458+00:00' AIRFLOW_CTX_TRY_NUMBER='1' AIRFLOW_CTX_DAG_RUN_ID='manual__2026-01-24T12:44:38.644458+00:00'
+[2026-01-24T12:44:42.059+0000] {taskinstance.py:430} INFO - ::endgroup::
+[2026-01-24T12:44:42.073+0000] {logging_mixin.py:188} WARNING - /home/***/.local/lib/python3.9/site-packages/***/utils/context.py:320 AirflowContextDeprecationWarning: Accessing 'execution_date' from the template is deprecated and will be removed in a future version. Please use 'data_interval_start' or 'logical_date' instead.
+[2026-01-24T12:44:42.129+0000] {logging_mixin.py:188} INFO - Таблица user_reports_mart создана или уже существует
+[2026-01-24T12:44:42.164+0000] {taskinstance.py:441} INFO - ::group::Post task execution logs
+[2026-01-24T12:44:42.164+0000] {taskinstance.py:2905} ERROR - Task failed with exception
+Traceback (most recent call last):
+  File "/home/airflow/.local/lib/python3.9/site-packages/airflow/models/taskinstance.py", line 465, in _execute_task
+    result = _execute_callable(context=context, **execute_callable_kwargs)
+  File "/home/airflow/.local/lib/python3.9/site-packages/airflow/models/taskinstance.py", line 432, in _execute_callable
+    return execute_callable(context=context, **execute_callable_kwargs)
+  File "/home/airflow/.local/lib/python3.9/site-packages/airflow/models/baseoperator.py", line 400, in wrapper
+    return func(self, *args, **kwargs)
+  File "/home/airflow/.local/lib/python3.9/site-packages/airflow/operators/python.py", line 235, in execute
+    return_value = self.execute_callable()
+  File "/home/airflow/.local/lib/python3.9/site-packages/airflow/operators/python.py", line 252, in execute_callable
+    return self.python_callable(*self.op_args, **self.op_kwargs)
+  File "/opt/airflow/dags/reports_etl_dag.py", line 360, in load_to_clickhouse
+    client.execute(insert_query, data_to_insert)
+  File "/home/airflow/.local/lib/python3.9/site-packages/clickhouse_driver/client.py", line 376, in execute
+    rv = self.process_insert_query(
+  File "/home/airflow/.local/lib/python3.9/site-packages/clickhouse_driver/client.py", line 607, in process_insert_query
+    rv = self.send_data(sample_block, data,
+  File "/home/airflow/.local/lib/python3.9/site-packages/clickhouse_driver/client.py", line 670, in send_data
+    self.receive_profile_events()
+  File "/home/airflow/.local/lib/python3.9/site-packages/clickhouse_driver/client.py", line 747, in receive_profile_events
+    raise packet.exception
+clickhouse_driver.errors.ServerException: Code: 1001.
+DB::Exception: std::__1::filesystem::filesystem_error: filesystem error: in rename: Permission denied ["/var/lib/clickhouse/store/4c2/4c294068-d338-446e-b31d-8c6d4e7b9cd7/tmp_insert_202601_6_6_0/"] ["/var/lib/clickhouse/store/4c2/4c294068-d338-446e-b31d-8c6d4e7b9cd7/202601_6_6_0/"]. Stack trace:
+
+0. std::system_error::system_error(std::error_code, String const&) @ 0x000000001febc497
+1. std::filesystem::filesystem_error::filesystem_error[abi:ne190107](String const&, std::filesystem::path const&, std::filesystem::path const&, std::error_code) @ 0x000000001fe729a0
+2. void std::filesystem::__throw_filesystem_error[abi:ne190107]<String&, std::filesystem::path const&, std::filesystem::path const&, std::error_code const&>(String&, std::filesystem::path const&, std::filesystem::path const&, std::error_code const&) @ 0x000000001fe726b4
+3. std::filesystem::detail::ErrorHandler<void>::report(std::error_code const&) const @ 0x000000001fe70b3a
+4. std::filesystem::__rename(std::filesystem::path const&, std::filesystem::path const&, std::error_code*) @ 0x000000001fe77edd
+5. DB::DiskLocal::moveDirectory(String const&, String const&) @ 0x000000001742399b
+6. DB::DataPartStorageOnDiskBase::rename(String, String, std::shared_ptr<Poco::Logger>, bool, bool) @ 0x0000000019274de2
+7. DB::IMergeTreeDataPart::renameTo(String const&, bool) @ 0x00000000192cf25b
+8. DB::MergeTreeData::preparePartForCommit(std::shared_ptr<DB::IMergeTreeDataPart>&, DB::MergeTreeData::Transaction&, bool, bool) @ 0x0000000019413aa3
+9. DB::MergeTreeData::renameTempPartAndReplaceImpl(std::shared_ptr<DB::IMergeTreeDataPart>&, DB::MergeTreeData::Transaction&, DB::DataPartsLock&, std::vector<std::shared_ptr<DB::IMergeTreeDataPart const>, std::allocator<std::shared_ptr<DB::IMergeTreeDataPart const>>>*, bool) @ 0x00000000194528d7
+10. DB::MergeTreeData::renameTempPartAndAdd(std::shared_ptr<DB::IMergeTreeDataPart>&, DB::MergeTreeData::Transaction&, DB::DataPartsLock&, bool) @ 0x0000000019453aa8
+11. DB::MergeTreeSink::commitPart(std::shared_ptr<DB::IMergeTreeDataPart>&, String const&) @ 0x00000000196d2589
+12. DB::MergeTreeSink::finishDelayedChunk() @ 0x00000000196d1e63
+13. DB::runStep(std::function<void ()>, std::shared_ptr<DB::ThreadGroup>&) @ 0x0000000019ff6583
+14. DB::ExceptionKeepingTransform::work() @ 0x0000000019ff5fbf
+15. DB::ExecutionThreadContext::executeTask() @ 0x0000000019d1ce02
+16. DB::PipelineExecutor::executeStepImpl(unsigned long, DB::IAcquiredSlot*, std::atomic<bool>*) @ 0x0000000019d0e950
+17. void std::__function::__policy_invoker<void ()>::__call_impl[abi:ne190107]<std::__function::__default_alloc_func<DB::PipelineExecutor::spawnThreads(std::shared_ptr<DB::IAcquiredSlot>)::$_0, void ()>>(std::__function::__policy_storage const*) @ 0x0000000019d12803
+18. ThreadPoolImpl<ThreadFromGlobalPoolImpl<false, true>>::ThreadFromThreadPool::worker() @ 0x00000000136f5c2b
+19. void std::__function::__policy_invoker<void ()>::__call_impl[abi:ne190107]<std::__function::__default_alloc_func<ThreadFromGlobalPoolImpl<false, true>::ThreadFromGlobalPoolImpl<void (ThreadPoolImpl<ThreadFromGlobalPoolImpl<false, true>>::ThreadFromThreadPool::*)(), ThreadPoolImpl<ThreadFromGlobalPoolImpl<false, true>>::ThreadFromThreadPool*>(void (ThreadPoolImpl<ThreadFromGlobalPoolImpl<false, true>>::ThreadFromThreadPool::*&&)(), ThreadPoolImpl<ThreadFromGlobalPoolImpl<false, true>>::ThreadFromThreadPool*&&)::'lambda'(), void ()>>(std::__function::__policy_storage const*) @ 0x00000000136fcfa6
+20. ThreadPoolImpl<std::thread>::ThreadFromThreadPool::worker() @ 0x00000000136f2c12
+21. void* std::__thread_proxy[abi:ne190107]<std::tuple<std::unique_ptr<std::__thread_struct, std::default_delete<std::__thread_struct>>, void (ThreadPoolImpl<std::thread>::ThreadFromThreadPool::*)(), ThreadPoolImpl<std::thread>::ThreadFromThreadPool*>>(void*) @ 0x00000000136fa6da
+22. ? @ 0x0000000000094ac3
+23. ? @ 0x00000000001268c0
+
+[2026-01-24T12:44:42.194+0000] {taskinstance.py:1206} INFO - Marking task as UP_FOR_RETRY. dag_id=reports_etl_dag, task_id=load_to_clickhouse, run_id=manual__2026-01-24T12:44:38.644458+00:00, execution_date=20260124T124438, start_date=20260124T124441, end_date=20260124T124442
+[2026-01-24T12:44:42.208+0000] {standard_task_runner.py:110} ERROR - Failed to execute job 228 for task load_to_clickhouse (Code: 1001.
+DB::Exception: std::__1::filesystem::filesystem_error: filesystem error: in rename: Permission denied ["/var/lib/clickhouse/store/4c2/4c294068-d338-446e-b31d-8c6d4e7b9cd7/tmp_insert_202601_6_6_0/"] ["/var/lib/clickhouse/store/4c2/4c294068-d338-446e-b31d-8c6d4e7b9cd7/202601_6_6_0/"]. Stack trace:
+
+0. std::system_error::system_error(std::error_code, String const&) @ 0x000000001febc497
+1. std::filesystem::filesystem_error::filesystem_error[abi:ne190107](String const&, std::filesystem::path const&, std::filesystem::path const&, std::error_code) @ 0x000000001fe729a0
+2. void std::filesystem::__throw_filesystem_error[abi:ne190107]<String&, std::filesystem::path const&, std::filesystem::path const&, std::error_code const&>(String&, std::filesystem::path const&, std::filesystem::path const&, std::error_code const&) @ 0x000000001fe726b4
+3. std::filesystem::detail::ErrorHandler<void>::report(std::error_code const&) const @ 0x000000001fe70b3a
+4. std::filesystem::__rename(std::filesystem::path const&, std::filesystem::path const&, std::error_code*) @ 0x000000001fe77edd
+5. DB::DiskLocal::moveDirectory(String const&, String const&) @ 0x000000001742399b
+6. DB::DataPartStorageOnDiskBase::rename(String, String, std::shared_ptr<Poco::Logger>, bool, bool) @ 0x0000000019274de2
+7. DB::IMergeTreeDataPart::renameTo(String const&, bool) @ 0x00000000192cf25b
+8. DB::MergeTreeData::preparePartForCommit(std::shared_ptr<DB::IMergeTreeDataPart>&, DB::MergeTreeData::Transaction&, bool, bool) @ 0x0000000019413aa3
+9. DB::MergeTreeData::renameTempPartAndReplaceImpl(std::shared_ptr<DB::IMergeTreeDataPart>&, DB::MergeTreeData::Transaction&, DB::DataPartsLock&, std::vector<std::shared_ptr<DB::IMergeTreeDataPart const>, std::allocator<std::shared_ptr<DB::IMergeTreeDataPart const>>>*, bool) @ 0x00000000194528d7
+10. DB::MergeTreeData::renameTempPartAndAdd(std::shared_ptr<DB::IMergeTreeDataPart>&, DB::MergeTreeData::Transaction&, DB::DataPartsLock&, bool) @ 0x0000000019453aa8
+11. DB::MergeTreeSink::commitPart(std::shared_ptr<DB::IMergeTreeDataPart>&, String const&) @ 0x00000000196d2589
+12. DB::MergeTreeSink::finishDelayedChunk() @ 0x00000000196d1e63
+13. DB::runStep(std::function<void ()>, std::shared_ptr<DB::ThreadGroup>&) @ 0x0000000019ff6583
+14. DB::ExceptionKeepingTransform::work() @ 0x0000000019ff5fbf
+15. DB::ExecutionThreadContext::executeTask() @ 0x0000000019d1ce02
+16. DB::PipelineExecutor::executeStepImpl(unsigned long, DB::IAcquiredSlot*, std::atomic<bool>*) @ 0x0000000019d0e950
+17. void std::__function::__policy_invoker<void ()>::__call_impl[abi:ne190107]<std::__function::__default_alloc_func<DB::PipelineExecutor::spawnThreads(std::shared_ptr<DB::IAcquiredSlot>)::$_0, void ()>>(std::__function::__policy_storage const*) @ 0x0000000019d12803
+18. ThreadPoolImpl<ThreadFromGlobalPoolImpl<false, true>>::ThreadFromThreadPool::worker() @ 0x00000000136f5c2b
+19. void std::__function::__policy_invoker<void ()>::__call_impl[abi:ne190107]<std::__function::__default_alloc_func<ThreadFromGlobalPoolImpl<false, true>::ThreadFromGlobalPoolImpl<void (ThreadPoolImpl<ThreadFromGlobalPoolImpl<false, true>>::ThreadFromThreadPool::*)(), ThreadPoolImpl<ThreadFromGlobalPoolImpl<false, true>>::ThreadFromThreadPool*>(void (ThreadPoolImpl<ThreadFromGlobalPoolImpl<false, true>>::ThreadFromThreadPool::*&&)(), ThreadPoolImpl<ThreadFromGlobalPoolImpl<false, true>>::ThreadFromThreadPool*&&)::'lambda'(), void ()>>(std::__function::__policy_storage const*) @ 0x00000000136fcfa6
+20. ThreadPoolImpl<std::thread>::ThreadFromThreadPool::worker() @ 0x00000000136f2c12
+21. void* std::__thread_proxy[abi:ne190107]<std::tuple<std::unique_ptr<std::__thread_struct, std::default_delete<std::__thread_struct>>, void (ThreadPoolImpl<std::thread>::ThreadFromThreadPool::*)(), ThreadPoolImpl<std::thread>::ThreadFromThreadPool*>>(void*) @ 0x00000000136fa6da
+22. ? @ 0x0000000000094ac3
+23. ? @ 0x00000000001268c0
+; 361)
+[2026-01-24T12:44:42.237+0000] {local_task_job_runner.py:240} INFO - Task exited with return code 1
+[2026-01-24T12:44:42.267+0000] {taskinstance.py:3498} INFO - 0 downstream tasks scheduled from follow-on schedule check
+[2026-01-24T12:44:42.271+0000] {local_task_job_runner.py:222} INFO - ::endgroup::

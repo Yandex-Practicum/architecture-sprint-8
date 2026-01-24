@@ -1,0 +1,20 @@
+[2026-01-24T12:33:55.740+0000] {local_task_job_runner.py:120} INFO - ::group::Pre task execution logs
+[2026-01-24T12:33:55.779+0000] {taskinstance.py:2076} INFO - Dependencies all met for dep_context=non-requeueable deps ti=<TaskInstance: reports_etl_dag.transform_and_aggregate manual__2026-01-24T12:28:52.048073+00:00 [queued]>
+[2026-01-24T12:33:55.786+0000] {taskinstance.py:2076} INFO - Dependencies all met for dep_context=requeueable deps ti=<TaskInstance: reports_etl_dag.transform_and_aggregate manual__2026-01-24T12:28:52.048073+00:00 [queued]>
+[2026-01-24T12:33:55.786+0000] {taskinstance.py:2306} INFO - Starting attempt 1 of 3
+[2026-01-24T12:33:55.798+0000] {taskinstance.py:2330} INFO - Executing <Task(PythonOperator): transform_and_aggregate> on 2026-01-24 12:28:52.048073+00:00
+[2026-01-24T12:33:55.803+0000] {standard_task_runner.py:63} INFO - Started process 324 to run task
+[2026-01-24T12:33:55.806+0000] {standard_task_runner.py:90} INFO - Running: ['***', 'tasks', 'run', 'reports_etl_dag', 'transform_and_aggregate', 'manual__2026-01-24T12:28:52.048073+00:00', '--job-id', '184', '--raw', '--subdir', 'DAGS_FOLDER/reports_etl_dag.py', '--cfg-path', '/tmp/tmp9l1knpqv']
+[2026-01-24T12:33:55.808+0000] {standard_task_runner.py:91} INFO - Job 184: Subtask transform_and_aggregate
+[2026-01-24T12:33:55.889+0000] {task_command.py:426} INFO - Running <TaskInstance: reports_etl_dag.transform_and_aggregate manual__2026-01-24T12:28:52.048073+00:00 [running]> on host 232384de18f5
+[2026-01-24T12:33:56.015+0000] {taskinstance.py:2648} INFO - Exporting env vars: AIRFLOW_CTX_DAG_OWNER='bionicpro' AIRFLOW_CTX_DAG_ID='reports_etl_dag' AIRFLOW_CTX_TASK_ID='transform_and_aggregate' AIRFLOW_CTX_EXECUTION_DATE='2026-01-24T12:28:52.048073+00:00' AIRFLOW_CTX_TRY_NUMBER='1' AIRFLOW_CTX_DAG_RUN_ID='manual__2026-01-24T12:28:52.048073+00:00'
+[2026-01-24T12:33:56.016+0000] {taskinstance.py:430} INFO - ::endgroup::
+[2026-01-24T12:33:56.030+0000] {logging_mixin.py:188} WARNING - /home/***/.local/lib/python3.9/site-packages/***/utils/context.py:320 AirflowContextDeprecationWarning: Accessing 'execution_date' from the template is deprecated and will be removed in a future version. Please use 'data_interval_start' or 'logical_date' instead.
+[2026-01-24T12:33:56.119+0000] {logging_mixin.py:188} INFO - Трансформировано и объединено 6 записей
+[2026-01-24T12:33:56.119+0000] {logging_mixin.py:188} INFO - Уникальных пользователей: 3
+[2026-01-24T12:33:56.120+0000] {python.py:237} INFO - Done. Returned value was: /tmp/transformed_data_20260124.parquet
+[2026-01-24T12:33:56.120+0000] {taskinstance.py:441} INFO - ::group::Post task execution logs
+[2026-01-24T12:33:56.180+0000] {taskinstance.py:1206} INFO - Marking task as SUCCESS. dag_id=reports_etl_dag, task_id=transform_and_aggregate, run_id=manual__2026-01-24T12:28:52.048073+00:00, execution_date=20260124T122852, start_date=20260124T123355, end_date=20260124T123356
+[2026-01-24T12:33:56.219+0000] {local_task_job_runner.py:240} INFO - Task exited with return code 0
+[2026-01-24T12:33:56.251+0000] {taskinstance.py:3498} INFO - 1 downstream tasks scheduled from follow-on schedule check
+[2026-01-24T12:33:56.253+0000] {local_task_job_runner.py:222} INFO - ::endgroup::

@@ -1,0 +1,54 @@
+[2026-01-24T12:41:20.563+0000] {local_task_job_runner.py:120} INFO - ::group::Pre task execution logs
+[2026-01-24T12:41:20.607+0000] {taskinstance.py:2076} INFO - Dependencies all met for dep_context=non-requeueable deps ti=<TaskInstance: reports_etl_dag.load_to_clickhouse manual__2026-01-24T12:31:12.529682+00:00 [queued]>
+[2026-01-24T12:41:20.615+0000] {taskinstance.py:2076} INFO - Dependencies all met for dep_context=requeueable deps ti=<TaskInstance: reports_etl_dag.load_to_clickhouse manual__2026-01-24T12:31:12.529682+00:00 [queued]>
+[2026-01-24T12:41:20.616+0000] {taskinstance.py:2306} INFO - Starting attempt 2 of 3
+[2026-01-24T12:41:20.628+0000] {taskinstance.py:2330} INFO - Executing <Task(PythonOperator): load_to_clickhouse> on 2026-01-24 12:31:12.529682+00:00
+[2026-01-24T12:41:20.633+0000] {standard_task_runner.py:63} INFO - Started process 612 to run task
+[2026-01-24T12:41:20.636+0000] {standard_task_runner.py:90} INFO - Running: ['***', 'tasks', 'run', 'reports_etl_dag', 'load_to_clickhouse', 'manual__2026-01-24T12:31:12.529682+00:00', '--job-id', '213', '--raw', '--subdir', 'DAGS_FOLDER/reports_etl_dag.py', '--cfg-path', '/tmp/tmpevfl_y7m']
+[2026-01-24T12:41:20.638+0000] {standard_task_runner.py:91} INFO - Job 213: Subtask load_to_clickhouse
+[2026-01-24T12:41:20.746+0000] {task_command.py:426} INFO - Running <TaskInstance: reports_etl_dag.load_to_clickhouse manual__2026-01-24T12:31:12.529682+00:00 [running]> on host aa419605c513
+[2026-01-24T12:41:20.882+0000] {taskinstance.py:2648} INFO - Exporting env vars: AIRFLOW_CTX_DAG_OWNER='bionicpro' AIRFLOW_CTX_DAG_ID='reports_etl_dag' AIRFLOW_CTX_TASK_ID='load_to_clickhouse' AIRFLOW_CTX_EXECUTION_DATE='2026-01-24T12:31:12.529682+00:00' AIRFLOW_CTX_TRY_NUMBER='2' AIRFLOW_CTX_DAG_RUN_ID='manual__2026-01-24T12:31:12.529682+00:00'
+[2026-01-24T12:41:20.883+0000] {taskinstance.py:430} INFO - ::endgroup::
+[2026-01-24T12:41:20.897+0000] {logging_mixin.py:188} WARNING - /home/***/.local/lib/python3.9/site-packages/***/utils/context.py:320 AirflowContextDeprecationWarning: Accessing 'execution_date' from the template is deprecated and will be removed in a future version. Please use 'data_interval_start' or 'logical_date' instead.
+[2026-01-24T12:41:27.256+0000] {local_task_job_runner.py:124} ERROR - Received SIGTERM. Terminating subprocesses
+[2026-01-24T12:41:27.264+0000] {process_utils.py:132} INFO - Sending 15 to group 612. PIDs of all processes in the group: [612]
+[2026-01-24T12:41:27.265+0000] {process_utils.py:87} INFO - Sending the signal 15 to group 612
+[2026-01-24T12:41:27.266+0000] {taskinstance.py:2611} ERROR - Received SIGTERM. Terminating subprocesses.
+[2026-01-24T12:41:27.266+0000] {taskinstance.py:441} INFO - ::group::Post task execution logs
+[2026-01-24T12:41:27.305+0000] {taskinstance.py:2905} ERROR - Task failed with exception
+Traceback (most recent call last):
+  File "/home/airflow/.local/lib/python3.9/site-packages/airflow/models/taskinstance.py", line 465, in _execute_task
+    result = _execute_callable(context=context, **execute_callable_kwargs)
+  File "/home/airflow/.local/lib/python3.9/site-packages/airflow/models/taskinstance.py", line 432, in _execute_callable
+    return execute_callable(context=context, **execute_callable_kwargs)
+  File "/home/airflow/.local/lib/python3.9/site-packages/airflow/models/baseoperator.py", line 400, in wrapper
+    return func(self, *args, **kwargs)
+  File "/home/airflow/.local/lib/python3.9/site-packages/airflow/operators/python.py", line 235, in execute
+    return_value = self.execute_callable()
+  File "/home/airflow/.local/lib/python3.9/site-packages/airflow/operators/python.py", line 252, in execute_callable
+    return self.python_callable(*self.op_args, **self.op_kwargs)
+  File "/opt/airflow/dags/reports_etl_dag.py", line 311, in load_to_clickhouse
+    client.execute(create_table_query)
+  File "/home/airflow/.local/lib/python3.9/site-packages/clickhouse_driver/client.py", line 370, in execute
+    with self.disconnect_on_error(query, settings):
+  File "/usr/local/lib/python3.9/contextlib.py", line 119, in __enter__
+    return next(self.gen)
+  File "/home/airflow/.local/lib/python3.9/site-packages/clickhouse_driver/client.py", line 313, in disconnect_on_error
+    self.establish_connection(settings)
+  File "/home/airflow/.local/lib/python3.9/site-packages/clickhouse_driver/client.py", line 300, in establish_connection
+    self.connection.force_connect()
+  File "/home/airflow/.local/lib/python3.9/site-packages/clickhouse_driver/connection.py", line 278, in force_connect
+    self.connect()
+  File "/home/airflow/.local/lib/python3.9/site-packages/clickhouse_driver/connection.py", line 428, in connect
+    return self._init_connection(host, port)
+  File "/home/airflow/.local/lib/python3.9/site-packages/clickhouse_driver/connection.py", line 358, in _init_connection
+    self.socket = self._create_socket(host, port)
+  File "/home/airflow/.local/lib/python3.9/site-packages/clickhouse_driver/connection.py", line 317, in _create_socket
+    sock.connect(sa)
+  File "/home/airflow/.local/lib/python3.9/site-packages/airflow/models/taskinstance.py", line 2613, in signal_handler
+    raise AirflowTaskTerminated("Task received SIGTERM signal")
+airflow.exceptions.AirflowTaskTerminated: Task received SIGTERM signal
+[2026-01-24T12:41:27.315+0000] {taskinstance.py:1206} INFO - Marking task as UP_FOR_RETRY. dag_id=reports_etl_dag, task_id=load_to_clickhouse, run_id=manual__2026-01-24T12:31:12.529682+00:00, execution_date=20260124T123112, start_date=20260124T124120, end_date=20260124T124127
+[2026-01-24T12:41:27.398+0000] {process_utils.py:80} INFO - Process psutil.Process(pid=612, status='terminated', exitcode=2, started='12:41:20') (612) terminated with exit code 2
+[2026-01-24T12:41:27.399+0000] {local_task_job_runner.py:240} INFO - Task exited with return code 143
+[2026-01-24T12:41:27.441+0000] {taskinstance.py:3498} INFO - 0 downstream tasks scheduled from follow-on schedule check

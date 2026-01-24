@@ -1,0 +1,20 @@
+[2026-01-24T11:01:14.540+0000] {local_task_job_runner.py:120} INFO - ::group::Pre task execution logs
+[2026-01-24T11:01:14.587+0000] {taskinstance.py:2076} INFO - Dependencies all met for dep_context=non-requeueable deps ti=<TaskInstance: reports_etl_dag.extract_crm_data scheduled__2026-01-24T10:57:00+00:00 [queued]>
+[2026-01-24T11:01:14.596+0000] {taskinstance.py:2076} INFO - Dependencies all met for dep_context=requeueable deps ti=<TaskInstance: reports_etl_dag.extract_crm_data scheduled__2026-01-24T10:57:00+00:00 [queued]>
+[2026-01-24T11:01:14.597+0000] {taskinstance.py:2306} INFO - Starting attempt 1 of 3
+[2026-01-24T11:01:14.610+0000] {taskinstance.py:2330} INFO - Executing <Task(PythonOperator): extract_crm_data> on 2026-01-24 10:57:00+00:00
+[2026-01-24T11:01:14.615+0000] {standard_task_runner.py:63} INFO - Started process 187 to run task
+[2026-01-24T11:01:14.619+0000] {standard_task_runner.py:90} INFO - Running: ['***', 'tasks', 'run', 'reports_etl_dag', 'extract_crm_data', 'scheduled__2026-01-24T10:57:00+00:00', '--job-id', '38', '--raw', '--subdir', 'DAGS_FOLDER/reports_etl_dag.py', '--cfg-path', '/tmp/tmpfj24ws9q']
+[2026-01-24T11:01:14.623+0000] {standard_task_runner.py:91} INFO - Job 38: Subtask extract_crm_data
+[2026-01-24T11:01:14.732+0000] {task_command.py:426} INFO - Running <TaskInstance: reports_etl_dag.extract_crm_data scheduled__2026-01-24T10:57:00+00:00 [running]> on host 5b7742ada674
+[2026-01-24T11:01:14.902+0000] {taskinstance.py:2648} INFO - Exporting env vars: AIRFLOW_CTX_DAG_OWNER='bionicpro' AIRFLOW_CTX_DAG_ID='reports_etl_dag' AIRFLOW_CTX_TASK_ID='extract_crm_data' AIRFLOW_CTX_EXECUTION_DATE='2026-01-24T10:57:00+00:00' AIRFLOW_CTX_TRY_NUMBER='1' AIRFLOW_CTX_DAG_RUN_ID='scheduled__2026-01-24T10:57:00+00:00'
+[2026-01-24T11:01:14.904+0000] {taskinstance.py:430} INFO - ::endgroup::
+[2026-01-24T11:01:14.926+0000] {logging_mixin.py:188} INFO - Предупреждение: файл /data/crm/users.csv не найден
+[2026-01-24T11:01:14.926+0000] {logging_mixin.py:188} INFO - Предупреждение: файл /data/crm/orders.csv не найден
+[2026-01-24T11:01:14.927+0000] {logging_mixin.py:188} INFO - Предупреждение: файл /data/crm/maintenance_history.csv не найден
+[2026-01-24T11:01:14.927+0000] {python.py:237} INFO - Done. Returned value was: {}
+[2026-01-24T11:01:14.927+0000] {taskinstance.py:441} INFO - ::group::Post task execution logs
+[2026-01-24T11:01:14.984+0000] {taskinstance.py:1206} INFO - Marking task as SUCCESS. dag_id=reports_etl_dag, task_id=extract_crm_data, run_id=scheduled__2026-01-24T10:57:00+00:00, execution_date=20260124T105700, start_date=20260124T110114, end_date=20260124T110114
+[2026-01-24T11:01:15.038+0000] {local_task_job_runner.py:240} INFO - Task exited with return code 0
+[2026-01-24T11:01:15.078+0000] {taskinstance.py:3498} INFO - 0 downstream tasks scheduled from follow-on schedule check
+[2026-01-24T11:01:15.081+0000] {local_task_job_runner.py:222} INFO - ::endgroup::

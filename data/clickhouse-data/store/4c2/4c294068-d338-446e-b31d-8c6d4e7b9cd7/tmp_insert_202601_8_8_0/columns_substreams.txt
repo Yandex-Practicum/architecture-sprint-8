@@ -1,0 +1,58 @@
+columns substreams version: 1
+24 columns:
+1 substreams for column `user_id`:
+	user_id
+1 substreams for column `date`:
+	date
+1 substreams for column `device_id`:
+	device_id
+1 substreams for column `total_usage_seconds`:
+	total_usage_seconds
+1 substreams for column `total_movements`:
+	total_movements
+1 substreams for column `avg_sensor_value`:
+	avg_sensor_value
+1 substreams for column `min_sensor_value`:
+	min_sensor_value
+1 substreams for column `max_sensor_value`:
+	max_sensor_value
+1 substreams for column `usage_hours`:
+	usage_hours
+1 substreams for column `year`:
+	year
+1 substreams for column `month`:
+	month
+1 substreams for column `week`:
+	week
+1 substreams for column `day_of_week`:
+	day_of_week
+2 substreams for column `user_name`:
+	user_name.null
+	user_name
+2 substreams for column `prosthesis_install_date`:
+	prosthesis_install_date.null
+	prosthesis_install_date
+2 substreams for column `prosthesis_type`:
+	prosthesis_type.null
+	prosthesis_type
+2 substreams for column `order_date`:
+	order_date.null
+	order_date
+2 substreams for column `order_status`:
+	order_status.null
+	order_status
+2 substreams for column `maintenance_date`:
+	maintenance_date.null
+	maintenance_date
+2 substreams for column `maintenance_type`:
+	maintenance_type.null
+	maintenance_type
+2 substreams for column `maintenance_status`:
+	maintenance_status.null
+	maintenance_status
+1 substreams for column `processed_at`:
+	processed_at
+1 substreams for column `data_period_start`:
+	data_period_start
+1 substreams for column `data_period_end`:
+	data_period_end

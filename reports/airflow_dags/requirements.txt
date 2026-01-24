@@ -8,5 +8,8 @@ pyarrow>=12.0.0  # Для работы с Parquet файлами
 psycopg2-binary>=2.9.0  # PostgreSQL
 clickhouse-driver>=0.2.6  # ClickHouse
 
+# Airflow providers (для Airflow 2.x)
+apache-airflow-providers-postgres>=5.0.0  # PostgreSQL provider для Airflow 2.x
+
 # Airflow (обычно устанавливается отдельно)
 # apache-airflow>=2.5.0

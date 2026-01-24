@@ -87,7 +87,8 @@ services:
       POSTGRES_PASSWORD: sensors_password
     volumes:
       - ./data/postgres-sensors-data:/var/lib/postgresql/data
-      - ./data/reports/airflow_dags/init_sensor_telemetry.sql:/docker-entrypoint-initdb.d/init_sensor_telemetry.sql
+      - ./reports/airflow_dags/init_sensor_telemetry.sql:/docker-entrypoint-initdb.d/init_sensor_telemetry.sql
+      - ./reports/airflow_dags/insert_test_sensor_data.sql:/docker-entrypoint-initdb.d/insert_test_sensor_data.sql
     ports:
       - "5434:5432"
     healthcheck:
@@ -101,13 +102,14 @@ services:
   clickhouse:
     image: clickhouse/clickhouse-server:25.8
     container_name: clickhouse
+    user: "0:0"
     environment:
       CLICKHOUSE_DB: bionicpro_reports
       CLICKHOUSE_USER: default
       CLICKHOUSE_PASSWORD: clickhouse_password
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
     volumes:
-      - ./data/clickhouse-data:/var/lib/clickhouse
+      - clickhouse-data:/var/lib/clickhouse  # Используем named volume вместо bind mount
       - ./reports/airflow_dags/clickhouse_schema.sql:/etc/clickhouse-server/clickhouse_schema.sql:ro
       - ./reports/airflow_dags/init_clickhouse.sh:/etc/clickhouse-server/init_clickhouse.sh:ro
     ports:
@@ -169,6 +171,8 @@ services:
       AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
       AIRFLOW__WEBSERVER__SECRET_KEY: 'your_airflow_webserver_sec_key'
       AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
+      # PostgreSQL connection для данных датчиков
+      AIRFLOW_CONN_POSTGRES_SENSORS: 'postgres://sensors_user:sensors_password@postgres_sensors:5432/bionicpro_sensors'
       _PIP_ADDITIONAL_REQUIREMENTS: ''
     volumes:
       - ./data/airflow-dags:/opt/airflow/dags
@@ -287,6 +291,10 @@ services:
     networks:
       - bionicpro-network
 
+
+volumes:
+  clickhouse-data:
+    driver: local
 
 networks:
   bionicpro-network:

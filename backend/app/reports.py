@@ -1,8 +1,12 @@
 """
 Модуль для работы с отчётами из ClickHouse
 """
+import json
+import math
+from decimal import Decimal
+
 from datetime import date, datetime
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any
 from app.database import get_clickhouse_client
 from app.security import verify_user_access
 from fastapi import HTTPException
@@ -93,6 +97,49 @@ async def check_data_availability(
             "last_processed_time": None
         }
 
+def convert_float_values(obj: Any) -> Any:
+    """
+    Рекурсивное преобразование значений, несовместимых с JSON
+    """
+    if isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return None  # или 0, в зависимости от бизнес-логики
+        return obj
+    elif isinstance(obj, Decimal):
+        return float(obj)
+    elif isinstance(obj, (list, tuple)):
+        return [convert_float_values(item) for item in obj]
+    elif isinstance(obj, dict):
+        return {key: convert_float_values(value) for key, value in obj.items()}
+    elif isinstance(obj, (date, datetime)):
+        return obj.isoformat()
+    return obj
+
+def safe_float_conversion(value: Any) -> Optional[float]:
+    """
+    Безопасное преобразование в float с обработкой особых случаев
+    """
+    if value is None:
+        return None
+    
+    if isinstance(value, float):
+        if math.isnan(value) or math.isinf(value):
+            return None
+        return value
+    
+    if isinstance(value, Decimal):
+        numeric_value = float(value)
+        if math.isnan(numeric_value) or math.isinf(numeric_value):
+            return None
+        return numeric_value
+    
+    try:
+        numeric_value = float(value)
+        if math.isnan(numeric_value) or math.isinf(numeric_value):
+            return None
+        return numeric_value
+    except (TypeError, ValueError):
+        return None
 
 async def get_user_report(
     user_id: int,
@@ -176,6 +223,18 @@ async def get_user_report(
                 # Преобразование дат в строки для JSON
                 if isinstance(value, (date, datetime)):
                     record[col] = value.isoformat()
+                elif col in ["total_usage_seconds", "total_movements", "usage_hours"]:
+                    # Целочисленные поля - конвертируем в int, если возможно
+                    if value is not None:
+                        try:
+                            record[col] = int(float(value)) if value != '' else None
+                        except (ValueError, TypeError):
+                            record[col] = None
+                    else:
+                        record[col] = None
+                elif col in ["avg_sensor_value", "min_sensor_value", "max_sensor_value"]:
+                    # Поля с плавающей точкой - безопасное преобразование
+                    record[col] = safe_float_conversion(value)
                 else:
                     record[col] = value
             data.append(record)
@@ -195,27 +254,41 @@ async def get_user_report(
                 AND date >= %(date_from)s 
                 AND date <= %(date_to)s
         """
-        
+
         result_summary = client.execute(
             query_summary,
             {
                 "user_id": user_id,
-                "date_from": date_from,
-                "date_to": date_to
+                "date_from": date_from.isoformat(),
+                "date_to": date_to.isoformat()
             }
         )
-        
+
         summary_columns = [
             "total_usage_seconds", "total_movements", "avg_sensor_value",
             "min_sensor_value", "max_sensor_value", "total_usage_hours",
             "days_count"
         ]
-        
+
         summary = {}
         if result_summary and result_summary[0]:
             for i, col in enumerate(summary_columns):
                 value = result_summary[0][i]
-                summary[col] = float(value) if value is not None else 0
+                if col in ["total_usage_seconds", "total_movements", "total_usage_hours", "days_count"]:
+                    # Для целочисленных метрик
+                    if value is not None:
+                        try:
+                            summary[col] = int(float(value)) if value != '' else 0
+                        except (ValueError, TypeError):
+                            summary[col] = 0
+                    else:
+                        summary[col] = 0
+                elif col in ["avg_sensor_value", "min_sensor_value", "max_sensor_value"]:
+                    # Для значений с плавающей точкой
+                    converted_value = safe_float_conversion(value)
+                    summary[col] = converted_value if converted_value is not None else 0
+                else:
+                    summary[col] = value
         
         # Дополнительная проверка: убеждаемся, что данные действительно принадлежат пользователю
         # Проверяем, есть ли данные для этого пользователя
@@ -226,16 +299,7 @@ async def get_user_report(
                 AND date >= %(date_from)s 
                 AND date <= %(date_to)s
         """
-        
-        result_check = client.execute(
-            query_check_user,
-            {
-                "user_id": user_id,
-                "date_from": date_from,
-                "date_to": date_to
-            }
-        )
-        
+
         # Если данных нет, это нормально (может быть пустой период)
         # Но если есть данные, убеждаемся, что они принадлежат правильному пользователю
         
@@ -254,21 +318,41 @@ async def get_user_report(
         last_processed_time = None
         
         if result_last and result_last[0][0]:
-            last_processed_date = result_last[0][0]
-            last_processed_time = result_last[0][1]
+            last_processed_date_val = result_last[0][0]
+            last_processed_time_val = result_last[0][1]
+            
+            if isinstance(last_processed_date_val, (date, datetime)):
+                last_processed_date = last_processed_date_val.isoformat()
+            else:
+                last_processed_date = last_processed_date_val
+                
+            if isinstance(last_processed_time_val, (date, datetime)):
+                last_processed_time = last_processed_time_val.isoformat()
+            else:
+                last_processed_time = last_processed_time_val
         
-        return {
-            "user_id": user_id,
-            "date_from": date_from,
-            "date_to": date_to,
+        response_data = {
+            "user_id": int(user_id),
+            "date_from": date_from.isoformat(),
+            "date_to": date_to.isoformat(),
             "data": data,
             "summary": summary,
             "last_processed_date": last_processed_date,
             "last_processed_time": last_processed_time
         }
+        
+        # Финальная проверка на совместимость с JSON
+        try:
+            json.dumps(response_data, ensure_ascii=False)
+        except (ValueError, TypeError):
+            # Если все равно есть проблемы, применяем универсальное преобразование
+            response_data = convert_float_values(response_data)
+        
+        return response_data
     
     except HTTPException:
         # Пробрасываем HTTPException как есть (ошибки доступа)
         raise
     except Exception as e:
-        raise Exception(f"Ошибка при получении отчёта: {str(e)}")
+        raise RuntimeError(
+            f"Ошибка при получении отчёта: {str(e)}") from e

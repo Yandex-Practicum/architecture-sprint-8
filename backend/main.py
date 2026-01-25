@@ -33,8 +33,8 @@ app.add_middleware(
 class ReportResponse(BaseModel):
     """Модель ответа для отчёта"""
     user_id: int
-    date_from: date
-    date_to: date
+    date_from: str
+    date_to: str
     data: list[dict]
     summary: dict
     last_processed_date: Optional[date] = None
@@ -45,8 +45,8 @@ class ErrorResponse(BaseModel):
     """Модель ответа для ошибки"""
     error: str
     message: str
-    last_available_date: Optional[date] = None
-    last_processed_time: Optional[datetime] = None
+    last_available_date: Optional[str] = None
+    last_processed_time: Optional[str] = None
 
 
 @app.get("/")
@@ -128,14 +128,14 @@ async def get_reports(
             detail={
                 "error": "data_not_available",
                 "message": f"Данные за период {date_from} - {date_to} ещё не обработаны",
-                "last_available_date": availability.get("last_available_date"),
-                "last_processed_time": availability.get("last_processed_time")
+                "last_available_date": availability.get("last_available_date").isoformat(),
+                "last_processed_time": availability.get("last_processed_time").isoformat()
             }
         )
     
     # Валидация user_id из токена
     validate_user_id_from_token(current_user_id)
-    
+
     # Получение отчёта
     # Важно: current_user_id извлекается из токена и используется для фильтрации данных
     # Пользователь может запрашивать только свои отчёты
@@ -158,9 +158,7 @@ async def get_reports(
                     "returned_user_id": report["user_id"]
                 }
             )
-        
         return ReportResponse(**report)
-    
     except HTTPException:
         # Пробрасываем HTTPException как есть (ошибки доступа, валидации и т.д.)
         raise
@@ -168,7 +166,7 @@ async def get_reports(
         raise HTTPException(
             status_code=500,
             detail=f"Ошибка при получении отчёта: {str(e)}"
-        )
+        ) from e
 
 
 @app.get("/reports/availability")
@@ -240,7 +238,7 @@ async def check_reports_availability(
         raise HTTPException(
             status_code=500,
             detail=f"Ошибка при проверке доступности данных: {str(e)}"
-        )
+        ) from e
 
 
 if __name__ == "__main__":

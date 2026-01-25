@@ -25,6 +25,8 @@ async def verify_token(token: str) -> dict:
         HTTPException: Если токен невалиден
     """
     try:
+        # print("Token is ", token)
+
         # Проверка токена через Keycloak
         async with httpx.AsyncClient() as client:
             response = await client.get(
@@ -32,25 +34,22 @@ async def verify_token(token: str) -> dict:
                 headers={"Authorization": f"Bearer {token}"},
                 timeout=5.0
             )
-            
             if response.status_code != 200:
                 raise HTTPException(
                     status_code=401,
                     detail="Невалидный токен доступа"
                 )
-            
             return response.json()
-    
     except httpx.RequestError as e:
         raise HTTPException(
             status_code=503,
             detail=f"Ошибка подключения к Keycloak: {str(e)}"
-        )
+        ) from e
     except Exception as e:
         raise HTTPException(
             status_code=401,
             detail=f"Ошибка проверки токена: {str(e)}"
-        )
+        ) from e
 
 
 async def get_current_user_id(
@@ -82,24 +81,25 @@ async def get_current_user_id(
                 status_code=401,
                 detail="Неверный формат токена. Используйте: Bearer <token>"
             )
-    except ValueError:
+    except ValueError as e:
         raise HTTPException(
             status_code=401,
             detail="Неверный формат заголовка Authorization"
-        )
+        ) from e
     
     # Проверка токена через Keycloak userinfo endpoint
     user_info = await verify_token(token)
-    
-    # Извлечение user_id из user_info
+    # print("User info:", user_info)
+
+    # Извлечение crm_user_id из user_info
     # Keycloak возвращает 'sub' как ID пользователя, но может быть в формате UUID
     # Для упрощения, используем preferred_username или sub
-    # В реальном приложении user_id должен быть в токене или БД
+    # В реальном приложении crm_user_id должен быть в токене или БД
     
-    # Пытаемся получить user_id из preferred_username (если это число)
-    # или из кастомного claim 'user_id'
+    # Пытаемся получить crm_user_id из preferred_username (если это число)
+    # или из кастомного claim 'crm_user_id'
     user_id_str = (
-        user_info.get("user_id") or  # Кастомный claim
+        user_info.get("crm_user_id") or  # Кастомный claim
         user_info.get("preferred_username") or  # Username
         user_info.get("sub", "")  # Subject (обычно UUID)
     )
@@ -122,4 +122,4 @@ async def get_current_user_id(
         raise HTTPException(
             status_code=400,
             detail="Не удалось определить ID пользователя из токена. Убедитесь, что токен содержит user_id или preferred_username"
-        )
+        ) from e

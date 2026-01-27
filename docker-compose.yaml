@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   keycloak_db:
@@ -20,7 +20,7 @@ services:
       KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
       KC_DB_USERNAME: keycloak_user
       KC_DB_PASSWORD: keycloak_password
-    command: 
+    command:
       - start-dev
       - --import-realm
     volumes:
@@ -40,3 +40,143 @@ services:
       REACT_APP_KEYCLOAK_URL: http://localhost:8080
       REACT_APP_KEYCLOAK_REALM: reports-realm
       REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    environment:
+      CLICKHOUSE_DB: reports_db
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: default
+  crm_db:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: crm_db
+      POSTGRES_USER: crm_user
+      POSTGRES_PASSWORD: crm_password
+    volumes:
+      - ./postgres-crm-data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+  telemetry_db:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: telemetry_db
+      POSTGRES_USER: telemetry_user
+      POSTGRES_PASSWORD: telemetry_password
+    volumes:
+      - ./postgres-telemetry-data:/var/lib/postgresql/data
+    ports:
+      - "5435:5432"
+  airflow-init:
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    environment:
+      _AIRFLOW_DB_MIGRATE: "true"
+      _AIRFLOW_WWW_USER_CREATE: "true"
+      _AIRFLOW_WWW_USER_USERNAME: admin
+      _AIRFLOW_WWW_USER_PASSWORD: admin
+      _AIRFLOW_WWW_USER_EMAIL: admin@example.com
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+    command: bash -c "airflow db init && airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com || true"
+  airflow-webserver:
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8080"
+    environment:
+      _AIRFLOW_DB_UPGRADE: "true"
+      _AIRFLOW_WWW_USER_CREATE: "true"
+      _AIRFLOW_WWW_USER_USERNAME: admin
+      _AIRFLOW_WWW_USER_PASSWORD: admin
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
+      CRM_DB_HOST: crm_db
+      CRM_DB_PORT: 5432
+      CRM_DB_NAME: crm_db
+      CRM_DB_USER: crm_user
+      CRM_DB_PASSWORD: crm_password
+      TELEMETRY_DB_HOST: telemetry_db
+      TELEMETRY_DB_PORT: 5432
+      TELEMETRY_DB_NAME: telemetry_db
+      TELEMETRY_DB_USER: telemetry_user
+      TELEMETRY_DB_PASSWORD: telemetry_password
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: 9000
+      CLICKHOUSE_DB: reports_db
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: default
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+    depends_on:
+      - airflow-init
+      - airflow-db
+    command: webserver
+  airflow-scheduler:
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    environment:
+      _AIRFLOW_DB_UPGRADE: "true"
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
+      CRM_DB_HOST: crm_db
+      CRM_DB_PORT: 5432
+      CRM_DB_NAME: crm_db
+      CRM_DB_USER: crm_user
+      CRM_DB_PASSWORD: crm_password
+      TELEMETRY_DB_HOST: telemetry_db
+      TELEMETRY_DB_PORT: 5432
+      TELEMETRY_DB_NAME: telemetry_db
+      TELEMETRY_DB_USER: telemetry_user
+      TELEMETRY_DB_PASSWORD: telemetry_password
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: 9000
+      CLICKHOUSE_DB: reports_db
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: default
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+    depends_on:
+      - airflow-init
+      - airflow-db
+    command: scheduler
+  airflow-db:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: airflow
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+    volumes:
+      - ./postgres-airflow-data:/var/lib/postgresql/data
+    ports:
+      - "5436:5432"
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: 9000
+      CLICKHOUSE_DB: reports_db
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: default
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: reports-realm
+    depends_on:
+      - clickhouse
+      - keycloak
+
+volumes:
+  clickhouse_data:

@@ -20,6 +20,7 @@ services:
       KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
       KC_DB_USERNAME: keycloak_user
       KC_DB_PASSWORD: keycloak_password
+      KC_HEAP_OPTS: -Xmx1024m -Xms512m
     command: 
       - start-dev
       - --import-realm

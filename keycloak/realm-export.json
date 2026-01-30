@@ -1,6 +1,7 @@
 {
     "realm": "reports-realm",
     "enabled": true,
+    "sslRequired": "none",
     "roles": {
       "realm": [
         {
@@ -123,7 +124,16 @@
         "enabled": true,
         "clientAuthenticatorType": "client-secret",
         "secret": "oNwoLQdvJAvRcL89SydqCWCe5ry1jMgq", 
-        "bearerOnly": true
+        "bearerOnly": false,
+        "redirectUris": ["http://localhost:8081/auth/callback"],
+        "webOrigins": ["http://localhost:8081"],
+        "attributes": {
+          "access.token.lifespan": "120",
+          "sso.session.idle.timeout": "1800",
+          "sso.session.max.lifespan": "36000",
+          "offline.session.idle.timeout": "2592000",
+          "offline.session.max.lifespan": "5184000"
+        }
       }
     ]
   }

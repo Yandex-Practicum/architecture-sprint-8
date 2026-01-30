@@ -21,6 +21,10 @@ services:
       KC_DB_USERNAME: keycloak_user
       KC_DB_PASSWORD: keycloak_password
       KC_HEAP_OPTS: -Xmx1024m -Xms512m
+      KC_HOSTNAME_STRICT_HTTPS: false
+      KC_HTTP_ENABLED: true
+      KC_HOSTNAME_STRICT: false
+      KC_SSL_REQUIRED: none
     command: 
       - start-dev
       - --import-realm
@@ -37,7 +41,25 @@ services:
     ports:
       - "3000:3000"
     environment:
-      REACT_APP_API_URL: http://localhost:8000
-      REACT_APP_KEYCLOAK_URL: http://localhost:8080
-      REACT_APP_KEYCLOAK_REALM: reports-realm
-      REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+      REACT_APP_API_URL: http://localhost:8081
+  bionicpro-auth:
+    build:
+      context: ./backend/bionicpro-auth
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+      - keycloak
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+  redis-insight:
+    image: redislabs/redisinsight:latest
+    ports:
+      - "8001:5540"
+    depends_on:
+      - redis
+    environment:
+      - RIHOSTS=local:redis:6379

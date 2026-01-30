@@ -1,27 +1,65 @@
-import React, { useState } from 'react';
-import { useKeycloak } from '@react-keycloak/web';
+import React, { useState, useEffect } from 'react';
 
 const ReportPage: React.FC = () => {
-  const { keycloak, initialized } = useKeycloak();
+  const [authenticated, setAuthenticated] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const downloadReport = async () => {
-    if (!keycloak?.token) {
-      setError('Not authenticated');
-      return;
-    }
+  useEffect(() => {
+    checkAuthStatus();
+  }, []);
 
+  const checkAuthStatus = async () => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/protected`, {
+        credentials: 'include'
+      });
+      if (response.ok) {
+        setAuthenticated(true);
+      } else {
+        setAuthenticated(false);
+      }
+    } catch (err) {
+      setAuthenticated(false);
+    }
+  };
+
+  const login = () => {
+    window.location.href = `${process.env.REACT_APP_API_URL}/auth/login`;
+  };
+
+  const logout = async () => {
+    try {
+      await fetch(`${process.env.REACT_APP_API_URL}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      setAuthenticated(false);
+    } catch (err) {
+      console.error('Logout failed:', err);
+    }
+  };
+
+  const downloadReport = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/reports`, {
-        headers: {
-          'Authorization': `Bearer ${keycloak.token}`
-        }
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/reports`, {
+        credentials: 'include'
       });
 
+      if (!response.ok) {
+        if (response.status === 401) {
+          setAuthenticated(false);
+          throw new Error('Session expired. Please login again.');
+        }
+        throw new Error('Failed to download report');
+      }
+
+      const data = await response.json();
+      console.log('Reports:', data);
+      // Handle report data
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -30,19 +68,19 @@ const ReportPage: React.FC = () => {
     }
   };
 
-  if (!initialized) {
-    return <div>Loading...</div>;
-  }
-
-  if (!keycloak.authenticated) {
+  if (!authenticated) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
-        <button
-          onClick={() => keycloak.login()}
-          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-        >
-          Login
-        </button>
+        <div className="p-8 bg-white rounded-lg shadow-md">
+          <h1 className="text-2xl font-bold mb-6">BionicPRO Reports</h1>
+          <p className="mb-4 text-gray-600">Please login to access reports</p>
+          <button
+            onClick={login}
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            Login
+          </button>
+        </div>
       </div>
     );
   }
@@ -50,23 +88,23 @@ const ReportPage: React.FC = () => {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
       <div className="p-8 bg-white rounded-lg shadow-md">
-        <h1 className="text-2xl font-bold mb-6">Usage Reports</h1>
-        
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold">Usage Reports</h1>
+          <button
+            onClick={logout}
+            className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+          >
+            Logout
+          </button>
+        </div>
         <button
           onClick={downloadReport}
           disabled={loading}
-          className={`px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 ${
-            loading ? 'opacity-50 cursor-not-allowed' : ''
-          }`}
+          className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50"
         >
-          {loading ? 'Generating Report...' : 'Download Report'}
+          {loading ? 'Loading...' : 'Download Report'}
         </button>
-
-        {error && (
-          <div className="mt-4 p-4 bg-red-100 text-red-700 rounded">
-            {error}
-          </div>
-        )}
+        {error && <p className="text-red-500 mt-4">{error}</p>}
       </div>
     </div>
   );

@@ -36,15 +36,3 @@ COMMENT ON COLUMN devices.device_type IS 'тип: верхняя_конечно�
 
 CREATE INDEX IF NOT EXISTS idx_devices_client_id ON devices(client_id);
 CREATE INDEX IF NOT EXISTS idx_devices_serial_number ON devices(serial_number);
-
--- Вставляем тестовые данные (опционально)
-INSERT INTO clients (external_client_id, first_name, last_name, email, phone, date_of_birth) VALUES
-('client_001', 'Иван', 'Петров', 'ivan.petrov@example.com', '+79161234567', '1985-05-15'),
-('client_002', 'Мария', 'Сидорова', 'maria.sidorova@example.com', '+79167654321', '1990-08-22')
-ON CONFLICT (email) DO NOTHING;
-
-INSERT INTO devices (device_id, client_id, device_name, device_type, serial_number, manufacturing_date) VALUES
-('device_001', 1, 'Мой протез руки', 'верхняя_конечность', 'SN-ARM-001', '2023-01-15'),
-('device_002', 1, 'Запасной протез', 'верхняя_конечность', 'SN-ARM-002', '2023-06-20'),
-('device_003', 2, 'Протез ноги', 'нижняя_конечность', 'SN-LEG-001', '2023-03-10')
-ON CONFLICT (device_id) DO NOTHING;

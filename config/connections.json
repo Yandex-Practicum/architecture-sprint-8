@@ -1,0 +1,20 @@
+{
+    "crm_db_conn": {
+        "conn_type": "postgres",
+        "host": "crm-db",
+        "port": 5432,
+        "schema": "crm_db",
+        "login": "crm_user",
+        "password": "crm_password123",
+        "extra": null
+    },
+    "telemetry_db_conn": {
+        "conn_type": "postgres",
+        "host": "telemetry-db",
+        "port": 5432,
+        "schema": "telemetry_db",
+        "login": "telemetry_user",
+        "password": "telemetry_password123",
+        "extra": null
+    }
+}

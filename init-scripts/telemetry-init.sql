@@ -22,10 +22,3 @@ COMMENT ON COLUMN device_telemetry.error_code IS 'Код ошибки устро
 
 CREATE INDEX IF NOT EXISTS idx_telemetry_device_timestamp ON device_telemetry(device_id, timestamp);
 CREATE INDEX IF NOT EXISTS idx_telemetry_timestamp ON device_telemetry(timestamp);
-
--- Вставляем тестовые данные телеметрии (опционально)
-INSERT INTO device_telemetry (device_id, battery_level, temperature, pressure_sensor_reading, flexion_angle, step_count, accelerometer_x, accelerometer_y, accelerometer_z) VALUES
-('device_001', 85.5, 28.5, 12.3456, 45.2, 0, 0.1234, -0.9876, 0.5432),
-('device_001', 84.2, 29.1, 11.8765, 42.1, 0, 0.2345, -0.8765, 0.6543),
-('device_003', 92.0, 26.8, 15.4321, 15.5, 125, 0.8765, 0.1234, -0.2345),
-('device_002', 78.3, 30.2, 10.5678, 38.7, 0, 0.3456, -0.7654, 0.7654);

@@ -1,0 +1,27 @@
+{
+    "client_external_id": "client_001",
+    "client_name": "Алексей Иванов",
+    "email": "client_001@example.com",
+    "total_devices": 1,
+    "reports": [
+        {
+            "period_date": "2026-01-31",
+            "device_id": "device_001",
+            "device_name": "Основной протез",
+            "device_type": "кисть",
+            "telemetry_count": 6,
+            "avg_battery_level": 91.04000091552734,
+            "min_battery_level": 83.16999816894531,
+            "max_battery_level": 98.27999877929688,
+            "avg_temperature": 29.373332977294922,
+            "max_temperature": 34.349998474121094,
+            "total_steps": 0,
+            "error_count": 0,
+            "active_hours": 3,
+            "device_health": 100.0
+        }
+    ],
+    "period_start": "2026-01-25",
+    "period_end": "2026-01-31",
+    "generated_at": "2026-02-01T14:28:30.196697"
+}

@@ -1,0 +1,22 @@
+FROM apache/airflow:2.8.1
+
+USER root
+
+RUN apt-get update && \
+    apt-get install -y \
+    gcc \
+    python3-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+USER airflow
+
+RUN pip install --no-cache-dir \
+    apache-airflow-providers-postgres \
+    apache-airflow-providers-common-sql \
+    psycopg2-binary \
+    clickhouse-driver \
+    clickhouse-sqlalchemy
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt

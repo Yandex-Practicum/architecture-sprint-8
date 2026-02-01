@@ -1,53 +1,6 @@
 version: '3.8'
 
 services:
-  keycloak_db:
-    image: postgres:14
-    environment:
-      POSTGRES_DB: keycloak_db
-      POSTGRES_USER: keycloak_user
-      POSTGRES_PASSWORD: keycloak_password
-    volumes:
-      - ./postgres-keycloak-data:/var/lib/postgresql/data
-    ports:
-      - "5433:5432"
-    networks:
-      - prosthetics-network
-  keycloak:
-    image: quay.io/keycloak/keycloak:21.1
-    environment:
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
-      KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
-      KC_DB_USERNAME: keycloak_user
-      KC_DB_PASSWORD: keycloak_password
-    command: 
-      - start-dev
-      - --import-realm
-    volumes:
-      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
-    ports:
-      - "8081:8080"
-    depends_on:
-      - keycloak_db
-    networks:
-      - prosthetics-network
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
-    environment:
-      REACT_APP_API_URL: http://localhost:8000
-      REACT_APP_KEYCLOAK_URL: http://localhost:8081
-      REACT_APP_KEYCLOAK_REALM: reports-realm
-      REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
-    networks:
-      - prosthetics-network
-
   # Airflow Metadata Database
   airflow-db:
     image: postgres:16.0
@@ -77,11 +30,9 @@ services:
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
       AIRFLOW__WEBSERVER__SECRET_KEY: 'your_airflow_webserver_sec_key'
-      AIRFLOW__CORE__LOAD_DEFAULT_CONNECTIONS: 'true'
     volumes:
       - ./dags:/opt/airflow/dags
       - ./requirements.txt:/opt/airflow/requirements.txt
-      - ./config/connections.json:/opt/airflow/connections.json
     ports:
       - "8080:8080"
     depends_on:
@@ -104,11 +55,9 @@ services:
       AIRFLOW__CORE__FERNET_KEY: ''
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
-      AIRFLOW__CORE__LOAD_DEFAULT_CONNECTIONS: 'true'
     volumes:
       - ./dags:/opt/airflow/dags
       - ./requirements.txt:/opt/airflow/requirements.txt
-      - ./config/connections.json:/opt/airflow/connections.json
     depends_on:
       airflow-db:
         condition: service_healthy
@@ -129,7 +78,6 @@ services:
       AIRFLOW__CORE__FERNET_KEY: ''
     volumes:
       - ./dags:/opt/airflow/dags
-      - ./config/connections.json:/opt/airflow/connections.json
     depends_on:
       airflow-db:
         condition: service_healthy
@@ -140,9 +88,7 @@ services:
       --lastname User
       --role Admin
       --email admin@prosthetics.ru
-      --password admin &&
-      airflow connections import /opt/airflow/connections.json
-      "
+      --password admin"
     networks:
       - prosthetics-network
 
@@ -230,7 +176,6 @@ services:
         condition: service_healthy
     networks:
       - prosthetics-network
-
 
 volumes:
   airflow_postgres_data:

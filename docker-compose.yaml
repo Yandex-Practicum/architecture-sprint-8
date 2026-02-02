@@ -11,6 +11,11 @@ services:
       - ./postgres-keycloak-data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak_user -d keycloak_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - prosthetics-network
   keycloak:
@@ -22,15 +27,19 @@ services:
       KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
       KC_DB_USERNAME: keycloak_user
       KC_DB_PASSWORD: keycloak_password
+      KC_IMPORT: /opt/keycloak/data/import/realm-export.json
+      KC_FEATURES: preview
     command: 
       - start-dev
+      - --features=preview
       - --import-realm
     volumes:
       - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
     ports:
       - "8081:8080"
     depends_on:
-      - keycloak_db
+      keycloak_db:
+        condition: service_healthy
     networks:
       - prosthetics-network
 
@@ -39,7 +48,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "3001:3000"
     environment:
       REACT_APP_API_URL: http://localhost:8000
       REACT_APP_KEYCLOAK_URL: http://localhost:8081
@@ -83,7 +92,7 @@ services:
       - ./requirements.txt:/opt/airflow/requirements.txt
       - ./config/connections.json:/opt/airflow/connections.json
     ports:
-      - "8080:8080"
+      - "8082:8080"
     depends_on:
       airflow-db:
         condition: service_healthy

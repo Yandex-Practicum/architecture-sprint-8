@@ -12,6 +12,7 @@
         "description": "Administrator role"
       },
       {
+        "id": "prothetic-user-role-id",
         "name": "prothetic_user",
         "description": "Prothetic user role with report access"
       }
@@ -31,9 +32,7 @@
           "temporary": false
         }
       ],
-      "realmRoles": [
-        "user"
-      ]
+      "realmRoles": ["user"]
     },
     {
       "username": "user2",
@@ -48,9 +47,7 @@
           "temporary": false
         }
       ],
-      "realmRoles": [
-        "user"
-      ]
+      "realmRoles": ["user"]
     },
     {
       "username": "admin1",
@@ -65,9 +62,7 @@
           "temporary": false
         }
       ],
-      "realmRoles": [
-        "administrator"
-      ]
+      "realmRoles": ["administrator"]
     },
     {
       "username": "prothetic1",
@@ -82,9 +77,7 @@
           "temporary": false
         }
       ],
-      "realmRoles": [
-        "prothetic_user"
-      ]
+      "realmRoles": ["prothetic_user"]
     },
     {
       "username": "prothetic2",
@@ -99,9 +92,7 @@
           "temporary": false
         }
       ],
-      "realmRoles": [
-        "prothetic_user"
-      ]
+      "realmRoles": ["prothetic_user"]
     },
     {
       "username": "prothetic3",
@@ -116,9 +107,82 @@
           "temporary": false
         }
       ],
-      "realmRoles": [
-        "prothetic_user"
-      ]
+      "realmRoles": ["prothetic_user"]
+    },
+    {
+      "username": "client_001",
+      "enabled": true,
+      "email": "client_001@example.com",
+      "firstName": "Client",
+      "lastName": "One",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "client123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["prothetic_user"]
+    },
+    {
+      "username": "client_002",
+      "enabled": true,
+      "email": "client_002@example.com",
+      "firstName": "Client",
+      "lastName": "Two",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "client123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["prothetic_user"]
+    },
+    {
+      "username": "client_003",
+      "enabled": true,
+      "email": "client_003@example.com",
+      "firstName": "Client",
+      "lastName": "Three",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "client123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["prothetic_user"]
+    },
+    {
+      "username": "client_004",
+      "enabled": true,
+      "email": "client_004@example.com",
+      "firstName": "Client",
+      "lastName": "Four",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "client123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["prothetic_user"]
+    },
+    {
+      "username": "client_005",
+      "enabled": true,
+      "email": "client_005@example.com",
+      "firstName": "Client",
+      "lastName": "Five",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "client123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["prothetic_user"]
     }
   ],
   "clients": [
@@ -126,12 +190,8 @@
       "clientId": "reports-frontend",
       "enabled": true,
       "publicClient": true,
-      "redirectUris": [
-        "http://localhost:3000/*"
-      ],
-      "webOrigins": [
-        "http://localhost:3000"
-      ],
+      "redirectUris": ["http://localhost:3001/*"],
+      "webOrigins": ["http://localhost:3001"],
       "standardFlowEnabled": true,
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
@@ -151,7 +211,32 @@
       "enabled": true,
       "clientAuthenticatorType": "client-secret",
       "secret": "oNwoLQdvJAvRcL89SydqCWCe5ry1jMgq",
-      "bearerOnly": true
+      "bearerOnly": true,
+      "authorizationSettings": {
+        "allowRemoteResourceManagement": false,
+        "policyEnforcementMode": "ENFORCING",
+        "resources": [
+          {
+            "name": "Reports Resource",
+            "type": "urn:reports-api:resources:reports",
+            "uris": ["/report*", "/reports*"],
+            "attributes": {},
+            "scopes": []
+          }
+        ],
+        "policies": [
+          {
+            "name": "Prothetic Users Only",
+            "type": "role",
+            "logic": "POSITIVE",
+            "decisionStrategy": "UNANIMOUS",
+            "config": {
+              "roles": "[ {\"id\":\"prothetic-user-role-id\"} ]"
+            }
+          }
+        ],
+        "scopes": []
+      }
     }
   ]
 }

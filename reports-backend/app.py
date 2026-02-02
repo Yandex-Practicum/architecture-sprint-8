@@ -1,15 +1,26 @@
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from datetime import date, datetime, timedelta
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
 from clickhouse_driver import Client
 import os
+import jwt
+from fastapi.middleware.cors import CORSMiddleware
 
 # FastAPI app
 app = FastAPI(
     title="Prosthetics Reports API",
     description="API for accessing prosthetics reports from ClickHouse",
     version="1.2.0"
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins – change in production!
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods (GET, POST, OPTIONS, etc.)
+    allow_headers=["*"],  # Allows all headers (Authorization, Content-Type, etc.)
 )
 
 # ClickHouse connection settings
@@ -62,6 +73,33 @@ def get_clickhouse_client():
         settings={'use_numpy': False}
     )
 
+# --- Security: Verify that username in token matches client_id ---
+def verify_access_token(request: Request):
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
+
+    token = auth_header.split(" ")[1]
+    try:
+        # Decode without verification (we trust Keycloak issued it)
+        # In production, use public key to verify signature
+        payload = jwt.decode(token, options={"verify_signature": False})
+        return payload
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+def verify_client_access(request: Request, client_id: str):
+    payload = verify_access_token(request)
+    username = payload.get("preferred_username")  # or "sub" if you prefer
+    if not username:
+        raise HTTPException(status_code=401, detail="Token does not contain username")
+
+    if username != client_id:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Access denied: you can only access your own data (expected client_id={username})"
+        )
+
 def calculate_device_health(report: dict) -> float:
     """Calculate device health score based on various metrics"""
     health_score = 100.0
@@ -104,50 +142,36 @@ def safe_query_execute(client: Client, query: str, params: dict = None):
     
     return client.execute(query)
 
-@app.get("/reports", response_model=ClientReport, responses={
+@app.get("/report", response_model=ClientReport, responses={
     404: {"model": ErrorResponse, "description": "Client not found or no data available"},
     400: {"model": ErrorResponse, "description": "Invalid parameters"},
     500: {"model": ErrorResponse, "description": "Internal server error"}
 })
-async def get_reports(
+async def get_report(
+    request: Request,
     client_id: str = Query(..., description="External client ID (e.g., 'client_001')"),
-    start_date: Optional[date] = Query(None, description="Start date (YYYY-MM-DD). Defaults to 7 days ago"),
-    end_date: Optional[date] = Query(None, description="End date (YYYY-MM-DD). Defaults to yesterday"),
+    report_date: date = Query(..., description="Report date (YYYY-MM-DD)"),
     device_id: Optional[str] = Query(None, description="Filter by specific device ID"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of records to return")
 ):
     """
-    Get reports for a specific client from ClickHouse.
+    Get report for a specific client and date from ClickHouse.
     
-    Only returns data for periods that have been fully processed by ETL.
-    By default, returns data from the last 7 days up to yesterday.
+    Returns data only for the specified date if available.
     """
+    verify_client_access(request, client_id) 
     try:
-        # Set default date range if not provided
-        if end_date is None:
-            end_date = date.today() - timedelta(days=1)  # Yesterday
-        
-        if start_date is None:
-            start_date = end_date - timedelta(days=6)  # Last 7 days
-        
-        # Validate dates
-        if start_date > end_date:
+        # Validate date - allow today, but block future dates
+        if report_date > date.today():
             raise HTTPException(
                 status_code=400,
-                detail="start_date must be before or equal to end_date"
-            )
-        
-        if end_date >= date.today():
-            raise HTTPException(
-                status_code=400,
-                detail="end_date must be before today (data only available for fully processed days)"
+                detail="report_date cannot be in the future"
             )
         
         # Connect to ClickHouse
         ch_client = get_clickhouse_client()
         
         # 1. First, check if client exists and get basic info
-        # Using manual parameter replacement for ClickHouse
         client_query = """
         SELECT 
             external_client_id,
@@ -171,7 +195,6 @@ async def get_reports(
         external_client_id, client_name, email = client_result[0]
         
         # 2. Count total active devices for this client
-        # First get the client_id from clients_dimension
         get_client_id_query = """
         SELECT client_id 
         FROM clients_dimension 
@@ -200,8 +223,7 @@ async def get_reports(
         device_count_result = safe_query_execute(ch_client, device_count_query, {'internal_client_id': internal_client_id})
         total_devices = device_count_result[0][0] if device_count_result else 0
         
-        # 3. Get the report data from the daily mart table
-        # Build the query with manual parameter replacement
+        # 3. Get the report data from the daily mart table for the specific date
         report_query = """
         SELECT 
             external_client_id,
@@ -231,27 +253,32 @@ async def get_reports(
             last_telemetry_time
         FROM client_telemetry_daily_mart
         WHERE external_client_id = :client_id
-            AND period_date BETWEEN :start_date AND :end_date
+            AND period_date = :report_date
         """
         
-        # Prepare parameters dictionary
+        # Add device filter if provided
         params = {
             'client_id': client_id,
-            'start_date': start_date,
-            'end_date': end_date
+            'report_date': report_date
         }
         
-        # Add device filter if provided
         if device_id:
             report_query += " AND device_id = :device_id"
             params['device_id'] = device_id
         
-        report_query += " ORDER BY period_date DESC, device_id"
+        report_query += " ORDER BY device_id"
         report_query += " LIMIT :limit"
         params['limit'] = limit
         
-        # Execute the query with manual parameter replacement
+        # Execute the query
         report_data = safe_query_execute(ch_client, report_query, params)
+        
+        # Check if we have data for this date
+        if not report_data:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No data available for client '{client_id}' on date {report_date}"
+            )
         
         # 4. Format the response
         reports = []
@@ -315,8 +342,8 @@ async def get_reports(
             email=email,
             total_devices=total_devices,
             reports=reports,
-            period_start=start_date,
-            period_end=end_date,
+            period_start=report_date,
+            period_end=report_date,
             generated_at=datetime.now()
         )
         
@@ -325,7 +352,7 @@ async def get_reports(
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Error retrieving reports: {str(e)}"
+            detail=f"Error retrieving report: {str(e)}"
         )
 
 @app.get("/health")

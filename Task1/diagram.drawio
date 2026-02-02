@@ -1,0 +1,152 @@
+<mxfile host="app.diagrams.net" modified="2025-02-02T12:00:00.000Z" agent="BionicPRO" version="22.0.0" etag="c4-auth" type="device">
+  <diagram name="C4 - Управление учётными данными" id="c4-identity">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- BionicPRO system boundary (dashed) -->
+        <mxCell id="bionicpro-boundary" value="BionicPRO [Software System]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;dashed=1;strokeWidth=2;fontStyle=1;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="320" y="200" width="960" height="720" as="geometry"/>
+        </mxCell>
+
+        <!-- Title -->
+        <mxCell id="title" value="C4: Управление учётными данными BionicPRO&#xa;(унификация доступа, безопасные токены, мульти-IdP)" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontStyle=1;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="520" y="40" width="560" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- Persons -->
+        <mxCell id="person-buyer" value="Покупатель&#xa;протеза" style="shape=umlLollipop;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="80" y="280" width="80" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="person-pilot" value="Пилот&#xa;протеза" style="shape=umlLollipop;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="80" y="400" width="80" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="person-operator" value="Оператор&#xa;производства" style="shape=umlLollipop;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="80" y="520" width="80" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="person-ml" value="ML-инженер" style="shape=umlLollipop;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="80" y="640" width="80" height="80" as="geometry"/>
+        </mxCell>
+
+        <!-- External: Identity Source (country of representation) -->
+        <mxCell id="ext-identity-source" value="Внешний источник&#xa;учётных записей&#xa;(страна представительства)&#xa;[Software System]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1320" y="320" width="220" height="100" as="geometry"/>
+        </mxCell>
+
+        <!-- External IdPs -->
+        <mxCell id="ext-idp1" value="IdP Страна A&#xa;[External IdP]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="1320" y="520" width="140" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="ext-idp2" value="IdP Страна B&#xa;[External IdP]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="1320" y="600" width="140" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="ext-idp3" value="IdP Страна N&#xa;[External IdP]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="1320" y="680" width="140" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- Inside BionicPRO: Auth Gateway -->
+        <mxCell id="auth-gateway" value="Auth Gateway&#xa;[Container]&#xa;Обмен code→токены IdP на бэкенде;&#xa;запрос учётных данных;&#xa;выдача сессий (cookie/opaque token)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="440" y="280" width="320" height="100" as="geometry"/>
+        </mxCell>
+
+        <!-- Inside BionicPRO: Frontend / Web -->
+        <mxCell id="frontend" value="Фронтенд&#xa;(веб/мобильные клиенты)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="440" y="440" width="180" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- Inside BionicPRO: API -->
+        <mxCell id="api" value="API&#xa;[Container]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="440" y="540" width="140" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- Inside BionicPRO: CRM, Online Store -->
+        <mxCell id="crm" value="CRM [Bitrix24]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="660" y="440" width="120" height="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="store" value="Интернет-магазин&#xa;[Bitrix24]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="660" y="540" width="120" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- Inside BionicPRO: DB -->
+        <mxCell id="db" value="База данных&#xa;(персональные/&#xa;медицинские данные)" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=10;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="440" y="660" width="140" height="80" as="geometry"/>
+        </mxCell>
+
+        <!-- Inside BionicPRO: CLI -->
+        <mxCell id="cli" value="CLI tool" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="660" y="660" width="100" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- Legend: Token flow -->
+        <mxCell id="legend-box" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="320" y="880" width="400" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="legend-text" value="Безопасность: фронтенд получает только сессию (cookie/opaque token).&#xa;Access/Refresh токены IdP остаются на Auth Gateway." style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="330" y="895" width="380" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- Edges: Persons -> Frontend/CRM/CLI -->
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="person-buyer" target="frontend">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="person-pilot" target="frontend">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="person-operator" target="crm">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="person-ml" target="cli">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Edge: Frontend -> Auth Gateway (login/session) -->
+        <mxCell id="e5" value="Вход / сессия&#xa;(без токенов IdP)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontStyle=2;strokeColor=#82b366;" edge="1" parent="1" source="frontend" target="auth-gateway">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Edge: Auth Gateway -> External Identity Source -->
+        <mxCell id="e6" value="Запрос учётных&#xa;данных" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#9673a6;" edge="1" parent="1" source="auth-gateway" target="ext-identity-source">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Edges: Auth Gateway <-> External IdPs -->
+        <mxCell id="e7" value="OAuth2/OIDC&#xa;(code, токены на бэкенде)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#b85450;" edge="1" parent="1" source="auth-gateway" target="ext-idp1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e8" value="OAuth2/OIDC" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#b85450;" edge="1" parent="1" source="auth-gateway" target="ext-idp2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e9" value="OAuth2/OIDC" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#b85450;" edge="1" parent="1" source="auth-gateway" target="ext-idp3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Edges: Frontend/CRM/Store -> API -->
+        <mxCell id="e10" value="Запросы с сессией" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="frontend" target="api">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="crm" target="api">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="store" target="api">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Edge: API -> DB -->
+        <mxCell id="e13" value="Локальные данные" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="api" target="db">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Edge: API <-> CLI -->
+        <mxCell id="e14" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="api" target="cli">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Edge: API validates session with Auth Gateway (optional note) -->
+        <mxCell id="e15" value="Проверка сессии" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;strokeColor=#82b366;" edge="1" parent="1" source="api" target="auth-gateway">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

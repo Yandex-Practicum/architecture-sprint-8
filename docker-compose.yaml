@@ -33,7 +33,19 @@ services:
     ports:
       - "8080:8080"
     depends_on:
+      - ldap
       - keycloak_db
+  ldap:
+    image: osixia/openldap:1.5.0
+    command: ["--copy-service"]
+    environment:
+      LDAP_ORGANISATION: "BionicPRO"
+      LDAP_DOMAIN: "example.com"
+      LDAP_ADMIN_PASSWORD: "admin"
+    volumes:
+      - ./ldap/config.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom.ldif:ro
+    ports:
+      - "389:389"
   frontend:
     build:
       context: ./frontend

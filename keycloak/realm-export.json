@@ -110,6 +110,119 @@
         "realmRoles": ["prothetic_user"]
       }
     ],
+    "components": {
+      "org.keycloak.storage.UserStorageProvider": [
+        {
+          "id": "ldap",
+          "name": "ldap",
+          "providerId": "ldap",
+          "subType": "org.keycloak.storage.UserStorageProvider",
+          "config": {
+            "enabled": ["true"],
+            "priority": ["0"],
+            "cachePolicy": ["DEFAULT"],
+            "fullSyncPeriod": ["-1"],
+            "changedSyncPeriod": ["-1"],
+            "batchSizeForSync": ["1000"],
+            "editMode": ["READ_ONLY"],
+            "syncRegistrations": ["false"],
+            "vendor": ["other"],
+            "usernameLDAPAttribute": ["uid"],
+            "rdnLDAPAttribute": ["uid"],
+            "uuidLDAPAttribute": ["entryUUID"],
+            "userObjectClasses": ["inetOrgPerson"],
+            "connectionUrl": ["ldap://ldap:389"],
+            "usersDn": ["ou=People,dc=example,dc=com"],
+            "authType": ["simple"],
+            "bindDn": ["cn=admin,dc=example,dc=com"],
+            "bindCredential": ["admin"],
+            "searchScope": ["2"],
+            "useTruststoreSpi": ["ldapsOnly"],
+            "pagination": ["true"],
+            "allowKerberosAuthentication": ["false"]
+          },
+          "subComponents": {
+            "org.keycloak.storage.ldap.mappers.LDAPStorageMapper": [
+              {
+                "id": "ldap-email-mapper",
+                "name": "ldap-email-mapper",
+                "providerId": "user-attribute-ldap-mapper",
+                "subType": "org.keycloak.storage.ldap.mappers.LDAPStorageMapper",
+                "config": {
+                  "user.model.attribute": ["email"],
+                  "ldap.attribute": ["mail"],
+                  "read.only": ["true"],
+                  "always.read.value.from.ldap": ["true"],
+                  "is.mandatory.in.ldap": ["false"]
+                },
+                "subComponents": {}
+              },
+              {
+                "id": "ldap-firstname-mapper",
+                "name": "ldap-firstname-mapper",
+                "providerId": "user-attribute-ldap-mapper",
+                "subType": "org.keycloak.storage.ldap.mappers.LDAPStorageMapper",
+                "config": {
+                  "user.model.attribute": ["firstName"],
+                  "ldap.attribute": ["cn"],
+                  "read.only": ["true"],
+                  "always.read.value.from.ldap": ["true"],
+                  "is.mandatory.in.ldap": ["false"]
+                },
+                "subComponents": {}
+              },
+              {
+                "id": "ldap-lastname-mapper",
+                "name": "ldap-lastname-mapper",
+                "providerId": "user-attribute-ldap-mapper",
+                "subType": "org.keycloak.storage.ldap.mappers.LDAPStorageMapper",
+                "config": {
+                  "user.model.attribute": ["lastName"],
+                  "ldap.attribute": ["sn"],
+                  "read.only": ["true"],
+                  "always.read.value.from.ldap": ["true"],
+                  "is.mandatory.in.ldap": ["false"]
+                },
+                "subComponents": {}
+              },
+              {
+                "id": "ldap-username-mapper",
+                "name": "ldap-username-mapper",
+                "providerId": "user-attribute-ldap-mapper",
+                "subType": "org.keycloak.storage.ldap.mappers.LDAPStorageMapper",
+                "config": {
+                  "user.model.attribute": ["username"],
+                  "ldap.attribute": ["uid"],
+                  "read.only": ["true"],
+                  "always.read.value.from.ldap": ["true"],
+                  "is.mandatory.in.ldap": ["true"]
+                },
+                "subComponents": {}
+              },
+              {
+                "id": "ldap-role-mapper",
+                "name": "ldap-role-mapper",
+                "providerId": "role-ldap-mapper",
+                "subType": "org.keycloak.storage.ldap.mappers.LDAPStorageMapper",
+                "config": {
+                  "roles.dn": ["ou=Groups,dc=example,dc=com"],
+                  "role.name.ldap.attribute": ["cn"],
+                  "role.object.classes": ["groupOfNames"],
+                  "membership.ldap.attribute": ["member"],
+                  "membership.attribute.type": ["DN"],
+                  "membership.user.ldap.attribute": ["uid"],
+                  "mode": ["READ_ONLY"],
+                  "use.realm.roles.mapping": ["true"],
+                  "client.id": [""],
+                  "user.roles.retrieve.strategy": ["LOAD_ROLES_BY_MEMBER_ATTRIBUTE"]
+                },
+                "subComponents": {}
+              }
+            ]
+          }
+        }
+      ]
+    },
     "clients": [
       {
         "clientId": "reports-frontend",

@@ -137,13 +137,15 @@ const ReportPage: React.FC = () => {
       <div className="p-8 bg-white rounded-lg shadow-md max-w-2xl w-full">
         <h1 className="text-2xl font-bold mb-6">Отчёты по использованию протеза</h1>
 
-        <button
-          onClick={getReport}
-          disabled={loading}
-          className="px-5 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-        >
-          {loading ? 'Загрузка отчёта…' : 'Получить отчёт'}
-        </button>
+        {!report && (
+          <button
+            onClick={getReport}
+            disabled={loading}
+            className="px-5 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+          >
+            {loading ? 'Загрузка отчёта…' : 'Получить отчёт'}
+          </button>
+        )}
 
         {error && (
           <div className="mt-4 p-4 bg-red-100 text-red-700 rounded-lg">

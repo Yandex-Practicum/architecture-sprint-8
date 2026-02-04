@@ -1,6 +1,17 @@
 version: '3.8'
 
 services:
+  olap_db:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: olap_reports
+      POSTGRES_USER: olap_user
+      POSTGRES_PASSWORD: olap_password
+    ports:
+      - "5434:5432"
+    volumes:
+      - ./Task2/airflow/sql/01_schema_olap.sql:/docker-entrypoint-initdb.d/01_schema.sql
+      - ./Task2/airflow/sql/03_seed_report_datamart.sql:/docker-entrypoint-initdb.d/03_seed.sql
   keycloak_db:
     image: postgres:14
     environment:
@@ -40,3 +51,5 @@ services:
       REACT_APP_KEYCLOAK_URL: http://localhost:8080
       REACT_APP_KEYCLOAK_REALM: reports-realm
       REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+    depends_on:
+      - keycloak

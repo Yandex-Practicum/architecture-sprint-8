@@ -1,0 +1,31 @@
+server:
+  port: ${SERVER_PORT:8000}
+
+spring:
+  application:
+    name: reports-api
+  datasource:
+    url: ${OLAP_DATASOURCE_URL:jdbc:postgresql://localhost:5434/olap_reports}
+    username: ${OLAP_DATASOURCE_USERNAME:olap_user}
+    password: ${OLAP_DATASOURCE_PASSWORD:olap_password}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      connection-timeout: 5000
+      maximum-pool-size: 10
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    open-in-view: false
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8080/realms/reports-realm}
+
+# Логирование
+logging:
+  level:
+    com.bionicpro: INFO
+    org.springframework.web: INFO

@@ -7,8 +7,6 @@ const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );
 
-root.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+// StrictMode в dev дважды монтирует компоненты — из-за этого страница может мигать.
+// Раскомментируйте StrictMode для проверки побочных эффектов.
+root.render(<App />);

@@ -1,0 +1,4 @@
+fastapi
+uvicorn
+clickhouse-driver
+PyJWT

@@ -1,0 +1,73 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36" version="29.3.0">
+  <diagram name="C4 Container - Identity and Reports" id="0">
+    <mxGraphModel dx="1273" dy="755" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="user" parent="1" style="shape=umlActor;" value="Пользователь" vertex="1">
+          <mxGeometry height="100" width="60" x="20" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="mobile" parent="1" style="rounded=1;whiteSpace=wrap;" value="Mobile App&#xa;iOS / Android" vertex="1">
+          <mxGeometry height="80" width="180" x="120" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="bff" parent="1" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;" value="BFF&#xa;Backend for Frontend&#xa;(OAuth2, Sessions, RBAC)" vertex="1">
+          <mxGeometry height="100" width="240" x="360" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="session" parent="1" style="shape=cylinder;whiteSpace=wrap;fillColor=#fff2cc;" value="Session Store&#xa;Redis" vertex="1">
+          <mxGeometry height="80" width="180" x="360" y="440" as="geometry" />
+        </mxCell>
+        <mxCell id="idp" parent="1" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;" value="Regional IdP&#xa;Keycloak" vertex="1">
+          <mxGeometry height="80" width="220" x="360" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="broker" parent="1" style="rounded=1;whiteSpace=wrap;fillColor=#f5f5f5;" value="Central Identity Broker&#xa;Keycloak Federation" vertex="1">
+          <mxGeometry height="80" width="260" x="640" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="api" parent="1" style="rounded=1;whiteSpace=wrap;" value="Core API&#xa;Business Logic" vertex="1">
+          <mxGeometry height="80" width="200" x="660" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="crm" parent="1" style="rounded=1;whiteSpace=wrap;" value="CRM" vertex="1">
+          <mxGeometry height="80" width="140" x="900" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="crmdb" parent="1" style="shape=cylinder;whiteSpace=wrap;" value="CRM DB&#xa;PostgreSQL / Oracle" vertex="1">
+          <mxGeometry height="80" width="180" x="900" y="420" as="geometry" />
+        </mxCell>
+        <mxCell id="report" parent="1" style="rounded=1;whiteSpace=wrap;fillColor=#e1d5e7;" value="Report Service&#xa;User Reports" vertex="1">
+          <mxGeometry height="80" width="220" x="660" y="500" as="geometry" />
+        </mxCell>
+        <mxCell id="ch" parent="1" style="shape=cylinder;whiteSpace=wrap;fillColor=#d5e8d4;" value="Analytics DB&#xa;ClickHouse" vertex="1">
+          <mxGeometry height="80" width="200" x="950" y="500" as="geometry" />
+        </mxCell>
+        <mxCell id="BOt2byIwOQ5kdMHRkujq-1" edge="1" parent="1" source="user" style="endArrow=block;" target="mobile">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="BOt2byIwOQ5kdMHRkujq-2" edge="1" parent="1" source="mobile" style="endArrow=block;" target="bff">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="BOt2byIwOQ5kdMHRkujq-3" edge="1" parent="1" source="bff" style="endArrow=block;" target="session">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="BOt2byIwOQ5kdMHRkujq-4" edge="1" parent="1" source="bff" style="endArrow=block;" target="idp">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="BOt2byIwOQ5kdMHRkujq-5" edge="1" parent="1" source="idp" style="endArrow=block;" target="broker">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="BOt2byIwOQ5kdMHRkujq-6" edge="1" parent="1" source="bff" style="endArrow=block;" target="api">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="BOt2byIwOQ5kdMHRkujq-7" edge="1" parent="1" source="api" style="endArrow=block;" target="crm">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="BOt2byIwOQ5kdMHRkujq-8" edge="1" parent="1" source="crm" style="endArrow=block;" target="crmdb">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="BOt2byIwOQ5kdMHRkujq-9" edge="1" parent="1" source="bff" style="endArrow=block;" target="report">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="BOt2byIwOQ5kdMHRkujq-10" edge="1" parent="1" source="report" style="endArrow=block;" target="ch">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

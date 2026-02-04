@@ -1,0 +1,71 @@
+<mxfile host="app.diagrams.net">
+    <diagram name="C4 Reports Architecture">
+        <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+
+                <!-- PERSON -->
+                <mxCell id="user" value="User&#10;Prosthesis Owner" style="shape=umlActor;" vertex="1" parent="1">
+                    <mxGeometry x="20" y="260" width="60" height="100" as="geometry"/>
+                </mxCell>
+
+                <!-- CLIENT -->
+                <mxCell id="mobile" value="Mobile App&#10;iOS / Android" style="rounded=1;whiteSpace=wrap;" vertex="1" parent="1">
+                    <mxGeometry x="120" y="260" width="180" height="80" as="geometry"/>
+                </mxCell>
+
+                <!-- REPORT API -->
+                <mxCell id="reportApi" value="Report API&#10;Backend Service" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;" vertex="1" parent="1">
+                    <mxGeometry x="360" y="260" width="220" height="80" as="geometry"/>
+                </mxCell>
+
+                <!-- CLICKHOUSE -->
+                <mxCell id="clickhouse" value="OLAP DB&#10;ClickHouse&#10;Report Data Mart" style="shape=cylinder;whiteSpace=wrap;fillColor=#d5e8d4;" vertex="1" parent="1">
+                    <mxGeometry x="660" y="250" width="240" height="100" as="geometry"/>
+                </mxCell>
+
+                <!-- AIRFLOW -->
+                <mxCell id="airflow" value="ETL Orchestrator&#10;Apache Airflow" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;" vertex="1" parent="1">
+                    <mxGeometry x="360" y="80" width="260" height="80" as="geometry"/>
+                </mxCell>
+
+                <!-- CRM -->
+                <mxCell id="crm" value="CRM&#10;User and Prosthesis Data" style="rounded=1;whiteSpace=wrap;" vertex="1" parent="1">
+                    <mxGeometry x="120" y="80" width="220" height="80" as="geometry"/>
+                </mxCell>
+
+                <!-- TELEMETRY DB -->
+                <mxCell id="telemetry" value="Telemetry DB&#10;Sensor Data" style="shape=cylinder;whiteSpace=wrap;" vertex="1" parent="1">
+                    <mxGeometry x="660" y="80" width="240" height="80" as="geometry"/>
+                </mxCell>
+
+                <!-- RELATIONS -->
+                <mxCell edge="1" parent="1" source="user" target="mobile" style="endArrow=block;">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+
+                <mxCell edge="1" parent="1" source="mobile" target="reportApi" style="endArrow=block;">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+
+                <mxCell edge="1" parent="1" source="reportApi" target="clickhouse" style="endArrow=block;">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+
+                <mxCell edge="1" parent="1" source="crm" target="airflow" style="endArrow=block;">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+
+                <mxCell edge="1" parent="1" source="telemetry" target="airflow" style="endArrow=block;">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+
+                <mxCell edge="1" parent="1" source="airflow" target="clickhouse" style="endArrow=block;">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

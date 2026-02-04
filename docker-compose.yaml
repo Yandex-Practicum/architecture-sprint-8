@@ -25,6 +25,7 @@ services:
       KC_HTTP_ENABLED: true
       KC_HOSTNAME_STRICT: false
       KC_SSL_REQUIRED: none
+      KC_IMPORT_STRATEGY: OVERWRITE_EXISTING
     command: 
       - start-dev
       - --import-realm

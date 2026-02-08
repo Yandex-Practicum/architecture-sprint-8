@@ -1,4 +1,4 @@
-J# BionicPRO Analytics Platform
+# BionicPRO Analytics Platform
 
 Аналитическая платформа для мониторинга и отчетности бионических протезов.
 
@@ -11,20 +11,16 @@ J# BionicPRO Analytics Platform
 - **Таблицы**:
   - `crm.customers` - клиенты компании
   - `crm.prostheses` - бионические протезы
-- **Хранение**: Постоянное
 
 #### Telemetry Database (PostgreSQL)
 - **Назначение**: Прием событий телеметрии в реальном времени
 - **Таблицы**:
   - `telemetry.events` - события от протезов (4G модуль → ESP32)
-- **Хранение**: 30-90 дней (затем архивация)
-- **Объем**: ~1-10 млн событий/день
 
 ### 2. ETL Pipeline (Apache Airflow)
 
 #### DAG: `etl_bionicpro_reports`
 - **Расписание**: Ежедневно в 02:00 MSK
-- **Стратегия**: Инкрементальная загрузка (вчерашний день)
 
 **Этапы:**
 1. **Extract** (параллельно):
@@ -52,7 +48,6 @@ J# BionicPRO Analytics Platform
 **Staging Layer** (временные данные)
 - `stg_crm_customers` - клиенты из CRM
 - `stg_crm_prostheses` - протезы из CRM
-- TTL: 7 дней
 
 **Dimensional Layer** (измерения)
 - `dim_user` - пользователи (SCD Type 1)
@@ -62,7 +57,6 @@ J# BionicPRO Analytics Platform
 - `fact_telemetry_daily` - дневная агрегация телеметрии
 - Партиционирование: по месяцам
 - Engine: ReplacingMergeTree
-- TTL: 2 года
 
 **Reporting Layer** (витрины)
 - `vw_user_telemetry_daily` - основная витрина для API
@@ -88,7 +82,6 @@ J# BionicPRO Analytics Platform
 
 ### Предварительные требования
 - Docker & Docker Compose
-- 8GB RAM минимум
 - Порты: 3000, 8000, 8080, 8081, 8123, 9000
 
 ### Запуск
@@ -129,7 +122,7 @@ chmod +x seed-user-data.sh
 
 1. Открыть Airflow UI: http://localhost:8081
 2. Найти DAG `etl_bionicpro_reports`
-3. Включить DAG (toggle)
+3. Включить DAG
 4. Trigger DAG вручную или дождаться расписания (02:00)
 
 ## Мониторинг
@@ -159,21 +152,6 @@ docker exec -it crm_db psql -U crm_user -d crm_db \
 docker exec -it telemetry_db psql -U telemetry_user -d telemetry_db \
   -c "SELECT COUNT(*) FROM telemetry.events;"
 ```
-
-## Производительность
-
-### Метрики
-
-- **Время отклика протеза**: < 100ms (целевое)
-- **Объем телеметрии**: ~1-10 млн событий/день
-- **Время ETL**: ~5-15 минут
-- **Время запроса API**: < 500ms
-
-### Оптимизация
-- **ClickHouse**: Партиционирование по месяцам
-- **PostgreSQL**: Индексы на часто используемые поля
-- **Airflow**: Параллельное выполнение задач
-- **API**: Кэширование JWKS (1 час)
 
 ## Безопасность
 - Аутентификация через Keycloak (OAuth2.0 + PKCE)

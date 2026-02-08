@@ -1,0 +1,5 @@
+apache-airflow-providers-postgres>=5.10.0
+psycopg2-binary>=2.9.9
+apache-airflow-providers-http>=4.9.0
+clickhouse-connect>=0.7.0
+pandas>=2.0.0

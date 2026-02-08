@@ -1,42 +1,300 @@
 version: '3.8'
 
+# ============================================================================
+# ОБЩИЕ НАСТРОЙКИ AIRFLOW
+# ============================================================================
+x-airflow-common: &airflow-common
+  build:
+    context: ./airflow
+    dockerfile: Dockerfile
+  environment: &airflow-common-env
+    # Основные настройки Airflow
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor  # Локальный исполнитель задач
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow_db/airflow
+    AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow_db/airflow
+    AIRFLOW__CORE__FERNET_KEY: ''  # Ключ шифрования (пустой для dev)
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'  # DAG'и создаются в паузе
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'  # Не загружать примеры DAG'ов
+    AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'  # Включить healthcheck планировщика
+    AIRFLOW__WEBSERVER__SECRET_KEY: 'your_airflow_webserver_sec_key'  # Секретный ключ веб-сервера
+    _PIP_ADDITIONAL_REQUIREMENTS: "apache-airflow-providers-postgres apache-airflow-providers-http clickhouse-connect"
+    AIRFLOW_INPUT_DIR: '/opt/airflow/dag-inputs'
+    
+    # Подключения к базам данных для DAG'ов (через переменные окружения)
+    CRM_DB_CONN: postgresql://crm_user:crm_password@crm_db:5432/crm_db  # Строка подключения к CRM
+    TELEMETRY_DB_CONN: postgresql://telemetry_user:telemetry_password@telemetry_db:5432/telemetry_db  # Строка подключения к телеметрии
+    
+    # Параметры подключения к ClickHouse
+    CLICKHOUSE_HOST: clickhouse  # Хост ClickHouse
+    CLICKHOUSE_PORT: 8123  # HTTP порт ClickHouse
+    CLICKHOUSE_USER: clickhouse_user  # Пользователь ClickHouse
+    CLICKHOUSE_PASSWORD: clickhouse_pass  # Пароль ClickHouse
+    CLICKHOUSE_DB: default  # База данных ClickHouse
+    
+    # Airflow Connections (автоматическая регистрация через переменные окружения)
+    AIRFLOW_CONN_CRM_DB: postgresql://crm_user:crm_password@crm_db:5432/crm_db
+    AIRFLOW_CONN_TELEMETRY_DB: postgresql://telemetry_user:telemetry_password@telemetry_db:5432/telemetry_db
+    AIRFLOW_CONN_CLICKHOUSE_HTTP: http://clickhouse_user:clickhouse_pass@clickhouse:8123/default
+  volumes:
+    - ./airflow/dags/:/opt/airflow/dags  # Папка с DAG'ами
+    - ./airflow/requirements.txt:/opt/airflow/requirements.txt  # Зависимости Python
+  user: "${AIRFLOW_UID:-50000}:0"
+  depends_on: &airflow-common-depends-on
+    airflow_db:
+      condition: service_healthy
+
 services:
+
+  # ==========================================================================
+  # БЛОК 1: АУТЕНТИФИКАЦИЯ И АВТОРИЗАЦИЯ (Keycloak)
+  # ==========================================================================
+  
   keycloak_db:
     image: postgres:14
+    container_name: keycloak_db
     environment:
-      POSTGRES_DB: keycloak_db
-      POSTGRES_USER: keycloak_user
-      POSTGRES_PASSWORD: keycloak_password
+      POSTGRES_DB: keycloak_db  # Имя базы данных Keycloak
+      POSTGRES_USER: keycloak_user  # Пользователь БД
+      POSTGRES_PASSWORD: keycloak_password  # Пароль БД
     volumes:
-      - ./postgres-keycloak-data:/var/lib/postgresql/data
+      - ./postgres-keycloak-data:/var/lib/postgresql/data  # Персистентное хранилище
     ports:
-      - "5433:5432"
+      - "5433:5432"  # Порт для внешнего доступа
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U keycloak_user -d keycloak_password" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   keycloak:
     image: quay.io/keycloak/keycloak:21.1
+    container_name: keycloak
     environment:
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
-      KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
-      KC_DB_USERNAME: keycloak_user
-      KC_DB_PASSWORD: keycloak_password
-    command: 
-      - start-dev
-      - --import-realm
+      KEYCLOAK_ADMIN: admin  # Логин администратора Keycloak
+      KEYCLOAK_ADMIN_PASSWORD: admin  # Пароль администратора (ИЗМЕНИТЬ В PROD!)
+      KC_DB: postgres  # Тип БД
+      KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db  # JDBC URL
+      KC_DB_USERNAME: keycloak_user  # Пользователь БД
+      KC_DB_PASSWORD: keycloak_password  # Пароль БД
+    command:
+      - start-dev  # Режим разработки (ИЗМЕНИТЬ В PROD!)
+      - --import-realm  # Импортировать realm при старте
     volumes:
-      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json  # Конфигурация realm
     ports:
-      - "8080:8080"
+      - "8080:8080"  # HTTP порт Keycloak
     depends_on:
       - keycloak_db
+    restart: unless-stopped
+
+  # ==========================================================================
+  # БЛОК 2: ФРОНТЕНД (React приложение)
+  # ==========================================================================
+  
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    container_name: frontend
     ports:
-      - "3000:3000"
+      - "3000:3000"  # Порт веб-приложения
     environment:
-      REACT_APP_API_URL: http://localhost:8000
-      REACT_APP_KEYCLOAK_URL: http://localhost:8080
-      REACT_APP_KEYCLOAK_REALM: reports-realm
-      REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+      REACT_APP_API_URL: http://localhost:8000  # URL бэкенд API
+      REACT_APP_KEYCLOAK_URL: http://localhost:8080  # URL Keycloak (для браузера)
+      REACT_APP_KEYCLOAK_REALM: reports-realm  # Имя realm в Keycloak
+      REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend  # Client ID для фронтенда
+    restart: unless-stopped
+
+  # ==========================================================================
+  # БЛОК 3: ИСТОЧНИКИ ДАННЫХ (PostgreSQL)
+  # ==========================================================================
+  
+  crm_db:
+    image: postgres:14
+    container_name: crm_db
+    environment:
+      POSTGRES_DB: crm_db  # База данных CRM
+      POSTGRES_USER: crm_user  # Пользователь CRM БД
+      POSTGRES_PASSWORD: crm_password  # Пароль CRM БД
+    volumes:
+      - ./db/crm:/docker-entrypoint-initdb.d:ro  # Скрипты инициализации (схема, seed данные)
+    ports:
+      - "5434:5432"  # Порт для внешнего доступа
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U crm_user -d crm_db" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  telemetry_db:
+    image: postgres:14
+    container_name: telemetry_db
+    environment:
+      POSTGRES_DB: telemetry_db  # База данных телеметрии
+      POSTGRES_USER: telemetry_user  # Пользователь телеметрии БД
+      POSTGRES_PASSWORD: telemetry_password  # Пароль телеметрии БД
+    volumes:
+      - ./db/telemetry:/docker-entrypoint-initdb.d:ro  # Скрипты инициализации
+    ports:
+      - "5435:5432"  # Порт для внешнего доступа
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U telemetry_user -d telemetry_db" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ==========================================================================
+  # БЛОК 4: АНАЛИТИЧЕСКОЕ ХРАНИЛИЩЕ (ClickHouse OLAP)
+  # ==========================================================================
+  
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: clickhouse
+    ports:
+      - "8123:8123"  # HTTP интерфейс
+      - "9000:9000"  # Native TCP протокол
+    volumes:
+      - ./db/clickhouse:/docker-entrypoint-initdb.d:ro  # Скрипты инициализации
+    environment:
+      CLICKHOUSE_DB: default  # База данных по умолчанию
+      CLICKHOUSE_USER: clickhouse_user  # Пользователь ClickHouse
+      CLICKHOUSE_PASSWORD: clickhouse_pass  # Пароль ClickHouse
+    healthcheck:
+      test: [ "CMD", "clickhouse-client", "--user", "clickhouse_user", "--password", "clickhouse_pass", "--query", "SELECT 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ==========================================================================
+  # БЛОК 5: ETL ОРКЕСТРАЦИЯ (Apache Airflow)
+  # ==========================================================================
+  
+  airflow_db:
+    image: postgres:14
+    container_name: airflow_db
+    volumes:
+      - ./airflow/db:/docker-entrypoint-initdb.d:ro  # Скрипты инициализации (опционально)
+    environment:
+      POSTGRES_USER: airflow  # Пользователь БД Airflow
+      POSTGRES_PASSWORD: airflow  # Пароль БД Airflow
+      POSTGRES_DB: airflow  # База данных Airflow (метаданные)
+    logging:
+      options:
+        max-size: 10m
+        max-file: "3"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U airflow" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+
+  airflow-init:
+    <<: *airflow-common
+    container_name: airflow-init
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        airflow db init
+        airflow users create \
+          --username admin \
+          --firstname Admin \
+          --lastname User \
+          --role Admin \
+          --email admin@example.com \
+          --password admin || true
+    depends_on:
+      airflow_db:
+        condition: service_healthy
+
+  airflow-webserver:
+    <<: *airflow-common
+    container_name: airflow-webserver
+    command: webserver  # Запуск веб-интерфейса Airflow
+    ports:
+      - "8081:8080"  # Веб-интерфейс Airflow (http://localhost:8081)
+    depends_on:
+      telemetry_db:
+        condition: service_healthy
+      crm_db:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:8080/health || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: airflow-scheduler
+    command: scheduler  # Запуск планировщика задач Airflow
+    depends_on:
+      telemetry_db:
+        condition: service_healthy
+      crm_db:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      airflow-webserver:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:8080/health || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # ==========================================================================
+  # БЛОК 6: БЭКЕНД API (FastAPI)
+  # ==========================================================================
+  
+  reports-api:
+    build:
+      context: ./reports-api
+      dockerfile: Dockerfile
+    container_name: reports-api
+    ports:
+      - "8000:8000"  # HTTP API для отчетов
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+    environment:
+      # Подключение к ClickHouse
+      CH_HOST: clickhouse  # Хост ClickHouse
+      CH_PORT: 9000  # TCP порт
+      CH_DB: default  # База данных
+      CH_USER: clickhouse_user  # Пользователь
+      CH_PASSWORD: clickhouse_pass  # Пароль
+      
+      # Настройки Keycloak/OIDC (для проверки JWT токенов)
+      KEYCLOAK_ISSUER: http://localhost:8080/realms/reports-realm  # Issuer должен совпадать с iss в токене (URL из браузера)
+      JWKS_URL: http://keycloak:8080/realms/reports-realm/protocol/openid-connect/certs  # JWKS endpoint (внутренний URL)
+      OIDC_AUDIENCE: reports-backend  # Ожидаемая audience в токене (client_id бэкенда)
+      
+      # CORS настройки
+      FRONTEND_ORIGIN: http://localhost:3000  # Разрешенный origin для CORS
+      
+      # Витрина данных в ClickHouse
+      MART_TABLE: default.vw_user_telemetry_daily  # Представление с отчетными данными
+    restart: unless-stopped
+
+# ============================================================================
+# VOLUMES (опционально, для персистентности данных)
+# ============================================================================
+# volumes:
+#   postgres-keycloak-data:
+#   clickhouse-data:
+#   clickhouse-logs:

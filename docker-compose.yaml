@@ -11,6 +11,7 @@ services:
       - ./postgres-keycloak-data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+
   keycloak:
     image: quay.io/keycloak/keycloak:21.1
     environment:
@@ -20,7 +21,7 @@ services:
       KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
       KC_DB_USERNAME: keycloak_user
       KC_DB_PASSWORD: keycloak_password
-    command: 
+    command:
       - start-dev
       - --import-realm
     volumes:
@@ -29,6 +30,35 @@ services:
       - "8080:8080"
     depends_on:
       - keycloak_db
+
+  # Session / token store for bionicpro-auth (Задача 3)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  # New backend auth-service (Задача 3)
+  bionicpro-auth:
+    build:
+      context: ./bionicpro-auth
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8000"
+    environment:
+      # Keycloak connection
+      KEYCLOAK_BASE_URL: http://keycloak:8080
+      KEYCLOAK_REALM: reports-realm
+      # Session store
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      # Cookie settings (для локалки Secure=false, в проде будет true)
+      COOKIE_NAME: bpsid
+      COOKIE_SECURE: "false"
+      COOKIE_SAMESITE: Lax
+    depends_on:
+      - keycloak
+      - redis
+
   frontend:
     build:
       context: ./frontend
@@ -36,7 +66,10 @@ services:
     ports:
       - "3000:3000"
     environment:
-      REACT_APP_API_URL: http://localhost:8000
+      # Важно: фронт теперь ходит в bionicpro-auth (сессии/куки), а не в старый API
+      REACT_APP_API_URL: http://localhost:8001
       REACT_APP_KEYCLOAK_URL: http://localhost:8080
       REACT_APP_KEYCLOAK_REALM: reports-realm
       REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+    depends_on:
+      - bionicpro-auth

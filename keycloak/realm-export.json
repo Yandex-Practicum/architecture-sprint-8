@@ -107,6 +107,21 @@
           }
         ],
         "realmRoles": ["prothetic_user"]
+      },
+      {
+        "username": "user4",
+        "enabled": true,
+        "email": "userTest@example.com",
+        "firstName": "User",
+        "lastName": "4",
+        "credentials": [
+          {
+            "type": "password",
+            "value": "password123",
+            "temporary": false
+          }
+        ],
+        "realmRoles": ["user"]
       }
     ],
     "clients": [
@@ -116,13 +131,17 @@
         "publicClient": true,
         "redirectUris": ["http://localhost:3000/*"],
         "webOrigins": ["http://localhost:3000"],
-        "directAccessGrantsEnabled": true
-      },
+        "directAccessGrantsEnabled": false,
+        "attributes": {
+          "pkce.code.challenge.method": "S256",
+          "require.pkce": "true"
+        }
+        },
       {
         "clientId": "reports-api",
         "enabled": true,
         "clientAuthenticatorType": "client-secret",
-        "secret": "oNwoLQdvJAvRcL89SydqCWCe5ry1jMgq", 
+        "secret": "oNwoLQdvJAvRcL89SydqCWCe5ry1jMgq",
         "bearerOnly": true
       }
     ]

@@ -1,0 +1,6 @@
+# Для Airflow 2.9.1
+apache-airflow==2.9.1
+apache-airflow-providers-postgres==5.9.0
+pandas==2.0.3
+clickhouse-driver==0.2.6
+psycopg2-binary==2.9.9

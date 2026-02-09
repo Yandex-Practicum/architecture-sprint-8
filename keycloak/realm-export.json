@@ -1,6 +1,13 @@
 {
     "realm": "reports-realm",
     "enabled": true,
+
+    "accessTokenLifespan": 120,
+    "revokeRefreshToken": true,
+    "refreshTokenMaxReuse": 0,
+    "ssoSessionIdleTimeout": 1800,
+    "ssoSessionMaxLifespan": 36000,
+
     "roles": {
       "realm": [
         {
@@ -116,7 +123,14 @@
         "publicClient": true,
         "redirectUris": ["http://localhost:3000/*"],
         "webOrigins": ["http://localhost:3000"],
-        "directAccessGrantsEnabled": true
+        "standardFlowEnabled": true,
+        "implicitFlowEnabled": false,
+        "directAccessGrantsEnabled": false,
+        "serviceAccountsEnabled": false,
+
+        "attributes": {
+          "pkce.code.challenge.method": "S256"
+        }
       },
       {
         "clientId": "reports-api",
@@ -124,6 +138,157 @@
         "clientAuthenticatorType": "client-secret",
         "secret": "oNwoLQdvJAvRcL89SydqCWCe5ry1jMgq", 
         "bearerOnly": true
+      },
+      {
+        "clientId": "bionicpro-auth",
+        "enabled": true,
+
+        "publicClient": false,
+        "clientAuthenticatorType": "client-secret",
+        "secret": "CHANGE_ME_STRONG_SECRET",
+
+        "standardFlowEnabled": true,
+        "implicitFlowEnabled": false,
+        "directAccessGrantsEnabled": false,
+        "serviceAccountsEnabled": false,
+
+        "redirectUris": ["http://localhost:8081/auth/callback"],
+        "webOrigins": ["http://localhost:3000"],
+
+        "attributes": {
+          "pkce.code.challenge.method": "S256"
+        }
+      }
+    ],
+    "groups": [
+      {
+        "name": "mapped",
+        "path": "/mapped",
+        "subGroups": [
+          {
+            "name": "user",
+            "path": "/mapped/user",
+            "realmRoles": ["user"]
+          },
+          {
+            "name": "administrator",
+            "path": "/mapped/administrator",
+            "realmRoles": ["administrator"]
+          },
+          {
+            "name": "prothetic_user",
+            "path": "/mapped/prothetic_user",
+            "realmRoles": ["prothetic_user"]
+          }
+        ]
+      }
+    ],
+    "components": {
+    "org.keycloak.storage.UserStorageProvider": [
+      {
+        "id": "ldap-example",
+        "name": "ldap-example",
+        "providerId": "ldap",
+        "providerType": "org.keycloak.storage.UserStorageProvider",
+        "parentId": "reports-realm",
+        "config": {
+          "enabled": ["true"],
+          "priority": ["0"],
+          "importEnabled": ["true"],
+          "syncRegistrations": ["false"],
+          "editMode": ["READ_ONLY"],
+
+          "vendor": ["other"],
+          "connectionUrl": ["ldap://ldap:389"],
+
+          "bindDn": ["cn=admin,dc=example,dc=com"],
+          "bindCredential": ["admin"],
+
+          "usersDn": ["ou=People,dc=example,dc=com"],
+          "usernameLDAPAttribute": ["uid"],
+          "rdnLDAPAttribute": ["uid"],
+          "uuidLDAPAttribute": ["entryUUID"],
+          "userObjectClasses": ["inetOrgPerson, organizationalPerson, person, top"],
+
+          "pagination": ["true"]
+        }
+      }
+    ],
+
+    "org.keycloak.storage.ldap.mappers.LDAPStorageMapper": [
+      {
+        "id": "ldap-username",
+        "name": "username-mapper",
+        "providerId": "user-attribute-ldap-mapper",
+        "providerType": "org.keycloak.storage.ldap.mappers.LDAPStorageMapper",
+        "parentId": "ldap-example",
+        "config": {
+          "user.model.attribute": ["username"],
+          "ldap.attribute": ["uid"],
+          "read.only": ["true"],
+          "always.read.value.from.ldap": ["true"],
+          "is.mandatory.in.ldap": ["true"]
+        }
+      },
+      {
+        "id": "ldap-email",
+        "name": "email-mapper",
+        "providerId": "user-attribute-ldap-mapper",
+        "providerType": "org.keycloak.storage.ldap.mappers.LDAPStorageMapper",
+        "parentId": "ldap-example",
+        "config": {
+          "user.model.attribute": ["email"],
+          "ldap.attribute": ["mail"],
+          "read.only": ["true"],
+          "always.read.value.from.ldap": ["true"]
+        }
+      },
+
+      {
+        "id": "ldap-groups",
+        "name": "groups-mapper",
+        "providerId": "group-ldap-mapper",
+        "providerType": "org.keycloak.storage.ldap.mappers.LDAPStorageMapper",
+        "parentId": "ldap-example",
+        "config": {
+          "groups.dn": ["ou=Groups,dc=example,dc=com"],
+          "group.name.ldap.attribute": ["cn"],
+          "group.object.classes": ["groupOfNames"],
+          "membership.ldap.attribute": ["member"],
+          "membership.user.ldap.attribute": ["dn"],
+
+          "preserve.group.inheritance": ["true"],
+          "ignore.missing.groups": ["true"],
+          "mode": ["READ_ONLY"],
+
+          "user.roles.retrieve.strategy": ["LOAD_GROUPS_BY_MEMBER_ATTRIBUTE"],
+
+          "groups.path": ["/ldap/example"]
+        }
+      },
+
+      {
+        "id": "ldap-map-user",
+        "name": "map-ldap-user-to-kc-user",
+        "providerId": "hardcoded-ldap-group-mapper",
+        "providerType": "org.keycloak.storage.ldap.mappers.LDAPStorageMapper",
+        "parentId": "ldap-example",
+        "config": {
+          "ldap.group.dn": ["cn=user,ou=Groups,dc=example,dc=com"],
+          "group": ["/mapped/user"]
+        }
+      },
+      {
+        "id": "ldap-map-prothetic",
+        "name": "map-ldap-prothetic-to-kc-prothetic",
+        "providerId": "hardcoded-ldap-group-mapper",
+        "providerType": "org.keycloak.storage.ldap.mappers.LDAPStorageMapper",
+        "parentId": "ldap-example",
+        "config": {
+          "ldap.group.dn": ["cn=prothetic_user,ou=Groups,dc=example,dc=com"],
+          "group": ["/mapped/prothetic_user"]
+        }
       }
     ]
   }
+}

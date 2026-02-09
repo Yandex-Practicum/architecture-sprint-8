@@ -11,6 +11,7 @@ services:
       - ./postgres-keycloak-data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+
   keycloak:
     image: quay.io/keycloak/keycloak:21.1
     environment:
@@ -20,7 +21,7 @@ services:
       KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
       KC_DB_USERNAME: keycloak_user
       KC_DB_PASSWORD: keycloak_password
-    command: 
+    command:
       - start-dev
       - --import-realm
     volumes:
@@ -29,6 +30,8 @@ services:
       - "8080:8080"
     depends_on:
       - keycloak_db
+      - ldap
+
   frontend:
     build:
       context: ./frontend
@@ -36,7 +39,69 @@ services:
     ports:
       - "3000:3000"
     environment:
-      REACT_APP_API_URL: http://localhost:8000
-      REACT_APP_KEYCLOAK_URL: http://localhost:8080
-      REACT_APP_KEYCLOAK_REALM: reports-realm
-      REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+      # фронт теперь работает через cookie-сессию и редиректы bionicpro-auth
+      REACT_APP_API_URL: http://localhost:8081
+      REACT_APP_AUTH_URL: http://localhost:8081
+
+      # старые переменные можно убрать, если ты выкинул keycloak-js из фронта
+      # REACT_APP_KEYCLOAK_URL: http://localhost:8080
+      # REACT_APP_KEYCLOAK_REALM: reports-realm
+      # REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+    depends_on:
+      - bionicpro-auth
+
+  ldap:
+    image: osixia/openldap:1.5.0
+    environment:
+      LDAP_ORGANISATION: "BionicPRO EU"
+      LDAP_ADMIN_PASSWORD: "admin"
+      LDAP_DOMAIN: "example.com"
+      LDAP_BASE_DN: "dc=example,dc=com"
+    volumes:
+      - ./ldap/seed:/container/service/slapd/assets/config/bootstrap/ldif/custom
+    ports:
+      - "389:389"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  bionicpro-auth:
+    build:
+      context: ./bionicpro-auth
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      KEYCLOAK_BASE: http://keycloak:8080
+      KEYCLOAK_REALM: reports-realm
+      KEYCLOAK_CLIENT_ID: bionicpro-auth
+      KEYCLOAK_CLIENT_SECRET: CHANGE_ME_STRONG_SECRET
+
+      # callback зарегистрирован в Keycloak client redirectUris
+      KEYCLOAK_REDIRECT_URI: http://localhost:8081/auth/callback
+
+      # куда возвращать пользователя после логина
+      FRONTEND_RETURN_URL: http://localhost:3000/
+
+      # cookie/session
+      SESSION_COOKIE_NAME: bp_session
+      COOKIE_SECURE: "false"   # dev: http, иначе Secure cookie не сохранится
+      # COOKIE_DOMAIN: localhost  # обычно НЕ нужно на localhost
+
+      # redis
+      REDIS_URL: redis://redis:6379/0
+
+      # шифрование refresh_token (fernet key: urlsafe base64 32 bytes)
+      # Сгенерировать: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+      FERNET_KEY: "PASTE_YOUR_FERNET_KEY_HERE"
+
+      # session alias TTL для параллельных запросов (если добавлял)
+      SESSION_ALIAS_TTL_SEC: "20"
+
+      # CORS
+      FRONTEND_ORIGINS: http://localhost:3000
+    depends_on:
+      - keycloak
+      - redis

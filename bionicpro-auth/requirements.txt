@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+httpx
+redis
+cryptography
+python-dotenv

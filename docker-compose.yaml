@@ -46,7 +46,7 @@ services:
       - "8001:8000"
     environment:
       # Keycloak connection
-      KEYCLOAK_BASE_URL: http://keycloak:8080
+      KEYCLOAK_BASE_URL: http://localhost:8080
       KEYCLOAK_REALM: reports-realm
       # Session store
       REDIS_HOST: redis
@@ -55,6 +55,8 @@ services:
       COOKIE_NAME: bpsid
       COOKIE_SECURE: "false"
       COOKIE_SAMESITE: Lax
+      OIDC_CLIENT_ID: bionicpro-auth
+      OIDC_CLIENT_SECRET: Mbi3p71XH2cENasAEXHFbcFzpbi92dL8
     depends_on:
       - keycloak
       - redis

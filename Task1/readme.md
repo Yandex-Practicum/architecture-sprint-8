@@ -33,3 +33,17 @@ Valid redirect URIs - http://localhost:8001/auth/callback
 Access Token Lifespan - 5 мин (по умолчанию)
 
 ---
+
+    environment:
+      # Keycloak connection
+      KEYCLOAK_BASE_URL: http://keycloak:8080
+      KEYCLOAK_REALM: reports-realm
+      # Session store
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      # Cookie settings (для локалки Secure=false, в проде будет true)
+      COOKIE_NAME: bpsid
+      COOKIE_SECURE: "false"
+      COOKIE_SAMESITE: Lax
+      OIDC_CLIENT_ID: bionicpro-auth
+      OIDC_CLIENT_SECRET: Mbi3p71XH2cENasAEXHFbcFzpbi92dL8

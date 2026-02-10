@@ -122,8 +122,42 @@ async def auth_callback(code: Optional[str] = None, state: Optional[str] = None)
     return response
 
 
+async def _refresh_access_token(session_id: str):
+    data = r.hgetall(f"sess:{session_id}")
+    if not data or not data.get("refresh_token"):
+        return False
+
+    token_url = f"http://keycloak:8080/realms/{KEYCLOAK_REALM}/protocol/openid-connect/token"
+    payload = {
+        "grant_type": "refresh_token",
+        "client_id": OIDC_CLIENT_ID,
+        "client_secret": OIDC_CLIENT_SECRET,
+        "refresh_token": data["refresh_token"],
+    }
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.post(token_url, data=payload)
+
+    if resp.status_code != 200:
+        return False
+
+    tokens = resp.json()
+    now = int(time.time())
+    r.hset(
+        f"sess:{session_id}",
+        mapping={
+            "access_token": tokens["access_token"],
+            "refresh_token": tokens.get("refresh_token", data["refresh_token"]),
+            "access_exp": str(now + int(tokens.get("expires_in", 0))),
+        },
+    )
+    return True
+
+
+
+
 @app.get("/session/me")
-def session_me(request: Request):
+async def session_me(request: Request):
     sid = request.cookies.get(COOKIE_NAME)
     if not sid:
         return JSONResponse({"authenticated": False}, status_code=401)
@@ -132,7 +166,40 @@ def session_me(request: Request):
     if not data:
         return JSONResponse({"authenticated": False}, status_code=401)
 
-    return {"authenticated": True, "session": {"id": sid, "access_exp": data.get("access_exp")}}
+    now = int(time.time())
+    access_exp = int(data.get("access_exp", "0"))
+
+    if access_exp <= now:
+        ok = await _refresh_access_token(sid)
+        if not ok:
+            return JSONResponse({"authenticated": False}, status_code=401)
+
+        data = r.hgetall(f"sess:{sid}")
+
+    # --- session rotation ---
+    new_sid = secrets.token_urlsafe(32)
+
+    r.rename(f"sess:{sid}", f"sess:{new_sid}")
+    r.expire(f"sess:{new_sid}", SESSION_TTL_SECONDS)
+
+    response = JSONResponse({
+        "authenticated": True,
+        "session": {
+            "id": new_sid,
+            "access_exp": r.hget(f"sess:{new_sid}", "access_exp"),
+        },
+    })
+
+    response.set_cookie(
+        key=COOKIE_NAME,
+        value=new_sid,
+        httponly=True,
+        secure=COOKIE_SECURE,
+        samesite=COOKIE_SAMESITE,
+        max_age=SESSION_TTL_SECONDS,
+        path="/",
+    )
+    return response
 
 
 @app.post("/auth/logout")

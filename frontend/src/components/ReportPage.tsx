@@ -69,7 +69,17 @@ const ReportPage: React.FC = () => {
       const contentType = response.headers.get('content-type') || '';
       if (contentType.includes('application/json')) {
         const data = await response.json();
-        setReportData(data);
+        if (data.url && !data.summary) {
+          const reportResp = await fetch(data.url);
+          if (reportResp.ok) {
+            const report = await reportResp.json();
+            setReportData(report);
+          } else {
+            setReportData({ ...data, summary: { period_from: data.period_from, period_to: data.period_to } });
+          }
+        } else {
+          setReportData(data);
+        }
       } else {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);

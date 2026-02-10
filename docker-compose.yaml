@@ -88,13 +88,49 @@ services:
       REDIS_ADDR: redis:6379
       ENCRYPTION_KEY: X9k2mN7qR4vL1pW8sY3tB6cF0hJ5aZ2d
       SESSION_SECRET: k7mN2pR9vX4qL8wB3cF6hJ1zT5yU0aE
-      REPORTS_API_URL: http://localhost:9000/reports
+      REPORTS_API_URL: http://reports-api:9000/reports
       PROFILE_DB_PATH: /data/profiles.db
     volumes:
       - ./bionicpro-auth-data:/data
     depends_on:
       - keycloak
       - redis
+      - reports-api
+  olap_db:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: olap_db
+      POSTGRES_USER: olap_user
+      POSTGRES_PASSWORD: olap_password
+    volumes:
+      - ./olap/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - ./olap-data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U olap_user -d olap_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  reports-api:
+    build:
+      context: ./reports-api
+      dockerfile: Dockerfile
+    ports:
+      - "9000:9000"
+    environment:
+      OLAP_DATABASE_URL: postgresql://olap_user:olap_password@olap_db:5432/olap_db?sslmode=disable
+    depends_on:
+      olap_db:
+        condition: service_healthy
+  reports-etl:
+    build:
+      context: ./reports-etl
+      dockerfile: Dockerfile
+    image: reports-etl:latest
+    # Запускается по расписанию Airflow (DAG reports_etl), не как долгоживущий сервис
+    profiles:
+      - etl-build
   frontend:
     build:
       context: ./frontend

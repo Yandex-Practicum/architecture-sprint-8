@@ -108,7 +108,7 @@
    ```bash
    docker compose up -d --build
    ```
-   Сервисы: keycloak_db, keycloak, redis, openldap, ldap-bootstrap, bionicpro-auth, frontend.
+   Сервисы: keycloak_db, keycloak, redis, openldap, ldap-bootstrap, bionicpro-auth, olap_db, reports-api, frontend.
 
 2. **Проверить, что контейнеры запущены**:
    ```bash
@@ -140,3 +140,57 @@
 | Фронтенд работает с сессиями (без Keycloak напрямую) | [frontend/src/components/ReportPage.tsx](frontend/src/components/ReportPage.tsx) — `/auth/login`, `/auth/me`, `credentials: 'include'`   |
 | Экспорт realm после настроек Keycloak                | [keycloak/keycloak-results-export.json](keycloak/keycloak-results-export.json)                                                           |
 | OAuth 2.0 от Яндекс ID                               | [keycloak/YANDEX-ID-SETUP.md](keycloak/YANDEX-ID-SETUP.md), consent + сохранение профиля в bionicpro-auth                                |
+
+## 2. Разработка сервиса отчётов
+
+Пользователи должны иметь возможность получать данные о работе протеза и просматривать их в виде отчёта. Реализован отдельный сервис отчётов, который формирует отчёты из данных CRM и телеметрии через ETL и отдаёт их через API.
+
+### Требования задания и выполнение
+
+| № | Требование                                                                                                      | Что сделано                                                                                                                                                                                                                                                                                                                                                               |
+|---|-----------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 1 | **Airflow DAG**: ETL из CRM и телеметрии в OLAP, витрина по пользователям, расписание                           | DAG [airflow/dags/reports_etl_dag.py](airflow/dags/reports_etl_dag.py) (ежедневно). ETL-логика вынесена в сервис [reports-etl/](reports-etl/) (Go): загрузка в `staging_crm`/`staging_telemetry`, агрегация в [olap/init.sql](olap/init.sql) витрину `datamart_reports` (индексы по `user_id`, периоду). DAG запускает образ `reports-etl:latest` с connection `olap_db`. |
+| 2 | **Бэкенд API** для отчётов: эндпоинт возвращает готовый отчёт из OLAP без тяжёлых вычислений в реальном времени | Сервис [reports-api/](reports-api/) (Go): `GET /reports` читает из `datamart_reports` по `user_id` (из заголовка `X-User-Id`), возвращает последний отчёт (JSON). Подключение к OLAP через `OLAP_DATABASE_URL` (в Docker: `sslmode=disable`).                                                                                                                             |
+| 3 | **Ограничение доступа**: отчёт только по себе                                                                   | bionicpro-auth: маршрут `GET /api/reports` под middleware авторизации; в запрос к reports-api передаётся только `X-User-Id` из сессии (Keycloak `sub`). reports-api отдаёт данные только по переданному `user_id`.                                                                                                                                                        |
+| 4 | **UI**: кнопка получения отчёта и вызов API                                                                     | [frontend/src/components/ReportPage.tsx](frontend/src/components/ReportPage.tsx): кнопка «Получить отчёт» → `GET /api/reports` с `credentials: 'include'`. Показ JSON-отчёта или сообщения об ошибке (404 — «Данные за период ещё не готовы»). Отображается User ID для отчётов (Keycloak `sub`) для ручного добавления данных в витрину.                                 |
+
+**Архитектура решения**
+![reports-etl-arch.png](img/reports-etl-arch.png)
+
+описание — [docs/REPORTS-ARCHITECTURE.md](docs/REPORTS-ARCHITECTURE.md)
+
+### Компоненты
+
+- **OLAP** (`olap_db`, PostgreSQL): таблицы `staging_crm`, `staging_telemetry`, витрина `datamart_reports` (user_id, period_from, period_to, summary JSONB). Инициализация — [olap/init.sql](olap/init.sql).
+- **Reports API** (порт 9000): [reports-api/](reports-api/) — чтение из `datamart_reports` по `X-User-Id`; при отсутствии строки — 404 с телом `report_not_ready`.
+- **reports-etl** (Go): [reports-etl/](reports-etl/) — одна команда: загрузка в staging + построение витрины за «вчера − 6 дней». Образ для Airflow: `docker build -t reports-etl:latest ./reports-etl`.
+- **bionicpro-auth**: прокси `GET /api/reports` → reports-api с заголовком `X-User-Id` из сессии; при недоступности reports-api — 502.
+- **Airflow**: DAG `reports_etl` вызывает контейнер reports-etl с connection `olap_db` (см. [airflow/dags/reports_etl_dag.py](airflow/dags/reports_etl_dag.py)). Airflow поднимается отдельно (порт 8081 в [airflow/docker-compose.yaml](airflow/docker-compose.yaml)).
+
+### Как все работает
+
+- **UI вызывает API отчётов** — кнопка «Получить отчёт» отправляет `GET /api/reports` с cookie.
+- **Без аутентификации отчёт недоступен** — без сессии bionicpro-auth возвращает 401; в UI показывается экран входа.
+- **Авторизованный пользователь видит только свой отчёт** — `X-User-Id` берётся из сессии на бэкенде; reports-api фильтрует по этому user_id.
+- **Отчёты из OLAP** — reports-api читает только из `datamart_reports`, без расчётов на лету.
+- **Только за обработанный период** — витрину заполняет ETL; при отсутствии данных API возвращает 404 с сообщением «Данные за обработанный период ещё не готовы».
+
+![airflow_connection.png](img/airflow_connection.png)
+
+![airflow_dags.png](img/airflow_dags.png)
+
+![get-reports-1.png](img/get-reports-1.png)
+
+![report-not-ready-yet.png](img/report-not-ready-yet.png)
+
+![get-reports-2.png](img/get-reports-2.png)
+
+
+### Запуск и получение отчёта
+
+1. Поднять все сервисы:  
+   `docker compose up -d --build`
+2. Войти в приложение (http://localhost:3000)
+3. Нажать «Получить отчёт» — должен отобразиться JSON-отчёт, если данные уже есть в базе, либо сообщение "Данные за обработанный период еще не готовы" в противном случае
+
+Подробнее: [docs/REPORTS-SETUP.md](docs/REPORTS-SETUP.md).

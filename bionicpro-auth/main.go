@@ -119,10 +119,17 @@ func main() {
 	initProfileDB()
 	r := gin.Default()
 
-	// CORS middleware
+	// CORS: разрешаем фронт и бэкенд по localhost и 127.0.0.1, чтобы cookie с credentials отправлялись
+	allowedOrigins := map[string]bool{
+		"http://localhost:3000": true, "http://localhost:8000": true,
+		"http://127.0.0.1:3000": true, "http://127.0.0.1:8000": true,
+	}
+	if frontendURL := getEnv("FRONTEND_URL", ""); frontendURL != "" {
+		allowedOrigins[frontendURL] = true
+	}
 	r.Use(func(c *gin.Context) {
 		origin := c.GetHeader("Origin")
-		if origin == "http://localhost:3000" || origin == "http://localhost:8000" {
+		if allowedOrigins[origin] {
 			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
 			c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 			c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
@@ -271,17 +278,26 @@ func handleReports(c *gin.Context) {
 
 	req, _ := http.NewRequest("GET", getEnv("REPORTS_API_URL", "http://localhost:9000/reports"), nil)
 	req.Header.Set("Authorization", "Bearer "+sessionData.AccessToken)
+	req.Header.Set("X-User-Id", sessionData.UserID)
 
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch reports"})
+		log.Printf("reports api request failed: %v", err)
+		c.JSON(http.StatusBadGateway, gin.H{
+			"error":   "reports_unavailable",
+			"message": "Сервис отчётов недоступен. Убедитесь, что reports-api и olap_db запущены.",
+		})
 		return
 	}
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
-	c.Data(resp.StatusCode, "application/json", body)
+	contentType := resp.Header.Get("Content-Type")
+	if contentType == "" {
+		contentType = "application/json"
+	}
+	c.Data(resp.StatusCode, contentType, body)
 }
 
 func authMiddleware() gin.HandlerFunc {

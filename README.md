@@ -55,7 +55,31 @@ This project implements a secure authentication system for BionicPRO using Keycl
 3. **Authentication Flow**:
    - Visit the frontend
    - Click login to authenticate via Keycloak
+   - Choose authentication method (local or Yandex ID)
+   - For Yandex ID: Grant permission to use profile data
    - Access protected reports after authentication
+
+## Yandex ID Integration
+
+The system supports OAuth 2.0 authentication via Yandex ID using Keycloak's Identity Brokering.
+
+### Setup Yandex ID Provider:
+1. Register an application at [Yandex OAuth](https://oauth.yandex.com/)
+2. Get `client_id` and `client_secret`
+3. Update `keycloak/realm-export.json` with your credentials:
+   ```json
+   "config": {
+     "clientId": "your-yandex-client-id",
+     "clientSecret": "your-yandex-client-secret",
+     ...
+   }
+   ```
+4. Restart Keycloak: `docker compose restart keycloak`
+
+### Features:
+- User profile data retrieval from Yandex (email, name)
+- Consent screen for data usage permission
+- Seamless integration with existing authentication flow
 
 ## Development
 

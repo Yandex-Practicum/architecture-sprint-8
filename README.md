@@ -210,3 +210,79 @@
 **Компоненты:** Minio (порт 9001), сервис `cdn` (Nginx, порт 8082), переменные окружения reports-api: `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`, `CDN_BASE_URL`, `REDIS_ADDR`.
 
 ![docker-containers-3.png](img/docker-containers-3.png)
+
+## 4. Повышение оперативности и стабильности работы CRM
+
+CDC (Change Data Capture) для разделения потоков: выгрузки не нагружают OLTP CRM.
+
+### Что сделано
+
+1. **Debezium CDC**: захват изменений в таблицах CRM (`telemetry_events`, `users`) → Kafka
+2. **Kafka**: топики `crm_db.public.telemetry_events`, `crm_db.public.users`
+3. **ClickHouse KafkaEngine**: потребление из Kafka, парсинг Debezium JSON
+4. **MaterializedView**: `mv_telemetry_to_events` → сырые события, `mv_telemetry_to_datamart` → витрина `datamart_reports`
+5. **reports-api**: переведён на чтение из ClickHouse (при `CLICKHOUSE_DSN`)
+
+### Компоненты
+
+- **crm_db** (порт 5435): PostgreSQL с `wal_level=logical`
+- **Kafka** (9092), **Zookeeper** (2181)
+- **Debezium Connect** (8083)
+- **ClickHouse** (8123 HTTP, 9009 native)
+
+### Запуск
+
+```bash
+docker compose up -d --build
+# Подождать ~30 сек, затем:
+./scripts/register-debezium-connector.sh
+```
+
+Подробнее: [docs/CDC-CLICKHOUSE.md](docs/CDC-CLICKHOUSE.md)
+
+---
+## Запуск с нуля
+```bash
+# 1. Клонирование
+git clone <repo-url>
+cd architecture-bionicpro
+git checkout <branch>
+
+# 2. .env
+echo "CLICKHOUSE_PASSWORD=clickhouse" > .env
+
+# 3. init для Airflow (если airflow/db/init-db.sql нет в репо)
+mkdir -p airflow/db
+cp airflow/dags/sql/init-db.sql airflow/db/ 2>/dev/null || echo "CREATE DATABASE sample;" > airflow/db/init-db.sql
+
+# 4. Запуск основного стека
+docker compose up -d --build
+
+# 5. Ожидание ~2 минуты
+sleep 120
+
+# 6. reports-etl образ
+docker build -t reports-etl:latest ./reports-etl
+
+# 7. Debezium connector
+chmod +x scripts/register-debezium-connector.sh
+./scripts/register-debezium-connector.sh
+
+# 8. Airflow
+cd airflow && docker compose up -d && cd ..
+```
+
+## Список контейнеров в Docker
+![docker3.png](img/docker3.png)
+
+![docker4.png](img/docker4.png)
+
+Выполнение по пунктам:
+- Frontend: http://localhost:3000 (логин: user1 / password123)
+- Airflow: http://localhost:8081 (admin / admin)
+- Keycloak: http://localhost:8080 (admin / admin)
+- В Airflow:
+  - Включить DAG load_reports_seed — загрузка тестовых данных для user1
+  - Включить DAG reports_etl — ETL по расписанию
+  - Подключение olap_db (или как у вас): Postgres, host olap_db, порт 5432, схема из docker-compose
+  - После выполнения load_reports_seed отчёт для user1 будет доступен через UI

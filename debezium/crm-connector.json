@@ -1,0 +1,17 @@
+{
+  "name": "crm-db-connector",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "topic.prefix": "crm_db",
+    "database.hostname": "crm_db",
+    "database.port": "5432",
+    "database.user": "crm_user",
+    "database.password": "crm_password",
+    "database.dbname": "crm_db",
+    "database.server.name": "crm_db",
+    "table.include.list": "public.telemetry_events,public.users",
+    "plugin.name": "pgoutput",
+    "slot.name": "debezium_crm",
+    "publication.name": "debezium_publication"
+  }
+}

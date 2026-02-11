@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	_ "github.com/ClickHouse/clickhouse-go/v2"
 	_ "github.com/lib/pq"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -24,23 +25,34 @@ const (
 )
 
 var (
-	db          *sql.DB
-	s3Client    *minio.Client
-	redisClient *redis.Client
-	s3Bucket    string
-	cdnBaseURL  string
-	useS3       bool
+	db            *sql.DB
+	useClickHouse bool
+	s3Client      *minio.Client
+	redisClient   *redis.Client
+	s3Bucket      string
+	cdnBaseURL    string
+	useS3         bool
 )
 
 func main() {
-	dbURL := os.Getenv("OLAP_DATABASE_URL")
-	if dbURL == "" {
-		dbURL = defaultDBURL
-	}
 	var err error
-	db, err = sql.Open("postgres", dbURL)
-	if err != nil {
-		log.Fatalf("open db: %v", err)
+	chDSN := os.Getenv("CLICKHOUSE_DSN")
+	if chDSN != "" {
+		useClickHouse = true
+		db, err = sql.Open("clickhouse", chDSN)
+		if err != nil {
+			log.Fatalf("open ClickHouse: %v", err)
+		}
+		db.SetConnMaxLifetime(time.Minute * 3)
+	} else {
+		dbURL := os.Getenv("OLAP_DATABASE_URL")
+		if dbURL == "" {
+			dbURL = defaultDBURL
+		}
+		db, err = sql.Open("postgres", dbURL)
+		if err != nil {
+			log.Fatalf("open db: %v", err)
+		}
 	}
 	defer db.Close()
 	if err := db.Ping(); err != nil {
@@ -130,13 +142,34 @@ func handleReports(w http.ResponseWriter, r *http.Request) {
 
 	var periodFrom, periodTo, reportGeneratedAt string
 	var summary []byte
-	err := db.QueryRow(`
-		SELECT period_from::text, period_to::text, report_generated_at::text, COALESCE(summary::text, '{}')
-		FROM datamart_reports
-		WHERE user_id = $1
-		ORDER BY period_to DESC
-		LIMIT 1
-	`, userID).Scan(&periodFrom, &periodTo, &reportGeneratedAt, &summary)
+	var err error
+	if useClickHouse {
+		var usageHours, steps float64
+		var eventsCount uint64
+		err = db.QueryRow(`
+			SELECT toString(period_from), toString(period_to), toString(report_generated_at),
+			       usage_hours, steps, events_count
+			FROM datamart_reports FINAL
+			WHERE user_id = ?
+			ORDER BY period_to DESC
+			LIMIT 1
+		`, userID).Scan(&periodFrom, &periodTo, &reportGeneratedAt, &usageHours, &steps, &eventsCount)
+		if err == nil {
+			summary, _ = json.Marshal(map[string]any{
+				"usage_hours":  usageHours,
+				"steps":        steps,
+				"events_count": float64(eventsCount),
+			})
+		}
+	} else {
+		err = db.QueryRow(`
+			SELECT period_from::text, period_to::text, report_generated_at::text, COALESCE(summary::text, '{}')
+			FROM datamart_reports
+			WHERE user_id = $1
+			ORDER BY period_to DESC
+			LIMIT 1
+		`, userID).Scan(&periodFrom, &periodTo, &reportGeneratedAt, &summary)
+	}
 	if err == sql.ErrNoRows {
 		writeJSON(w, http.StatusNotFound, map[string]any{
 			"error":   "report_not_ready",

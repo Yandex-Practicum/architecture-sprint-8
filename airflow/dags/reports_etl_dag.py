@@ -1,6 +1,8 @@
 """
 ETL DAG: запуск Go 1.24 ETL (reports-etl) — извлечение CRM/телеметрии и формирование витрины в OLAP.
-Расписание: ежедневно. Нужны connection olap_db и образ reports-etl:latest (docker build -t reports-etl:latest ./reports-etl).
+Расписание: ежедневно. Нужны connection olap_db и образ reports-etl:latest.
+
+Сеть основного проекта (olap_db, crm_db, clickhouse) — reports-etl подключается к ней.
 """
 from datetime import datetime, timedelta
 
@@ -9,6 +11,8 @@ from airflow.operators.python import PythonOperator
 from airflow.hooks.base import BaseHook
 
 OLAP_CONN_ID = "olap_db"
+# Сеть основного docker compose (architecture-bionicpro)
+MAIN_PROJECT_NETWORK = "architecture-bionicpro_default"
 
 default_args = {
     "owner": "airflow",
@@ -27,6 +31,7 @@ def _run_go_etl(**context):
     url = f"postgresql://{conn.login}:{conn.password}@{conn.host}:{port}/{schema}?sslmode=disable"
     cmd = [
         "docker", "run", "--rm",
+        "--network", MAIN_PROJECT_NETWORK,
         "-e", f"OLAP_DATABASE_URL={url}",
         "reports-etl:latest",
     ]

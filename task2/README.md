@@ -42,7 +42,7 @@ CREATE TABLE client_datamart (
 ## Запуск системы
 
 1. Запустите сервисы: `docker-compose up -d`
-2. Доступ к интерфейсу Airflow: http://localhost:8082 (логин: airflow, пароль: airflow или логин: admin, пароль: admin123)
+2. Доступ к интерфейсу Airflow: http://localhost:8082
 3. DAG будет запускаться ежедневно автоматически
 4. Для ручного запуска используйте интерфейс Airflow
 
@@ -51,3 +51,63 @@ CREATE TABLE client_datamart (
 - Извлечение CRM и телеметрии симулировано
 - В продакшене замените на реальные подключения к API/базам данных
 - OLAP база данных доступна на порту 5435
+
+
+# Reports API Backend
+
+Эта задача реализует бэкенд-сервис на Python с API для получения отчётов по пользователям из OLAP базы данных.
+
+## Архитектура
+
+- **Фреймворк**: FastAPI
+- **База данных**: PostgreSQL (OLAP) с витриной `client_datamart`
+- **API**: `/reports` — POST эндпоинт для получения отчёта по `client_id`
+
+## Сервисы
+
+- `reports_api`: FastAPI приложение на порту 8083
+- `olap_db`: PostgreSQL с данными витрины
+
+## API Эндпоинты
+
+### POST /reports
+- **Описание**: Возвращает отчёт по пользователю из витрины.
+- **Тело запроса**:
+  ```json
+  {
+    "client_id": 1
+  }
+  ```
+- **Ответ**:
+  ```json
+  {
+    "client_id": 1,
+    "name": "Client A",
+    "email": "a@example.com",
+    "total_events": 2,
+    "last_event": "2023-01-01T10:05:00"
+  }
+  ```
+- **Ошибки**: 404 если клиент не найден, 500 при ошибке БД.
+
+## Запуск
+
+1. Перейдите в папку `task3`.
+2. Запустите: `docker-compose up -d`
+3. API доступно на http://localhost:8083
+4. Документация API: http://localhost:8083/docs
+
+## Тестирование
+
+Используйте curl или Postman:
+
+```bash
+curl -X POST "http://localhost:8083/reports" \
+     -H "Content-Type: application/json" \
+     -d '{"client_id": 1}'
+```
+
+## Примечания
+
+- Данные берутся из витрины `client_datamart`, созданной в задаче 2.
+- Нет сложных вычислений — только быстрый запрос из готовой таблицы.

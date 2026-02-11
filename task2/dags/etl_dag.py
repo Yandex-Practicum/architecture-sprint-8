@@ -28,8 +28,8 @@ def extract_crm_data():
     # Simulate extracting CRM data
     # In real scenario, this would be an API call or database query
     crm_data = [
-        {'client_id': 1, 'name': 'Client A', 'email': 'a@example.com'},
-        {'client_id': 2, 'name': 'Client B', 'email': 'b@example.com'},
+        {'client_id': '21d74fdf-adad-4b60-b296-4e73569c942a', 'name': 'Client A', 'email': 'a@example.com'},
+        {'client_id': 'another-uuid', 'name': 'Client B', 'email': 'b@example.com'},
     ]
     return crm_data
 
@@ -41,8 +41,9 @@ def load_crm_to_olap(**context):
     cursor = conn.cursor()
     # Create table if not exists
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS crm_clients (
-            client_id INTEGER PRIMARY KEY,
+        DROP TABLE IF EXISTS crm_clients;
+        CREATE TABLE crm_clients (
+            client_id VARCHAR(255) PRIMARY KEY,
             name VARCHAR(255),
             email VARCHAR(255)
         );
@@ -62,9 +63,9 @@ def extract_telemetry_data():
     # Simulate extracting telemetry data from Redis or API
     # In real scenario, connect to Redis or telemetry service
     telemetry_data = [
-        {'client_id': 1, 'event': 'login', 'timestamp': '2023-01-01 10:00:00'},
-        {'client_id': 1, 'event': 'view_page', 'timestamp': '2023-01-01 10:05:00'},
-        {'client_id': 2, 'event': 'login', 'timestamp': '2023-01-01 11:00:00'},
+        {'client_id': '21d74fdf-adad-4b60-b296-4e73569c942a', 'event': 'login', 'timestamp': '2023-01-01 10:00:00'},
+        {'client_id': '21d74fdf-adad-4b60-b296-4e73569c942a', 'event': 'view_page', 'timestamp': '2023-01-01 10:05:00'},
+        {'client_id': 'another-uuid', 'event': 'login', 'timestamp': '2023-01-01 11:00:00'},
     ]
     return telemetry_data
 
@@ -75,9 +76,10 @@ def load_telemetry_to_olap(**context):
     cursor = conn.cursor()
     # Create table if not exists
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS telemetry_events (
+        DROP TABLE IF EXISTS telemetry_events;
+        CREATE TABLE telemetry_events (
             id SERIAL PRIMARY KEY,
-            client_id INTEGER,
+            client_id VARCHAR(255),
             event VARCHAR(255),
             timestamp TIMESTAMP
         );
@@ -96,8 +98,9 @@ create_datamart = PostgresOperator(
     task_id='create_datamart',
     postgres_conn_id='olap_conn',
     sql="""
-        CREATE TABLE IF NOT EXISTS client_datamart (
-            client_id INTEGER PRIMARY KEY,
+        DROP TABLE IF EXISTS client_datamart;
+        CREATE TABLE client_datamart (
+            client_id VARCHAR(255) PRIMARY KEY,
             name VARCHAR(255),
             email VARCHAR(255),
             total_events INTEGER,

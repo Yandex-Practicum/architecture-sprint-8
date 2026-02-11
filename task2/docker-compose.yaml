@@ -63,6 +63,22 @@ services:
     depends_on:
       - redis
       - keycloak
+
+  reports_api:
+    build:
+      context: ./backend/reports_api
+      dockerfile: Dockerfile
+    ports:
+      - "8083:8083"
+    environment:
+      OLAP_DB_HOST: host.docker.internal
+      OLAP_DB_PORT: 5435
+      OLAP_DB_NAME: olap
+      OLAP_DB_USER: olap_user
+      OLAP_DB_PASSWORD: olap_password
+    depends_on:
+      - olap_db
+
   redis:
     image: redis:7-alpine
     ports:
@@ -147,3 +163,4 @@ services:
 volumes:
   airflow_db_data:
   olap_db_data:
+

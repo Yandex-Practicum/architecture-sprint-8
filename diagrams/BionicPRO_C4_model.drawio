@@ -1,6 +1,6 @@
 <mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/29.3.6 Chrome/140.0.7339.249 Electron/38.8.0 Safari/537.36" version="29.3.6">
   <diagram name="Page-1" id="Vdj-dLDs9ZxfFK_ICv-k">
-    <mxGraphModel dx="4005" dy="3029" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+    <mxGraphModel dx="2253" dy="2178" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -20,8 +20,14 @@
             <mxGeometry height="180" width="200" x="-360" y="-660" as="geometry" />
           </mxCell>
         </object>
-        <mxCell id="-s9W17W-NFw-Ta7AQgpa-27" edge="1" parent="1" source="Lhtp9tOnbV0N8Cz71-gY-8" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="Lhtp9tOnbV0N8Cz71-gY-17" value="Отправка&lt;div&gt;&amp;nbsp;технической&lt;br&gt;телеметрии&lt;/div&gt;">
-          <mxGeometry relative="1" as="geometry" />
+        <mxCell id="-s9W17W-NFw-Ta7AQgpa-27" edge="1" parent="1" source="Lhtp9tOnbV0N8Cz71-gY-8" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#5BD560;strokeWidth=2;edgeStyle=orthogonalEdgeStyle;" target="SSO-2" value="1. Device Flow (RFC 8628)&lt;br&gt;активация через приложение&lt;br&gt;2. Телеметрия (Bearer token)">
+          <mxGeometry relative="1" x="-0.3684" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="280" y="-660" />
+              <mxPoint x="280" y="-440" />
+            </Array>
+          </mxGeometry>
         </mxCell>
         <object placeholders="1" c4Name="Программа в чипе протеза" c4Type="Software System" c4Description="Чтение данных с датчиков, распознавание движений и их воспроизводство. Чтение команд из приложения и их воспроизводство, передача телеметрии" label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#cccccc&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="Lhtp9tOnbV0N8Cz71-gY-8">
           <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;labelBackgroundColor=none;fillColor=#1061B0;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0D5091;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1">
@@ -29,13 +35,13 @@
           </mxCell>
         </object>
         <object placeholders="1" c4Name="База данных" c4Type="Container" c4Technology="PostgreSQL" c4Description="" label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%:&amp;nbsp;%c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="Lhtp9tOnbV0N8Cz71-gY-12">
-          <mxCell parent="1" style="shape=cylinder3;size=15;whiteSpace=wrap;html=1;boundedLbl=1;rounded=0;labelBackgroundColor=none;fillColor=#23A2D9;fontSize=12;fontColor=#ffffff;align=center;strokeColor=#0E7DAD;metaEdit=1;points=[[0.5,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.5,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];resizable=0;" vertex="1">
-            <mxGeometry height="120" width="240" x="800" y="-600" as="geometry" />
+          <mxCell parent="1" style="shape=cylinder3;size=15;whiteSpace=wrap;html=1;boundedLbl=1;rounded=0;labelBackgroundColor=none;fillColor=#23A2D9;fontSize=12;fontColor=#ffffff;align=center;strokeColor=#0E7DAD;metaEdit=1;points=[[0.5,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.5,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];resizable=1;" vertex="1">
+            <mxGeometry height="120" width="240" x="800" y="-720" as="geometry" />
           </mxCell>
         </object>
         <object placeholders="1" c4Name="BionicPRO" c4Type="SystemScopeBoundary" c4Application="Software System" label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;&lt;div style=&quot;text-align: left&quot;&gt;%c4Name%&lt;/div&gt;&lt;/b&gt;&lt;/font&gt;&lt;div style=&quot;text-align: left&quot;&gt;[%c4Application%]&lt;/div&gt;" id="Lhtp9tOnbV0N8Cz71-gY-13">
           <mxCell parent="1" style="rounded=1;fontSize=11;whiteSpace=wrap;html=1;dashed=1;arcSize=20;fillColor=none;strokeColor=#666666;fontColor=#333333;labelBackgroundColor=none;align=left;verticalAlign=bottom;labelBorderColor=none;spacingTop=0;spacing=10;dashPattern=8 4;metaEdit=1;rotatable=0;perimeter=rectanglePerimeter;noLabel=0;labelPadding=0;allowArrows=0;connectable=0;expand=0;recursiveResize=0;editable=1;pointerEvents=0;absoluteArcSize=1;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1">
-            <mxGeometry height="700" width="720" x="360" y="-1120" as="geometry" />
+            <mxGeometry height="830" width="720" x="360" y="-1120" as="geometry" />
           </mxCell>
         </object>
         <mxCell id="-s9W17W-NFw-Ta7AQgpa-4" edge="1" parent="1" source="Lhtp9tOnbV0N8Cz71-gY-17" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="Lhtp9tOnbV0N8Cz71-gY-12">
@@ -43,12 +49,9 @@
         </mxCell>
         <object placeholders="1" c4Name="API" c4Type="Container" c4Technology="e.g. SpringBoot, ElasticSearch, etc." c4Description="" label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%: %c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="Lhtp9tOnbV0N8Cz71-gY-17">
           <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;labelBackgroundColor=none;fillColor=#23A2D9;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0E7DAD;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1">
-            <mxGeometry height="120" width="240" x="400" y="-600" as="geometry" />
+            <mxGeometry height="120" width="240" x="400" y="-720" as="geometry" />
           </mxCell>
         </object>
-        <mxCell id="-s9W17W-NFw-Ta7AQgpa-1" edge="1" parent="1" source="Lhtp9tOnbV0N8Cz71-gY-20" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="Lhtp9tOnbV0N8Cz71-gY-17">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
         <mxCell id="-s9W17W-NFw-Ta7AQgpa-9" edge="1" parent="1" source="Lhtp9tOnbV0N8Cz71-gY-20" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="Lhtp9tOnbV0N8Cz71-gY-8">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
@@ -65,22 +68,27 @@
         <mxCell id="-s9W17W-NFw-Ta7AQgpa-15" edge="1" parent="1" source="-s9W17W-NFw-Ta7AQgpa-11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="-s9W17W-NFw-Ta7AQgpa-13">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
-              <mxPoint x="1520" y="-540" />
-              <mxPoint x="1520" y="-540" />
+              <mxPoint x="1520" y="-660" />
+              <mxPoint x="1520" y="-660" />
             </Array>
           </mxGeometry>
         </mxCell>
         <object placeholders="1" c4Name="ML-инженер" c4Type="Person" c4Description="" label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#cccccc&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="-s9W17W-NFw-Ta7AQgpa-11">
           <mxCell parent="1" style="html=1;fontSize=11;dashed=0;whiteSpace=wrap;fillColor=#083F75;strokeColor=#06315C;fontColor=#ffffff;shape=mxgraph.c4.person2;align=center;metaEdit=1;points=[[0.5,0,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0]];resizable=0;" vertex="1">
-            <mxGeometry height="180" width="200" x="1560" y="-660" as="geometry" />
+            <mxGeometry height="180" width="200" x="1550" y="-780" as="geometry" />
           </mxCell>
         </object>
         <mxCell id="-s9W17W-NFw-Ta7AQgpa-14" edge="1" parent="1" source="-s9W17W-NFw-Ta7AQgpa-13" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="Lhtp9tOnbV0N8Cz71-gY-12">
-          <mxGeometry relative="1" as="geometry" />
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1040" y="-660" />
+              <mxPoint x="1040" y="-660" />
+            </Array>
+          </mxGeometry>
         </mxCell>
         <object placeholders="1" c4Name="cli tool" c4Type="Container" c4Technology="e.g. SpringBoot, ElasticSearch, etc." c4Description="" label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%: %c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="-s9W17W-NFw-Ta7AQgpa-13">
           <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;labelBackgroundColor=none;fillColor=#23A2D9;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0E7DAD;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1">
-            <mxGeometry height="120" width="240" x="1160" y="-600" as="geometry" />
+            <mxGeometry height="120" width="240" x="1160" y="-720" as="geometry" />
           </mxCell>
         </object>
         <mxCell id="-s9W17W-NFw-Ta7AQgpa-18" edge="1" parent="1" source="-s9W17W-NFw-Ta7AQgpa-16" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="-s9W17W-NFw-Ta7AQgpa-17">
@@ -93,7 +101,7 @@
         </object>
         <object placeholders="1" c4Name="CRM DB" c4Type="Container" c4Technology="e.g. Oracle Database 12" c4Description="" label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%:&amp;nbsp;%c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="-s9W17W-NFw-Ta7AQgpa-17">
           <mxCell parent="1" style="shape=cylinder3;size=15;whiteSpace=wrap;html=1;boundedLbl=1;rounded=0;labelBackgroundColor=none;fillColor=#23A2D9;fontSize=12;fontColor=#ffffff;align=center;strokeColor=#0E7DAD;metaEdit=1;points=[[0.5,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.5,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];resizable=0;" vertex="1">
-            <mxGeometry height="120" width="240" x="800" y="-880" as="geometry" />
+            <mxGeometry height="120" width="240" x="800" y="-920" as="geometry" />
           </mxCell>
         </object>
         <mxCell id="-s9W17W-NFw-Ta7AQgpa-22" edge="1" parent="1" source="-s9W17W-NFw-Ta7AQgpa-19" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="-s9W17W-NFw-Ta7AQgpa-16">
@@ -130,6 +138,108 @@
             <mxGeometry height="180" width="200" x="1241" y="-1140" as="geometry" />
           </mxCell>
         </object>
+        <mxCell id="SSO-edge-1" edge="1" parent="1" source="Lhtp9tOnbV0N8Cz71-gY-20" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#5BD560;strokeWidth=2;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=classic;" target="SSO-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="SSO-edge-label-1" connectable="0" parent="SSO-edge-1" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];rounded=0;strokeColor=#5BD560;strokeWidth=2;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;" value="PKCE OAuth 2.0&lt;br&gt;session token&lt;br&gt;(короткий TTL)" vertex="1">
+          <mxGeometry relative="1" x="-0.1" y="2" as="geometry">
+            <mxPoint x="28" y="12" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <object placeholders="1" c4Name="BFF (Backend for Frontend)" c4Type="Container" c4Technology="Node.js, Express" c4Description="API Gateway. Прокси-слой для безопасной работы с токенами. Хранит refresh tokens, выдаёт session tokens фронтенду. Проксирует Device Flow (RFC 8628) для IoT устройств" label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%: %c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="SSO-2">
+          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;labelBackgroundColor=none;fillColor=#23A2D9;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0E7DAD;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];dashed=1;strokeWidth=3;" vertex="1">
+            <mxGeometry height="120" width="240" x="400" y="-480" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="SSO-edge-2" edge="1" parent="1" source="SSO-2" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#5BD560;strokeWidth=2;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=classic;" target="SSO-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="SSO-edge-label-2" connectable="0" parent="SSO-edge-2" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];rounded=0;strokeColor=#5BD560;strokeWidth=2;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;" value="Auth Code&lt;br&gt;→&amp;nbsp;access + refresh&lt;br&gt;(refresh хранится в BFF)" vertex="1">
+          <mxGeometry relative="1" x="-0.1" y="2" as="geometry">
+            <mxPoint x="8" y="12" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="SSO-edge-3" edge="1" parent="1" source="SSO-2" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#5BD560;strokeWidth=2;" target="Lhtp9tOnbV0N8Cz71-gY-17">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="SSO-edge-label-3" connectable="0" parent="SSO-edge-3" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="Проксирование запросов&lt;br&gt;Bearer: JWT access token&lt;br&gt;(подстановка из refresh)" vertex="1">
+          <mxGeometry relative="1" x="-0.1" y="2" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <object placeholders="1" c4Name="Keycloak (IAM)" c4Type="Container" c4Technology="Java, Keycloak" c4Description="Identity Provider. Управление пользователями, ролями (RBAC), выдача JWT токенов, федерация с внешними IdP" label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%: %c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="SSO-3">
+          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;labelBackgroundColor=none;fillColor=#23A2D9;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0E7DAD;metaEdit=1;resizable=1;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];dashed=1;strokeWidth=3;" vertex="1">
+            <mxGeometry height="120" width="240" x="800" y="-480" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="SSO-edge-4" edge="1" parent="1" source="SSO-3" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#5BD560;strokeWidth=2;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=classic;" target="SSO-4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="SSO-edge-label-4" connectable="0" parent="SSO-edge-4" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];rounded=0;strokeColor=#5BD560;strokeWidth=2;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;" value="OIDC/SAML&lt;br&gt;Federation" vertex="1">
+          <mxGeometry relative="1" x="0.1" y="2" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <object placeholders="1" c4Name="Внешние IdP (по странам)" c4Type="Software System" c4Description="ЕСИА (Россия), eIDAS (ЕС) и другие национальные системы идентификации" label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#cccccc&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="SSO-4">
+          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;labelBackgroundColor=none;fillColor=#8C8496;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#736782;metaEdit=1;resizable=1;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];dashed=1;strokeWidth=3;" vertex="1">
+            <mxGeometry height="120" width="260" x="1160" y="-480" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="SSO-edge-5" edge="1" parent="1" source="Lhtp9tOnbV0N8Cz71-gY-17" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;edgeStyle=orthogonalEdgeStyle;strokeWidth=2;strokeColor=#5BD560;" target="SSO-3">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="700" y="-640" />
+              <mxPoint x="700" y="-440" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="SSO-edge-label-5" connectable="0" parent="SSO-edge-5" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="Проверка JWT signature&lt;br&gt;Получение claims (роли, user_id)" vertex="1">
+          <mxGeometry relative="1" x="0.1" y="2" as="geometry">
+            <mxPoint x="-32" y="-34" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="SSO-edge-6" edge="1" parent="1" source="-s9W17W-NFw-Ta7AQgpa-19" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;edgeStyle=orthogonalEdgeStyle;jumpStyle=gap;jumpSize=10;strokeWidth=2;strokeColor=#5BD560;" target="SSO-3">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="720" y="-1000" />
+              <mxPoint x="720" y="-460" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="SSO-edge-label-6" connectable="0" parent="SSO-edge-6" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" value="SSO&lt;br&gt;аутентификация" vertex="1">
+          <mxGeometry relative="1" x="0.1" y="2" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="SSO-edge-8" edge="1" parent="1" source="-s9W17W-NFw-Ta7AQgpa-23" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;edgeStyle=orthogonalEdgeStyle;strokeWidth=2;strokeColor=#5BD560;" target="SSO-3" value="SSO&lt;br&gt;аутентификация,&lt;br&gt;RBAC роли">
+          <mxGeometry relative="1" x="-0.1891" y="30" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="1100" y="-1000" />
+              <mxPoint x="1100" y="-560" />
+              <mxPoint x="920" y="-560" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="SSO-edge-9" edge="1" parent="1" source="-s9W17W-NFw-Ta7AQgpa-20" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;edgeStyle=orthogonalEdgeStyle;strokeWidth=2;strokeColor=#5BD560;jumpStyle=gap;jumpSize=12;" target="SSO-3" value="SSO&lt;br&gt;аутентификация">
+          <mxGeometry relative="1" x="-0.6203" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="300" y="-1000" />
+              <mxPoint x="300" y="-260" />
+              <mxPoint x="900" y="-260" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="SSO-edge-10" edge="1" parent="1" source="-s9W17W-NFw-Ta7AQgpa-13" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;edgeStyle=orthogonalEdgeStyle;strokeWidth=2;strokeColor=#5BD560;" target="SSO-3" value="OAuth&lt;br&gt;аутентификация">
+          <mxGeometry relative="1" x="-0.4783" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="1280" y="-540" />
+              <mxPoint x="940" y="-540" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
       </root>
     </mxGraphModel>
   </diagram>

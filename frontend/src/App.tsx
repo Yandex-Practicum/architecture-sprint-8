@@ -1,23 +1,31 @@
-import React from 'react';
-import { ReactKeycloakProvider } from '@react-keycloak/web';
-import Keycloak, { KeycloakConfig } from 'keycloak-js';
+import React, { useEffect } from 'react';
+import { AuthProvider } from './contexts/AuthContext';
 import ReportPage from './components/ReportPage';
 
-const keycloakConfig: KeycloakConfig = {
-  url: process.env.REACT_APP_KEYCLOAK_URL,
-  realm: process.env.REACT_APP_KEYCLOAK_REALM||"",
-  clientId: process.env.REACT_APP_KEYCLOAK_CLIENT_ID||""
-};
-
-const keycloak = new Keycloak(keycloakConfig);
-
 const App: React.FC = () => {
+  // Handle OAuth callback
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const authenticated = params.get('authenticated');
+    const error = params.get('error');
+
+    if (authenticated === 'true') {
+      // Clear URL parameters and reload
+      window.history.replaceState({}, document.title, '/');
+      window.location.reload();
+    } else if (error) {
+      console.error('Authentication error:', error);
+      alert(`Authentication failed: ${error}`);
+      window.history.replaceState({}, document.title, '/');
+    }
+  }, []);
+
   return (
-    <ReactKeycloakProvider authClient={keycloak}>
+    <AuthProvider>
       <div className="App">
         <ReportPage />
       </div>
-    </ReactKeycloakProvider>
+    </AuthProvider>
   );
 };
 

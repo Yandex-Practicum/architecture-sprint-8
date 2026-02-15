@@ -1,0 +1,30 @@
+{
+  "name": "bionicpro-bff",
+  "version": "1.0.0",
+  "description": "Backend for Frontend service with PKCE OAuth 2.0 flow",
+  "main": "dist/index.js",
+  "scripts": {
+    "start": "node dist/index.js",
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "build": "tsc",
+    "test": "jest"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "axios": "^1.6.0",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express-session": "^1.17.3",
+    "crypto": "^1.0.1"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.20",
+    "@types/cookie-parser": "^1.4.6",
+    "@types/cors": "^2.8.16",
+    "@types/express-session": "^1.17.10",
+    "@types/node": "^20.9.0",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.2.2"
+  }
+}

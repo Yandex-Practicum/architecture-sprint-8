@@ -111,7 +111,37 @@
     ],
     "clients": [
       {
+        "clientId": "bionicpro-bff",
+        "name": "BionicPRO BFF Service",
+        "description": "Backend for Frontend with PKCE OAuth 2.0",
+        "enabled": true,
+        "publicClient": false,
+        "clientAuthenticatorType": "client-secret",
+        "secret": "BFF-SECRET-CHANGE-IN-PRODUCTION-123456",
+        "standardFlowEnabled": true,
+        "implicitFlowEnabled": false,
+        "directAccessGrantsEnabled": false,
+        "serviceAccountsEnabled": false,
+        "redirectUris": [
+          "http://localhost:4000/auth/callback",
+          "http://bff:4000/auth/callback"
+        ],
+        "webOrigins": [
+          "http://localhost:3000",
+          "http://localhost:4000"
+        ],
+        "attributes": {
+          "pkce.code.challenge.method": "S256",
+          "access.token.lifespan": "600",
+          "client.session.idle.timeout": "86400",
+          "client.session.max.lifespan": "86400"
+        },
+        "protocol": "openid-connect",
+        "fullScopeAllowed": true
+      },
+      {
         "clientId": "reports-frontend",
+        "name": "Reports Frontend (Legacy)",
         "enabled": true,
         "publicClient": true,
         "redirectUris": ["http://localhost:3000/*"],
@@ -120,10 +150,13 @@
       },
       {
         "clientId": "reports-api",
+        "name": "Reports API",
         "enabled": true,
         "clientAuthenticatorType": "client-secret",
         "secret": "oNwoLQdvJAvRcL89SydqCWCe5ry1jMgq", 
-        "bearerOnly": true
+        "bearerOnly": true,
+        "standardFlowEnabled": false,
+        "directAccessGrantsEnabled": false
       }
     ]
   }

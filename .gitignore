@@ -1,2 +1,46 @@
-/postgres-keycloak-data
-2024__yandex-architecture-sso.code-workspace
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Docker
+postgres-data/
+postgres-keycloak-data/
+airflow-db-data/
+clickhouse-data/
+
+# Logs
+*.log
+logs/
+
+# Environment variables
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+dist/
+build/
+*.egg-info/

@@ -40,3 +40,148 @@ services:
       REACT_APP_KEYCLOAK_URL: http://localhost:8080
       REACT_APP_KEYCLOAK_REALM: reports-realm
       REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+    depends_on:
+      - backend
+      - keycloak
+
+  # PostgreSQL для хранения телеметрии
+  postgres:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: bionicpro_db
+      POSTGRES_USER: bionicpro_user
+      POSTGRES_PASSWORD: bionicpro_password
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bionicpro_user -d bionicpro_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ClickHouse для OLAP аналитики
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    volumes:
+      - ./clickhouse-data:/var/lib/clickhouse
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PostgreSQL для Airflow метаданных
+  airflow_db:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: airflow_db
+      POSTGRES_USER: airflow_user
+      POSTGRES_PASSWORD: airflow_password
+    volumes:
+      - ./airflow-db-data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow_user -d airflow_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Airflow Redis для Celery
+  airflow_redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Airflow Webserver
+  airflow_webserver:
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    command: webserver
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow_user:airflow_password@airflow_db:5432/airflow_db
+      AIRFLOW__CORE__FERNET_KEY: ''
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth'
+      AIRFLOW__WEBSERVER__SECRET_KEY: 'airflow-secret-key'
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+    ports:
+      - "8081:8080"
+    depends_on:
+      - airflow_db
+      - airflow_scheduler
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Airflow Scheduler
+  airflow_scheduler:
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    command: scheduler
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow_user:airflow_password@airflow_db:5432/airflow_db
+      AIRFLOW__CORE__FERNET_KEY: ''
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+    depends_on:
+      - airflow_db
+      - postgres
+      - clickhouse
+    healthcheck:
+      test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob --hostname $$(hostname)"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Backend API для отчётов
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: reports-realm
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: 8123
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+    depends_on:
+      - clickhouse
+      - keycloak
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5

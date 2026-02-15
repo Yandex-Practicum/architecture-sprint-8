@@ -1,65 +1,85 @@
 import React, { useState, useEffect } from 'react';
+import Keycloak from 'keycloak-js';
 
 const ReportPage: React.FC = () => {
+  const [keycloak, setKeycloak] = useState<Keycloak.KeycloakInstance | null>(null);
   const [authenticated, setAuthenticated] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reportUrl, setReportUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    checkAuthStatus();
+    const initKeycloak = async () => {
+      const keycloakInstance = new Keycloak({
+        url: 'http://localhost:8080',
+        realm: 'reports-realm',
+        clientId: 'reports-frontend' // Existing client in realm
+      });
+
+      try {
+        const authenticated = await keycloakInstance.init({
+          onLoad: 'login-required',
+          checkLoginIframe: false
+        });
+        setKeycloak(keycloakInstance);
+        setAuthenticated(authenticated);
+      } catch (error) {
+        console.error('Keycloak init error:', error);
+      }
+    };
+
+    initKeycloak();
   }, []);
 
-  const checkAuthStatus = async () => {
-    try {
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/protected`, {
-        credentials: 'include'
-      });
-      if (response.ok) {
-        setAuthenticated(true);
-      } else {
-        setAuthenticated(false);
-      }
-    } catch (err) {
-      setAuthenticated(false);
-    }
-  };
-
   const login = () => {
-    window.location.href = `${process.env.REACT_APP_API_URL}/auth/login`;
+    keycloak?.login();
   };
 
-  const logout = async () => {
-    try {
-      await fetch(`${process.env.REACT_APP_API_URL}/auth/logout`, {
-        method: 'POST',
-        credentials: 'include'
-      });
-      setAuthenticated(false);
-    } catch (err) {
-      console.error('Logout failed:', err);
+  const logout = () => {
+    keycloak?.logout();
+  };
+
+  const getReport = async () => {
+    if (!keycloak) {
+      setError('Keycloak not initialized');
+      return;
     }
-  };
 
-  const downloadReport = async () => {
+    try {
+      // Update token if needed
+      await keycloak.updateToken(30);
+    } catch (error) {
+      setError('Failed to refresh token');
+      return;
+    }
+
+    if (!keycloak.token) {
+      setError('No token available');
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/reports`, {
-        credentials: 'include'
+      const response = await fetch('http://localhost:8083/reports', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${keycloak.token}`,
+          'Content-Type': 'application/json'
+        }
       });
 
       if (!response.ok) {
         if (response.status === 401) {
           setAuthenticated(false);
-          throw new Error('Session expired. Please login again.');
+          throw new Error('Unauthorized. Please login again.');
         }
-        throw new Error('Failed to download report');
+        throw new Error(`Failed to get report: ${response.statusText}`);
       }
 
       const data = await response.json();
-      console.log('Reports:', data);
-      // Handle report data
+      setReportUrl(data.report_url);
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -98,13 +118,21 @@ const ReportPage: React.FC = () => {
           </button>
         </div>
         <button
-          onClick={downloadReport}
+          onClick={getReport}
           disabled={loading}
           className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50"
         >
-          {loading ? 'Loading...' : 'Download Report'}
+          {loading ? 'Loading...' : 'Get Report'}
         </button>
         {error && <p className="text-red-500 mt-4">{error}</p>}
+        {reportUrl && (
+          <div className="mt-6 p-4 bg-gray-50 rounded">
+            <h2 className="text-lg font-semibold mb-2">Report</h2>
+            <a href={reportUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">
+              Download Report
+            </a>
+          </div>
+        )}
       </div>
     </div>
   );

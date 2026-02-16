@@ -1,0 +1,152 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/29.3.6 Chrome/140.0.7339.249 Electron/38.8.0 Safari/537.36" version="29.3.6">
+  <diagram name="ETL Architecture" id="o0lNJXGr8LR2zWZFhpY5">
+    <mxGraphModel dx="1678" dy="1187" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="airflow-container" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#8C8496;strokeColor=#5D4E70;fontColor=#ffffff;align=center;arcSize=5;verticalAlign=top;spacingTop=10;dashed=1;dashPattern=8 8;" value="&lt;b style=&quot;font-size: 18px;&quot;&gt;Apache Airflow&lt;/b&gt;&lt;br&gt;[Container: Python, Docker]" vertex="1">
+          <mxGeometry height="540" width="240" x="480" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="clickhouse-container" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2C5F2D;strokeColor=#1E4620;fontColor=#ffffff;align=center;arcSize=5;verticalAlign=top;spacingTop=10;dashed=1;dashPattern=8 8;" value="&lt;b style=&quot;font-size: 18px;&quot;&gt;ClickHouse (OLAP)&lt;/b&gt;&lt;br&gt;[Container: ClickHouse]" vertex="1">
+          <mxGeometry height="540" width="280" x="840" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow-pg-airflow" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#5BD560;" target="IT4TX0Njsb1uZ6pAUwHL-4" value="Выгрузка&lt;br&gt;телеметрии">
+          <mxGeometry relative="1" x="-0.1667" as="geometry">
+            <mxPoint as="offset" />
+            <mxPoint x="280" y="220.0000000000001" as="sourcePoint" />
+            <mxPoint x="520" y="220" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arrow-crm-airflow" edge="1" parent="1" source="IT4TX0Njsb1uZ6pAUwHL-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#5BD560;" target="IT4TX0Njsb1uZ6pAUwHL-5" value="Выгрузка&lt;br&gt;данных пользователей">
+          <mxGeometry relative="1" x="-0.1667" as="geometry">
+            <mxPoint as="offset" />
+            <mxPoint x="280" y="380" as="sourcePoint" />
+            <mxPoint x="520" y="380" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arrow-dag1-ch" edge="1" parent="1" source="IT4TX0Njsb1uZ6pAUwHL-4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#FFA500;" target="IT4TX0Njsb1uZ6pAUwHL-10" value="Вставка&lt;br&gt;телеметрии">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" />
+            <mxPoint x="680" y="220" as="sourcePoint" />
+            <mxPoint x="880" y="220" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arrow-dag2-ch" edge="1" parent="1" source="IT4TX0Njsb1uZ6pAUwHL-5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#FFA500;" target="IT4TX0Njsb1uZ6pAUwHL-9" value="Вставка данных&lt;br&gt;пользователей">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="680" y="380" as="sourcePoint" />
+            <mxPoint x="880" y="380" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arrow-dag3-ch" edge="1" parent="1" source="IT4TX0Njsb1uZ6pAUwHL-6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#9B7EBD;" target="IT4TX0Njsb1uZ6pAUwHL-11" value="Построение&lt;br&gt;материализованного&lt;br&gt;представления&lt;br&gt;(витрины)">
+          <mxGeometry relative="1" x="-0.1111" y="-20" as="geometry">
+            <mxPoint as="offset" />
+            <mxPoint x="680" y="560" as="sourcePoint" />
+            <mxPoint x="880" y="560" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arrow-ch-api" edge="1" parent="1" source="IT4TX0Njsb1uZ6pAUwHL-15" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#1976D2;" target="IT4TX0Njsb1uZ6pAUwHL-11" value="&lt;div&gt;Получение отчётов&lt;br&gt;для конкретного пользователя&lt;br&gt;на конкретный период времени&lt;/div&gt;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" />
+            <mxPoint x="980" y="720" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arrow-app-api" edge="1" parent="1" source="IT4TX0Njsb1uZ6pAUwHL-12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#1976D2;" target="IT4TX0Njsb1uZ6pAUwHL-15" value="&lt;div&gt;GET /reports&lt;/div&gt;&lt;div&gt;Authorization: Bearer JWT&lt;/div&gt;">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="640" y="800" as="sourcePoint" />
+            <mxPoint x="840" y="800" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="notes-bg" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF9C4;strokeColor=#F9A825;align=left;verticalAlign=top;spacingTop=10;spacingLeft=5;spacing=0;spacingBottom=0;arcSize=8;" value="&lt;span style=&quot;font-size: 10px;&quot;&gt;• Запуск по расписанию (@daily)&lt;/span&gt;&lt;br style=&quot;font-size: 10px;&quot;&gt;&lt;span style=&quot;font-size: 10px;&quot;&gt;•&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;font-size: 10px;&quot;&gt;Проверка доступа пользователя к своим отчётам в&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;font-size: 10px;&quot;&gt;API (&lt;/span&gt;&lt;span style=&quot;font-size: 10px;&quot;&gt;RBAC&lt;/span&gt;&lt;span style=&quot;font-size: 10px;&quot;&gt;)&lt;/span&gt;" vertex="1">
+          <mxGeometry height="50" width="310" x="40" y="40" as="geometry" />
+        </mxCell>
+        <object placeholders="1" c4Name="CRM DB" c4Type="Container" c4Technology="e.g. Oracle Database 12" c4Description="Данные о клиентах" label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%:&amp;nbsp;%c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="IT4TX0Njsb1uZ6pAUwHL-1">
+          <mxCell parent="1" style="shape=cylinder3;size=15;whiteSpace=wrap;html=1;boundedLbl=1;rounded=0;labelBackgroundColor=none;fillColor=#23A2D9;fontSize=12;fontColor=#ffffff;align=center;strokeColor=#0E7DAD;metaEdit=1;points=[[0.5,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.5,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];resizable=0;" vertex="1">
+            <mxGeometry height="120" width="240" x="40" y="320" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="База данных" c4Type="Container" c4Technology="PostgreSQL" c4Description="Телеметрия от чипов протезов" label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%:&amp;nbsp;%c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="IT4TX0Njsb1uZ6pAUwHL-2">
+          <mxCell parent="1" style="shape=cylinder3;size=15;whiteSpace=wrap;html=1;boundedLbl=1;rounded=0;labelBackgroundColor=none;fillColor=#23A2D9;fontSize=12;fontColor=#ffffff;align=center;strokeColor=#0E7DAD;metaEdit=1;points=[[0.5,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.5,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];resizable=1;" vertex="1">
+            <mxGeometry height="120" width="240" x="40" y="160" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="DAG: telemetry_etl" c4Type="Container" c4Technology="Python Script" c4Description="1. Чтение из PostgreSQL&#xa;2. Трансформация (агрегация)&#xa;3. Загрузка в ClickHouse&#xa;&#xa;Расписание: @daily" label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%: %c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="IT4TX0Njsb1uZ6pAUwHL-4">
+          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;labelBackgroundColor=none;fillColor=#7B68A6;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#5D4E70;metaEdit=1;resizable=1;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];verticalAlign=middle;fontFamily=Helvetica;" vertex="1">
+            <mxGeometry height="120" width="160" x="520" y="160" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="DAG: crm_etl" c4Type="Container" c4Technology="Python Script" c4Description="1. Чтение из CRM DB&#xa;2. Трансформация (слияние)&#xa;3. Загрузка в ClickHouse&#xa;&#xa;Расписание: @daily" label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%: %c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="IT4TX0Njsb1uZ6pAUwHL-5">
+          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;labelBackgroundColor=none;fillColor=#7B68A6;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#5D4E70;metaEdit=1;resizable=1;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];verticalAlign=middle;fontFamily=Helvetica;" vertex="1">
+            <mxGeometry height="120" width="160" x="520" y="320" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="DAG: build_reports_mart" c4Type="Container" c4Technology="Python Script" c4Description="1. Join telemetry + CRM&#xa;2. Aggregate by user&#xa;3. Create reports mart&#xa;&#xa;Schedule: @daily" label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%: %c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="IT4TX0Njsb1uZ6pAUwHL-6">
+          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;labelBackgroundColor=none;fillColor=#9B7EBD;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#7B68A6;metaEdit=1;resizable=1;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];verticalAlign=middle;fontFamily=Helvetica;" vertex="1">
+            <mxGeometry height="120" width="200" x="500" y="480" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="IT4TX0Njsb1uZ6pAUwHL-8" edge="1" parent="1" source="IT4TX0Njsb1uZ6pAUwHL-10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#5BD560;" target="IT4TX0Njsb1uZ6pAUwHL-6" value="Чтение&lt;br&gt;телеметрии">
+          <mxGeometry relative="1" x="-0.2609" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="780" y="240" />
+              <mxPoint x="780" y="500" />
+            </Array>
+            <mxPoint x="880" y="240" as="sourcePoint" />
+            <mxPoint x="520" y="220" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="IT4TX0Njsb1uZ6pAUwHL-7" edge="1" parent="1" source="IT4TX0Njsb1uZ6pAUwHL-9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#5BD560;" target="IT4TX0Njsb1uZ6pAUwHL-6" value="Чтение&lt;br&gt;данных&lt;br&gt;пользователей">
+          <mxGeometry relative="1" y="20" as="geometry">
+            <mxPoint as="offset" />
+            <Array as="points">
+              <mxPoint x="800" y="400" />
+              <mxPoint x="800" y="520" />
+            </Array>
+            <mxPoint x="880" y="400" as="sourcePoint" />
+            <mxPoint x="520" y="380" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <object placeholders="1" c4Name="crm_data" c4Type="Container" c4Technology="Table" c4Description="Данные о клиентах&#xa;user_id, name, email,&#xa;device_list" label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%: %c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="IT4TX0Njsb1uZ6pAUwHL-9">
+          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;labelBackgroundColor=none;fillColor=#1E4620;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#2C5F2D;metaEdit=1;resizable=1;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];verticalAlign=middle;fontFamily=Helvetica;" vertex="1">
+            <mxGeometry height="120" width="200" x="880" y="320" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="telemetry_raw" c4Type="Container" c4Technology="Table" c4Description="Сырые данные телеметрии&#xa;user_id, device_id,&#xa;timestamp, sensor_data" label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%: %c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="IT4TX0Njsb1uZ6pAUwHL-10">
+          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;labelBackgroundColor=none;fillColor=#1E4620;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#2C5F2D;metaEdit=1;resizable=1;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];verticalAlign=middle;fontFamily=Helvetica;" vertex="1">
+            <mxGeometry height="120" width="200" x="880" y="160" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="reports_mart" c4Type="Container" c4Technology="Materialized View" c4Description="Готовые данные для отчётов:&#xa;user_id, device_id и др." label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%: %c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="IT4TX0Njsb1uZ6pAUwHL-11">
+          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;labelBackgroundColor=none;fillColor=#4A7C59;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#2C5F2D;metaEdit=1;resizable=1;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];verticalAlign=middle;fontFamily=Helvetica;fontStyle=1;" vertex="1">
+            <mxGeometry height="120" width="200" x="880" y="480" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Приложение для донастройки протеза" c4Type="Container" c4Technology="iOD, Android" c4Description="1. Кнопка &quot;Download Report&quot;&#xa;→ 2. API /reports&#xa;→ 3. Отображение данных" label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%: %c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="IT4TX0Njsb1uZ6pAUwHL-12">
+          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;labelBackgroundColor=none;fillColor=#23A2D9;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0E7DAD;metaEdit=1;resizable=0;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];" vertex="1">
+            <mxGeometry height="120" width="240" x="400" y="740" as="geometry" />
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Пилот протеза" c4Type="Person" c4Description="Запрашивает отчёты&#xa;о работе своего протеза" label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#cccccc&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="IT4TX0Njsb1uZ6pAUwHL-13">
+          <mxCell parent="1" style="html=1;fontSize=11;dashed=0;whiteSpace=wrap;fillColor=#6C6477;strokeColor=#4D4D4D;fontColor=#ffffff;shape=mxgraph.c4.person2;align=center;metaEdit=1;points=[[0.5,0,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0]];resizable=0;" vertex="1">
+            <mxGeometry height="180" width="200" x="40" y="690" as="geometry" />
+          </mxCell>
+        </object>
+        <mxCell id="IT4TX0Njsb1uZ6pAUwHL-14" edge="1" parent="1" source="IT4TX0Njsb1uZ6pAUwHL-13" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;edgeStyle=orthogonalEdgeStyle;" target="IT4TX0Njsb1uZ6pAUwHL-12" value="&lt;span style=&quot;color: rgb(66, 66, 66); font-size: 10px;&quot;&gt;Нажимает кнопку&lt;/span&gt;&lt;br style=&quot;color: rgb(66, 66, 66); font-size: 10px;&quot;&gt;&lt;span style=&quot;color: rgb(66, 66, 66); font-size: 10px;&quot;&gt;&quot;Получить отчёт&quot;&lt;/span&gt;">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="280" y="810" />
+              <mxPoint x="280" y="810" />
+            </Array>
+            <mxPoint x="260" y="840" as="sourcePoint" />
+            <mxPoint x="420" y="904" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <object placeholders="1" c4Name="API (Reports Service)" c4Type="Container" c4Technology="Python/Java" c4Description="GET /reports?user_id={id}&amp;period={date}&#xa;&#xa;1. Проверка JWT токена&#xa;→ 2. RBAC: user.id == report.user_id&#xa;→ 3. Query ClickHouse: reports_mart&#xa;→ 4. Return JSON" label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%: %c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;div&gt;&lt;font style=&quot;font-size: 11px&quot;&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;&lt;/div&gt;" id="IT4TX0Njsb1uZ6pAUwHL-15">
+          <mxCell parent="1" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;labelBackgroundColor=none;fillColor=#23A2D9;fontColor=#ffffff;align=center;arcSize=10;strokeColor=#0E7DAD;metaEdit=1;resizable=1;points=[[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0.25,0],[1,0.5,0],[1,0.75,0],[0.75,1,0],[0.5,1,0],[0.25,1,0],[0,0.75,0],[0,0.5,0],[0,0.25,0]];recursiveResize=0;" vertex="1">
+            <mxGeometry height="160" width="240" x="860" y="720" as="geometry" />
+          </mxCell>
+        </object>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

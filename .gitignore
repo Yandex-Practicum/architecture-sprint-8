@@ -1,2 +1,22 @@
 /postgres-keycloak-data
 2024__yandex-architecture-sso.code-workspace
+*.bkp
+
+# Airflow
+airflow/logs/*
+!airflow/logs/.gitkeep
+airflow/*.pyc
+airflow/__pycache__/
+airflow/.env
+
+# Database volumes
+postgres-airflow-data/
+postgres-telemetry-data/
+postgres-crm-data/
+clickhouse-data/
+
+# Temporary files
+*.parquet
+*.tmp
+/tmp/
+__pycache__

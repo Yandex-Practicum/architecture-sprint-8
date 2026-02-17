@@ -1,0 +1,12 @@
+apache-airflow==2.9.1
+
+psycopg2-binary==2.9.9
+clickhouse-driver==0.2.7
+clickhouse-connect==0.7.10
+
+pandas==2.2.1
+numpy==1.26.4
+
+requests==2.31.0
+
+python-dotenv==1.0.1

@@ -1,0 +1,185 @@
+version: '3.8'
+
+services:
+  postgres-airflow:
+    image: postgres:15-alpine
+    container_name: postgres-airflow
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres-airflow-data:/var/lib/postgresql/data
+    ports:
+      - "5436:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - etl-network
+
+  postgres-telemetry:
+    image: postgres:15-alpine
+    container_name: postgres-telemetry
+    environment:
+      POSTGRES_USER: telemetry
+      POSTGRES_PASSWORD: telemetry
+      POSTGRES_DB: telemetry_db
+    volumes:
+      - postgres-telemetry-data:/var/lib/postgresql/data
+      - ./scripts/init_telemetry_db.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "telemetry"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - etl-network
+
+  postgres-crm:
+    image: postgres:15-alpine
+    container_name: postgres-crm
+    environment:
+      POSTGRES_USER: crm
+      POSTGRES_PASSWORD: crm
+      POSTGRES_DB: crm_db
+    volumes:
+      - postgres-crm-data:/var/lib/postgresql/data
+      - ./scripts/init_crm_db.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5435:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "crm"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - etl-network
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.12-alpine
+    container_name: clickhouse
+    environment:
+      CLICKHOUSE_DB: bionicpro
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: clickhouse
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - ./scripts/init_clickhouse.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./scripts/clickhouse_config.xml:/etc/clickhouse-server/config.d/ipv4_only.xml
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --query='SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - etl-network
+
+  airflow-webserver:
+    image: apache/airflow:2.9.1-python3.11
+    container_name: airflow-webserver
+    depends_on:
+      postgres-airflow:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres-airflow:5432/airflow
+      AIRFLOW__CORE__FERNET_KEY: ''
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__WEBSERVER__SECRET_KEY: 'bionicpro_secret_key_2024'
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
+      
+      AIRFLOW_CONN_POSTGRES_TELEMETRY: postgresql://telemetry:telemetry@postgres-telemetry:5432/telemetry_db
+      AIRFLOW_CONN_POSTGRES_CRM: postgresql://crm:crm@postgres-crm:5432/crm_db
+      AIRFLOW_CONN_CLICKHOUSE: clickhouse://default:clickhouse@clickhouse:9000/bionicpro
+      
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: 8123
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: clickhouse
+      CLICKHOUSE_DATABASE: bionicpro
+      
+      _PIP_ADDITIONAL_REQUIREMENTS: ''
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+      - ./requirements.txt:/requirements.txt
+    ports:
+      - "8081:8080"
+    command: >
+      bash -c "pip install --no-cache-dir -r /requirements.txt &&
+               airflow db init &&
+               airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@bionicpro.com --password admin &&
+               airflow webserver"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: on-failure
+    networks:
+      - etl-network
+
+  airflow-scheduler:
+    image: apache/airflow:2.9.1-python3.11
+    container_name: airflow-scheduler
+    depends_on:
+      airflow-webserver:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres-airflow:5432/airflow
+      AIRFLOW__CORE__FERNET_KEY: ''
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      
+      AIRFLOW_CONN_POSTGRES_TELEMETRY: postgresql://telemetry:telemetry@postgres-telemetry:5432/telemetry_db
+      AIRFLOW_CONN_POSTGRES_CRM: postgresql://crm:crm@postgres-crm:5432/crm_db
+      AIRFLOW_CONN_CLICKHOUSE: clickhouse://default:clickhouse@clickhouse:9000/bionicpro
+      
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: 8123
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: clickhouse
+      CLICKHOUSE_DATABASE: bionicpro
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+      - ./requirements.txt:/requirements.txt
+    command: >
+      bash -c "pip install --no-cache-dir -r /requirements.txt &&
+               airflow scheduler"
+    healthcheck:
+      test: ["CMD-SHELL", 'airflow jobs check --job-type SchedulerJob --hostname "$${HOSTNAME}"']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: on-failure
+    networks:
+      - etl-network
+
+volumes:
+  postgres-airflow-data:
+  postgres-telemetry-data:
+  postgres-crm-data:
+  clickhouse-data:
+
+networks:
+  etl-network:
+    driver: bridge

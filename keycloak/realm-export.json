@@ -335,7 +335,9 @@
                 "membership.user.ldap.attribute": [
                   "uid"
                 ],
-                "roles.ldap.filter": [],
+                "roles.ldap.filter": [
+                  ""
+                ],
                 "mode": [
                   "LDAP_ONLY"
                 ],

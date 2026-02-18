@@ -3,6 +3,7 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
+    
     API_TITLE: str = "BionicPRO Reports API"
     API_VERSION: str = "1.0.0"
     API_HOST: str = os.getenv("API_HOST", "0.0.0.0")
@@ -13,6 +14,10 @@ class Settings(BaseSettings):
     CLICKHOUSE_USER: str = os.getenv("CLICKHOUSE_USER", "default")
     CLICKHOUSE_PASSWORD: str = os.getenv("CLICKHOUSE_PASSWORD", "clickhouse")
     CLICKHOUSE_DATABASE: str = os.getenv("CLICKHOUSE_DATABASE", "bionicpro")
+    
+    KEYCLOAK_URL: str = os.getenv("KEYCLOAK_URL", "http://keycloak:8080")
+    KEYCLOAK_REALM: str = os.getenv("KEYCLOAK_REALM", "reports-realm")
+    KEYCLOAK_CLIENT_ID: str = os.getenv("KEYCLOAK_CLIENT_ID", "bionicpro-bff")
     
     JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "your-secret-key-change-in-production")
     JWT_ALGORITHM: str = "RS256"

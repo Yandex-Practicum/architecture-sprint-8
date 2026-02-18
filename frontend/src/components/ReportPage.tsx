@@ -15,9 +15,8 @@ const ReportPage: React.FC = () => {
       setError(null);
       setSuccess(null);
 
-      // Call BFF proxy endpoint (BFF will add JWT token)
       const response = await fetch(`${BFF_URL}/api/reports`, {
-        credentials: 'include', // Send session cookie
+        credentials: 'include',
       });
 
       if (!response.ok) {
@@ -29,7 +28,6 @@ const ReportPage: React.FC = () => {
       setSuccess('Report downloaded successfully!');
       console.log('Report data:', data);
 
-      // TODO: Handle report data (download, display, etc.)
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');

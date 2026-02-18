@@ -1,12 +1,13 @@
 import logging
 from datetime import datetime
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Depends
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
 from .models import ReportResponse, ErrorResponse, HealthResponse
 from .clickhouse import clickhouse_client
+from .auth import verify_jwt_token, require_user_id_match
 
 logging.basicConfig(
     level=logging.INFO,
@@ -69,6 +70,8 @@ async def health_check():
     tags=["Reports"],
     responses={
         200: {"description": "Report successfully retrieved"},
+        401: {"model": ErrorResponse, "description": "Unauthorized - invalid or missing token"},
+        403: {"model": ErrorResponse, "description": "Forbidden - cannot access other user's reports"},
         404: {"model": ErrorResponse, "description": "Report not found"},
         400: {"model": ErrorResponse, "description": "Invalid parameters"},
         500: {"model": ErrorResponse, "description": "Internal server error"}
@@ -76,8 +79,19 @@ async def health_check():
 )
 async def get_report(
     user_id: int = Query(..., description="User ID", gt=0),
-    period: str = Query(..., description="Period in YYYY-MM format (e.g., 2026-01)")
+    period: str = Query(..., description="Period in YYYY-MM format (e.g., 2026-01)"),
+    current_user: dict = Depends(verify_jwt_token)
 ):
+    if current_user["user_id"] != user_id:
+        logger.warning(
+            f"Authorization failed: user {current_user['user_id']} "
+            f"attempted to access reports for user {user_id}"
+        )
+        raise HTTPException(
+            status_code=403,
+            detail="You can only access your own reports"
+        )
+    
     try:
         try:
             datetime.strptime(period, "%Y-%m")
@@ -115,13 +129,26 @@ async def get_report(
     tags=["Reports"],
     responses={
         200: {"description": "Reports successfully retrieved"},
+        401: {"model": ErrorResponse, "description": "Unauthorized - invalid or missing token"},
+        403: {"model": ErrorResponse, "description": "Forbidden - cannot access other user's reports"},
         500: {"model": ErrorResponse, "description": "Internal server error"}
     }
 )
 async def get_user_reports(
     user_id: int,
-    limit: int = Query(10, description="Maximum number of reports to return", ge=1, le=100)
+    limit: int = Query(10, description="Maximum number of reports to return", ge=1, le=100),
+    current_user: dict = Depends(verify_jwt_token)
 ):
+    if current_user["user_id"] != user_id:
+        logger.warning(
+            f"Authorization failed: user {current_user['user_id']} "
+            f"attempted to access reports for user {user_id}"
+        )
+        raise HTTPException(
+            status_code=403,
+            detail="You can only access your own reports"
+        )
+    
     try:
         reports = clickhouse_client.get_user_reports(user_id=user_id, limit=limit)
         logger.info(f"Retrieved {len(reports)} reports for user_id={user_id}")

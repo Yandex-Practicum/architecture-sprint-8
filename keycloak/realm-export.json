@@ -64,49 +64,58 @@
         "realmRoles": ["administrator"]
       },
       {
-        "username": "prothetic1",
+        "username": "ivan.petrov",
         "enabled": true,
-        "email": "prothetic1@example.com",
-        "firstName": "Prothetic",
-        "lastName": "One",
+        "email": "ivan.petrov@example.com",
+        "firstName": "Иван",
+        "lastName": "Петров",
         "credentials": [
           {
             "type": "password",
-            "value": "prothetic123",
+            "value": "password123",
             "temporary": false
           }
         ],
-        "realmRoles": ["prothetic_user"]
+        "realmRoles": ["prothetic_user"],
+        "attributes": {
+          "user_id": ["1"]
+        }
       },
       {
-        "username": "prothetic2",
+        "username": "maria.sidorova",
         "enabled": true,
-        "email": "prothetic2@example.com",
-        "firstName": "Prothetic",
-        "lastName": "Two",
+        "email": "maria.sidorova@example.com",
+        "firstName": "Мария",
+        "lastName": "Сидорова",
         "credentials": [
           {
             "type": "password",
-            "value": "prothetic123",
+            "value": "password123",
             "temporary": false
           }
         ],
-        "realmRoles": ["prothetic_user"]
+        "realmRoles": ["prothetic_user"],
+        "attributes": {
+          "user_id": ["2"]
+        }
       },
       {
-        "username": "prothetic3",
+        "username": "john.smith",
         "enabled": true,
-        "email": "prothetic3@example.com",
-        "firstName": "Prothetic",
-        "lastName": "Three",
+        "email": "john.smith@example.com",
+        "firstName": "John",
+        "lastName": "Smith",
         "credentials": [
           {
             "type": "password",
-            "value": "prothetic123",
+            "value": "password123",
             "temporary": false
           }
         ],
-        "realmRoles": ["prothetic_user"]
+        "realmRoles": ["prothetic_user"],
+        "attributes": {
+          "user_id": ["3"]
+        }
       }
     ],
     "clients": [
@@ -120,7 +129,7 @@
         "secret": "BFF-SECRET-CHANGE-IN-PRODUCTION-123456",
         "standardFlowEnabled": true,
         "implicitFlowEnabled": false,
-        "directAccessGrantsEnabled": false,
+        "directAccessGrantsEnabled": true,
         "serviceAccountsEnabled": false,
         "redirectUris": [
           "http://localhost:4000/auth/callback",
@@ -137,7 +146,37 @@
           "client.session.max.lifespan": "86400"
         },
         "protocol": "openid-connect",
-        "fullScopeAllowed": true
+        "fullScopeAllowed": true,
+        "protocolMappers": [
+          {
+            "name": "user_id",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-usermodel-attribute-mapper",
+            "consentRequired": false,
+            "config": {
+              "user.attribute": "user_id",
+              "claim.name": "user_id",
+              "jsonType.label": "int",
+              "id.token.claim": "true",
+              "access.token.claim": "true",
+              "userinfo.token.claim": "true"
+            }
+          },
+          {
+            "name": "email",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-usermodel-property-mapper",
+            "consentRequired": false,
+            "config": {
+              "user.attribute": "email",
+              "claim.name": "email",
+              "jsonType.label": "String",
+              "id.token.claim": "true",
+              "access.token.claim": "true",
+              "userinfo.token.claim": "true"
+            }
+          }
+        ]
       },
       {
         "clientId": "reports-frontend",

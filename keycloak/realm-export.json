@@ -149,22 +149,20 @@
     {
       "clientId": "reports-backend",
       "enabled": true,
-      "clientAuthenticatorType": "client-secret",
-      "secret": "your-client-secret",
-      "publicClient": false,
+      "publicClient": true,
       "redirectUris": [
         "http://localhost:5050/auth/callback"
       ],
       "webOrigins": [
-        "http://localhost:5050"
+        "http://localhost:5050",
+        "http://localhost:3000"
       ],
       "directAccessGrantsEnabled": false,
-      "serviceAccountsEnabled": true,
-      "authorizationServicesEnabled": false,
+      "standardFlowEnabled": true,
       "attributes": {
-        "pkce.code.challenge.method": "S256",
-        "access.token.lifespan": "120"
+        "pkce.code.challenge.method": "S256"
       }
     }
+
   ]
 }

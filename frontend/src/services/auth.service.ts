@@ -4,7 +4,7 @@ import pkceChallenge from 'pkce-challenge';
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5050';
 const KEYCLOAK_URL = process.env.REACT_APP_KEYCLOAK_URL || 'http://localhost:8080';
 const REALM = process.env.REACT_APP_KEYCLOAK_REALM || 'reports-realm';
-const CLIENT_ID = process.env.REACT_APP_KEYCLOAK_CLIENT_ID || 'reports-frontend';
+const CLIENT_ID = process.env.REACT_APP_KEYCLOAK_CLIENT_ID || 'reports-backend';
 
 // Создаем axios instance с credentials для отправки cookies
 export const apiClient = axios.create({

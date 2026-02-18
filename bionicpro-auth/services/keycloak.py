@@ -12,7 +12,6 @@ class KeycloakService:
         self.keycloak_url = config.KEYCLOAK_URL
         self.realm = config.KEYCLOAK_REALM
         self.client_id = config.KEYCLOAK_CLIENT_ID
-        self.client_secret = config.KEYCLOAK_CLIENT_SECRET
         self.backend_url = config.BACKEND_URL
     
     def get_token_endpoint(self) -> str:
@@ -31,7 +30,6 @@ class KeycloakService:
                     'grant_type': 'authorization_code',
                     'code': code,
                     'client_id': self.client_id,
-                    'client_secret': self.client_secret,
                     'redirect_uri': f'{self.backend_url}/auth/callback',
                     'code_verifier': code_verifier  # PKCE
                 },
@@ -50,8 +48,7 @@ class KeycloakService:
                 data={
                     'grant_type': 'refresh_token',
                     'refresh_token': refresh_token,
-                    'client_id': self.client_id,
-                    'client_secret': self.client_secret
+                    'client_id': self.client_id
                 },
                 timeout=10
             )

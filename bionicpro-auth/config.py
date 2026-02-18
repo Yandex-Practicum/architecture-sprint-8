@@ -20,8 +20,7 @@ class Config:
         self.KEYCLOAK_URL = os.getenv('KEYCLOAK_URL', 'http://localhost:8080')
         self.KEYCLOAK_REALM = os.getenv('KEYCLOAK_REALM', 'reports-realm')
         self.KEYCLOAK_CLIENT_ID = os.getenv('KEYCLOAK_CLIENT_ID', 'reports-backend')
-        self.KEYCLOAK_CLIENT_SECRET = os.getenv('KEYCLOAK_CLIENT_SECRET', 'your-client-secret')
-        
+
         # Frontend URL
         self.FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
         self.BACKEND_URL = os.getenv('BACKEND_URL', 'http://localhost:5050')

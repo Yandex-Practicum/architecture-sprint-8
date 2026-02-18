@@ -49,7 +49,7 @@ def health_check():
     return jsonify({'status': 'healthy', 'service': 'bionicpro-auth'}), 200
 
 
-@app.route('/auth/init', methods=['POST'])
+@app.route('/auth/init', methods=['POST', 'OPTIONS'])
 def auth_init():
     """
     Инициализация PKCE flow
@@ -60,11 +60,20 @@ def auth_init():
     code_verifier = data.get('code_verifier')
     state = data.get('state')
 
+    logger.info("=== AUTH INIT ===")
+    logger.info(f"Received state: {state}")
+    logger.info(f"Received code_verifier length: {len(code_verifier) if code_verifier else 0}")
+    logger.info(f"Received code_challenge length: {len(code_challenge) if code_challenge else 0}")
+    logger.info("================")
+
     if not all([code_challenge, code_verifier, state]):
+        logger.error("Missing PKCE parameters!")
         return jsonify({'error': 'Missing PKCE parameters'}), 400
 
     # Сохраняем code_verifier для последующей верификации
-    pkce_store[state] = code_verifier
+    session[f'pkce_verifier_{state}'] = code_verifier
+
+    logger.info(f"Stored code_verifier in session for state: {state}")
 
     return jsonify({'status': 'ok'}), 200
 
@@ -78,12 +87,25 @@ def auth_callback():
     code = request.args.get('code')
     state = request.args.get('state')
 
+    logger.info("=== AUTH CALLBACK ===")
+    logger.info(f"Received state: {state}")
+    logger.info(f"Received code: {code[:20] if code else 'None'}...")
+    logger.info(f"PKCE store contains: {list(pkce_store.keys())}")
+    logger.info("====================")
+
     if not code:
         logger.error("No authorization code received")
         return redirect(f"{config.FRONTEND_URL}?error=no_code")
 
     # Получаем code_verifier для PKCE
-    code_verifier = pkce_store.pop(state, '')
+    code_verifier = session.pop(f'pkce_verifier_{state}', '')
+
+    logger.info(f"Code verifier retrieved: {code_verifier[:20] if code_verifier else 'EMPTY'}...")
+
+    if not code_verifier:
+        logger.error(f"No code_verifier found for state: {state}")
+        logger.error(f"Available states in store: {list(pkce_store.keys())}")
+        return redirect(f"{config.FRONTEND_URL}?error=no_verifier")
 
     try:
         # Обмен code на токены

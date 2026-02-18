@@ -35,7 +35,7 @@ export class AuthService {
     /**
      * Получить URL для авторизации в Keycloak с PKCE
      */
-    static getAuthorizationUrl(): string {
+    static async getAuthorizationUrl(): Promise<string> {
         const pkce = this.generatePKCE();
         const state = this.generateState();
 
@@ -43,8 +43,8 @@ export class AuthService {
         sessionStorage.setItem('pkce_code_verifier', pkce.code_verifier);
         sessionStorage.setItem('auth_state', state);
 
-        // Отправляем PKCE параметры на backend
-        this.initAuthFlow(pkce, state);
+        // ✅ ЖДЕМ завершения отправки PKCE параметров на backend
+        await this.initAuthFlow(pkce, state);
 
         const params = new URLSearchParams({
             client_id: CLIENT_ID,
@@ -86,8 +86,8 @@ export class AuthService {
     /**
      * Начать процесс аутентификации
      */
-    static login(): void {
-        const authUrl = this.getAuthorizationUrl();
+    static async login(): Promise<void> {
+        const authUrl = await this.getAuthorizationUrl();
         window.location.href = authUrl;
     }
 

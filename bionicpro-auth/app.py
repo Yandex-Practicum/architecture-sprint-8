@@ -213,7 +213,7 @@ def get_reports():
     except Exception as e:
         logger.error(f"Session rotation failed: {str(e)}")
 
-    # Здесь должен быть вызов к реальному API отчетов
+    # TODO: Здесь должен быть вызов к реальному API отчетов
     # Пока возвращаем mock данные
 
     # Получаем информацию о пользователе

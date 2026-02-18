@@ -27,13 +27,19 @@ app.config['SESSION_COOKIE_NAME'] = config.SESSION_COOKIE_NAME
 app.config['SESSION_COOKIE_HTTPONLY'] = config.SESSION_COOKIE_HTTPONLY
 app.config['SESSION_COOKIE_SECURE'] = config.SESSION_COOKIE_SECURE
 app.config['SESSION_COOKIE_SAMESITE'] = config.SESSION_COOKIE_SAMESITE
+app.config['SESSION_COOKIE_DOMAIN'] = None
 app.config['PERMANENT_SESSION_LIFETIME'] = config.PERMANENT_SESSION_LIFETIME
 
 # CORS с поддержкой credentials (для cookie)
-CORS(app,
-     supports_credentials=True,
-     origins=[config.FRONTEND_URL],
-     allow_headers=['Content-Type', 'Authorization'])
+# CORS с поддержкой credentials (для cookie)
+CORS(
+    app,
+    supports_credentials=True,
+    origins=[config.FRONTEND_URL],
+    allow_headers=['Content-Type', 'Authorization'],
+    methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    expose_headers=['Content-Type']
+)
 
 # Инициализация сервисов - передаем config объект
 keycloak_service = KeycloakService(config)
@@ -49,7 +55,7 @@ def health_check():
     return jsonify({'status': 'healthy', 'service': 'bionicpro-auth'}), 200
 
 
-@app.route('/auth/init', methods=['POST', 'OPTIONS'])
+@app.route('/auth/init', methods=['POST'])
 def auth_init():
     """
     Инициализация PKCE flow
@@ -70,10 +76,12 @@ def auth_init():
         logger.error("Missing PKCE parameters!")
         return jsonify({'error': 'Missing PKCE parameters'}), 400
 
-    # Сохраняем code_verifier для последующей верификации
+    # Сохраняем code_verifier в Flask session
+    session.permanent = True
     session[f'pkce_verifier_{state}'] = code_verifier
 
     logger.info(f"Stored code_verifier in session for state: {state}")
+    logger.info(f"Session keys after save: {list(session.keys())}")
 
     return jsonify({'status': 'ok'}), 200
 
@@ -91,6 +99,9 @@ def auth_callback():
     logger.info(f"Received state: {state}")
     logger.info(f"Received code: {code[:20] if code else 'None'}...")
     logger.info(f"PKCE store contains: {list(pkce_store.keys())}")
+    logger.info(f"Session keys: {list(session.keys())}")
+    logger.info(f"Looking for key: pkce_verifier_{state}")
+    logger.info(f"Session ID (Flask): {request.cookies.get('bionicpro_session', 'NO COOKIE')}")
     logger.info("====================")
 
     if not code:

@@ -43,43 +43,43 @@ services:
       timeout: 5s
       retries: 10
 
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
-    environment:
-      - REACT_APP_KEYCLOAK_URL=http://localhost:8080
-      - REACT_APP_KEYCLOAK_REALM=reports-realm
-      - REACT_APP_KEYCLOAK_CLIENT_ID=reports-frontend
-      - REACT_APP_BACKEND_URL=http://localhost:5050
-    depends_on:
-      bionicpro-auth:
-        condition: service_started
-      keycloak:
-        condition: service_healthy
+#  frontend:
+#    build:
+#      context: ./frontend
+#      dockerfile: Dockerfile
+#    ports:
+#      - "3000:3000"
+#    environment:
+#      - REACT_APP_KEYCLOAK_URL=http://localhost:8080
+#      - REACT_APP_KEYCLOAK_REALM=reports-realm
+#      - REACT_APP_KEYCLOAK_CLIENT_ID=reports-frontend
+#      - REACT_APP_BACKEND_URL=http://localhost:5050
+#    depends_on:
+#      bionicpro-auth:
+#        condition: service_started
+#      keycloak:
+#        condition: service_healthy
 
-  bionicpro-auth:
-    build:
-      context: ./bionicpro-auth
-      dockerfile: Dockerfile
-    ports:
-      - "5050:5050"
-    environment:
-      - SECRET_KEY=${SECRET_KEY:-your-secret-key}
-      - KEYCLOAK_URL=http://keycloak:8080
-      - KEYCLOAK_REALM=reports-realm
-      - KEYCLOAK_CLIENT_ID=reports-backend
-      - KEYCLOAK_CLIENT_SECRET=your-client-secret
-      - FRONTEND_URL=http://localhost:3000
-      - BACKEND_URL=http://localhost:5050
-      - SESSION_COOKIE_SECURE=False
-    depends_on:
-      keycloak:
-        condition: service_healthy
-    networks:
-      - default
+#  bionicpro-auth:
+#    build:
+#      context: ./bionicpro-auth
+#      dockerfile: Dockerfile
+#    ports:
+#      - "5050:5050"
+#    environment:
+#      - SECRET_KEY=${SECRET_KEY:-your-secret-key}
+#      - KEYCLOAK_URL=http://keycloak:8080
+#      - KEYCLOAK_REALM=reports-realm
+#      - KEYCLOAK_CLIENT_ID=reports-backend
+#      - KEYCLOAK_CLIENT_SECRET=your-client-secret
+#      - FRONTEND_URL=http://localhost:3000
+#      - BACKEND_URL=http://localhost:5050
+#      - SESSION_COOKIE_SECURE=False
+#    depends_on:
+#      keycloak:
+#        condition: service_healthy
+#    networks:
+#      - default
 
   openldap:
     image: osixia/openldap:1.5.0

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   keycloak_db:
     image: postgres:14
@@ -11,6 +9,13 @@ services:
       - postgres_keycloak_data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U keycloak_user -d keycloak_db" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
   keycloak:
     image: quay.io/keycloak/keycloak:21.1
     environment:
@@ -28,12 +33,16 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      - keycloak_db
+      keycloak_db:
+        condition: service_healthy
+      openldap:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/8080' >/dev/null 2>&1"]
       interval: 10s
       timeout: 5s
       retries: 10
+
   frontend:
     build:
       context: ./frontend
@@ -46,8 +55,10 @@ services:
       - REACT_APP_KEYCLOAK_CLIENT_ID=reports-frontend
       - REACT_APP_BACKEND_URL=http://localhost:5050
     depends_on:
-      - bionicpro-auth
-      - keycloak
+      bionicpro-auth:
+        condition: service_started
+      keycloak:
+        condition: service_healthy
 
   bionicpro-auth:
     build:
@@ -65,7 +76,8 @@ services:
       - BACKEND_URL=http://localhost:5050
       - SESSION_COOKIE_SECURE=False
     depends_on:
-      - keycloak
+      keycloak:
+        condition: service_healthy
     networks:
       - default
 
@@ -82,6 +94,13 @@ services:
     ports:
       - "389:389"
       - "636:636"
+    healthcheck:
+      test: [ "CMD-SHELL", "ldapsearch -x -H ldap://localhost:389 -b dc=example,dc=com -D 'cn=admin,dc=example,dc=com' -w admin" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
   crm_db:
     image: postgres:14
     environment:
@@ -93,6 +112,7 @@ services:
         - postgres_crm_data:/var/lib/postgresql/data
     ports:
       - "5444:5432"
+
   olap_db:
     image: clickhouse/clickhouse-server:latest
     ports:
@@ -108,6 +128,7 @@ services:
       interval: 1s
       timeout: 3s
       retries: 30
+
   minio:
     image: minio/minio
     ports:

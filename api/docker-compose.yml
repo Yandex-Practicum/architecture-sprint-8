@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  reports-api:
+    build: .
+    container_name: reports-api
+    ports:
+      - "8000:8000"
+    environment:
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: 8123
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: clickhouse
+      CLICKHOUSE_DATABASE: bionicpro
+    networks:
+      - etl_bionicpro-network
+    restart: unless-stopped
+
+networks:
+  etl_bionicpro-network:
+    external: true

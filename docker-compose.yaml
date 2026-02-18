@@ -8,7 +8,7 @@ services:
       POSTGRES_USER: keycloak_user
       POSTGRES_PASSWORD: keycloak_password
     volumes:
-      - ./postgres-keycloak-data:/var/lib/postgresql/data
+      - postgres_keycloak_data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
   keycloak:
@@ -20,7 +20,7 @@ services:
       KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
       KC_DB_USERNAME: keycloak_user
       KC_DB_PASSWORD: keycloak_password
-    command: 
+    command:
       - start-dev
       - --import-realm
     volumes:
@@ -29,6 +29,11 @@ services:
       - "8080:8080"
     depends_on:
       - keycloak_db
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/8080' >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
   frontend:
     build:
       context: ./frontend
@@ -36,10 +41,34 @@ services:
     ports:
       - "3000:3000"
     environment:
-      REACT_APP_API_URL: http://localhost:8000
-      REACT_APP_KEYCLOAK_URL: http://localhost:8080
-      REACT_APP_KEYCLOAK_REALM: reports-realm
-      REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+      - REACT_APP_KEYCLOAK_URL=http://localhost:8080
+      - REACT_APP_KEYCLOAK_REALM=reports-realm
+      - REACT_APP_KEYCLOAK_CLIENT_ID=reports-frontend
+      - REACT_APP_BACKEND_URL=http://localhost:5050
+    depends_on:
+      - bionicpro-auth
+      - keycloak
+
+  bionicpro-auth:
+    build:
+      context: ./bionicpro-auth
+      dockerfile: Dockerfile
+    ports:
+      - "5050:5050"
+    environment:
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key}
+      - KEYCLOAK_URL=http://keycloak:8080
+      - KEYCLOAK_REALM=reports-realm
+      - KEYCLOAK_CLIENT_ID=reports-backend
+      - KEYCLOAK_CLIENT_SECRET=your-client-secret
+      - FRONTEND_URL=http://localhost:3000
+      - BACKEND_URL=http://localhost:5050
+      - SESSION_COOKIE_SECURE=False
+    depends_on:
+      - keycloak
+    networks:
+      - default
+
   openldap:
     image: osixia/openldap:1.5.0
     container_name: openldap
@@ -53,7 +82,7 @@ services:
     ports:
       - "389:389"
       - "636:636"
-  crm_db: 
+  crm_db:
     image: postgres:14
     environment:
       POSTGRES_DB: crm_db
@@ -61,7 +90,7 @@ services:
       POSTGRES_PASSWORD: crm_password
     volumes:
         - ./crm-db:/docker-entrypoint-initdb.d
-        - ./postgres-crm-data:/var/lib/postgresql/data
+        - postgres_crm_data:/var/lib/postgresql/data
     ports:
       - "5444:5432"
   olap_db:
@@ -70,7 +99,7 @@ services:
       - "8123:8123"
       - "9431:9000"
     volumes:
-      - ./clickhouse-data:/var/lib/clickhouse
+      - clickhouse_data:/var/lib/clickhouse
       - ./olap-db:/docker-entrypoint-initdb.d
       - ./olap-db:/var/lib/clickhouse/user_files
       - ./olap-db/users.xml:/etc/clickhouse-server/users.d/users.xml
@@ -92,3 +121,7 @@ services:
     command: server --console-address ":9001" /data
 volumes:
   minio_storage: {}
+  redis_data: {}
+  postgres_keycloak_data: {}
+  postgres_crm_data: {}
+  clickhouse_data: {}

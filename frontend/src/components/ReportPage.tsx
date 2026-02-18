@@ -8,6 +8,10 @@ const ReportPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  
+  const now = new Date();
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth() + 1);
 
   const downloadReport = async () => {
     try {
@@ -15,7 +19,22 @@ const ReportPage: React.FC = () => {
       setError(null);
       setSuccess(null);
 
-      const response = await fetch(`${BFF_URL}/api/reports`, {
+      console.log('User object:', user);
+      console.log('User object keys:', Object.keys(user || {}));
+
+      const userId = (user as any)?.user_id;
+      console.log('Extracted user_id:', userId);
+      
+      if (!userId) {
+        throw new Error(`User ID not found in user profile. Available fields: ${Object.keys(user || {}).join(', ')}. Please re-login.`);
+      }
+
+      const period = `${year}-${String(month).padStart(2, '0')}`;
+
+      const url = `${BFF_URL}/api/reports?user_id=${userId}&period=${period}`;
+      console.log('Fetching report:', url);
+
+      const response = await fetch(url, {
         credentials: 'include',
       });
 
@@ -27,8 +46,6 @@ const ReportPage: React.FC = () => {
       const data = await response.json();
       setSuccess('Report downloaded successfully!');
       console.log('Report data:', data);
-
-      
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -92,6 +109,30 @@ const ReportPage: React.FC = () => {
           <p className="text-gray-600 mb-6">
             Download your prosthesis usage report with telemetry data
           </p>
+
+          {/* Period Selector */}
+          <div className="mb-6 flex items-center gap-4">
+            <label className="text-sm font-medium text-gray-700">Select Period:</label>
+            <select
+              value={month}
+              onChange={(e) => setMonth(Number(e.target.value))}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                <option key={m} value={m}>
+                  {new Date(2000, m - 1).toLocaleString('default', { month: 'long' })}
+                </option>
+              ))}
+            </select>
+            <input
+              type="number"
+              value={year}
+              onChange={(e) => setYear(Number(e.target.value))}
+              min={2020}
+              max={2030}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-24"
+            />
+          </div>
 
           <button
             onClick={downloadReport}

@@ -3,7 +3,6 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    
     API_TITLE: str = "BionicPRO Reports API"
     API_VERSION: str = "1.0.0"
     API_HOST: str = os.getenv("API_HOST", "0.0.0.0")

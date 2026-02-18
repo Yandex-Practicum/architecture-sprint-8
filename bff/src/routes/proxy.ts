@@ -26,12 +26,13 @@ router.get('/reports', requireAuth, async (req: Request, res: Response) => {
   try {
     const accessToken = req.session.accessToken;
 
-    console.log('Proxying /reports request to API');
+    console.log('Proxying /reports request to API with params:', req.query);
 
     const response = await axios.get(`${config.apiUrl}/reports`, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
+      params: req.query,
     });
 
     res.json(response.data);

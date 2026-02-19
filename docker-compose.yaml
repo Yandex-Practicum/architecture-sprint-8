@@ -75,3 +75,15 @@ services:
       REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
     depends_on:
       - bionicpro-auth
+  
+  ldap:
+    image: osixia/openldap:1.5.0
+    environment:
+      LDAP_ORGANISATION: "BionicPRO"
+      LDAP_DOMAIN: "bionicpro.local"
+      LDAP_ADMIN_PASSWORD: "admin"
+    volumes:
+      - ./ldap/bootstrap:/container/service/slapd/assets/config/bootstrap/ldif/custom:ro
+
+    ports:
+      - "389:389"

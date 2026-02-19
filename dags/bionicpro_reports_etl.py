@@ -148,9 +148,8 @@ def bionicpro_reports_etl():
                 str(c.get("phone") or ""),
                 str(c.get("country") or ""),
                 str(c.get("city") or ""),
-                str(c.get("prosthesis_id") or ""),  # критично для join с телеметрией
+                str(c.get("prosthesis_id") or ""),  
                 str(c.get("contract_id") or ""),
-                # updated_at обязателен для ReplacingMergeTree
                 str(c.get("updated_at") or end.to_iso8601_string()),
             ))
 
@@ -245,7 +244,7 @@ def bionicpro_reports_etl():
             "ALTER TABLE mart_user_daily_report DELETE WHERE day >= toDate(%(s)s) AND day < toDate(%(e)s)",
             parameters={"s": str(start_day), "e": str(end_day)},
         )
-        
+
         ch.command(f"""
         INSERT INTO mart_user_daily_report
         SELECT
@@ -282,7 +281,6 @@ def bionicpro_reports_etl():
 
         return {"built_from": str(start_day), "built_to": str(end_day)}
 
-    # Граф
     t0 = ensure_tables()
     crm_rows = extract_crm_customers()
     crm_loaded = load_crm_to_ch(crm_rows)

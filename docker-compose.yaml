@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   keycloak_db:
     image: postgres:14
@@ -11,6 +9,7 @@ services:
       - ./postgres-keycloak-data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+
   keycloak:
     image: quay.io/keycloak/keycloak:21.1
     environment:
@@ -20,7 +19,7 @@ services:
       KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
       KC_DB_USERNAME: keycloak_user
       KC_DB_PASSWORD: keycloak_password
-    command: 
+    command:
       - start-dev
       - --import-realm
     volumes:
@@ -29,6 +28,37 @@ services:
       - "8080:8080"
     depends_on:
       - keycloak_db
+
+  # Session / token store for bionicpro-auth (Задача 3)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  # New backend auth-service (Задача 3)
+  bionicpro-auth:
+    build:
+      context: ./bionicpro-auth
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8000"
+    environment:
+      # Keycloak connection
+      KEYCLOAK_BASE_URL: http://localhost:8080
+      KEYCLOAK_REALM: reports-realm
+      # Session store
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      # Cookie settings (для локалки Secure=false, в проде будет true)
+      COOKIE_NAME: bpsid
+      COOKIE_SECURE: "false"
+      COOKIE_SAMESITE: Lax
+      OIDC_CLIENT_ID: bionicpro-auth
+      OIDC_CLIENT_SECRET: Mbi3p71XH2cENasAEXHFbcFzpbi92dL8
+    depends_on:
+      - keycloak
+      - redis
+
   frontend:
     build:
       context: ./frontend
@@ -36,7 +66,220 @@ services:
     ports:
       - "3000:3000"
     environment:
-      REACT_APP_API_URL: http://localhost:8000
+      # Важно: фронт теперь ходит в bionicpro-auth (сессии/куки), а не в старый API
+      REACT_APP_API_URL: http://localhost:8001
       REACT_APP_KEYCLOAK_URL: http://localhost:8080
       REACT_APP_KEYCLOAK_REALM: reports-realm
       REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+    depends_on:
+      - bionicpro-auth
+
+  ldap:
+    image: osixia/openldap:1.5.0
+    environment:
+      LDAP_ORGANISATION: "BionicPRO"
+      LDAP_DOMAIN: "bionicpro.local"
+      LDAP_ADMIN_PASSWORD: "admin"
+    volumes:
+      - ./ldap/bootstrap:/container/service/slapd/assets/config/bootstrap/ldif/custom:ro
+    ports:
+      - "389:389"
+
+  # =========================
+  # OLAP: ClickHouse + init
+  # =========================
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    ports:
+      - "8123:8123"   # HTTP
+      - "9000:9000"   # Native
+    environment:
+      # можно поменять под себя
+      CLICKHOUSE_DB: trends
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+    volumes:
+      - ./clickhouse/data:/var/lib/clickhouse
+      - ./clickhouse/logs:/var/log/clickhouse-server
+      # init SQL: положи файл по пути ./clickhouse/init/01_mart.sql
+      - ./clickhouse/init:/docker-entrypoint-initdb.d:ro
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+
+  # Инициализация ClickHouse (создание staging + mart таблиц)
+  # ВАЖНО: положи SQL в ./clickhouse/init/01_mart.sql
+  # (ClickHouse выполнит всё из /docker-entrypoint-initdb.d при первом старте с пустыми данными)
+  clickhouse-init:
+    image: clickhouse/clickhouse-server:24.8
+    depends_on:
+      - clickhouse
+    entrypoint: ["/bin/bash", "-lc"]
+    command: >
+      "
+      echo 'Waiting for ClickHouse...';
+      until clickhouse-client --host clickhouse --query 'SELECT 1' >/dev/null 2>&1; do
+        sleep 2;
+      done;
+      echo 'ClickHouse is up.';
+      # повторно применим DDL на всякий случай (идемпотентно через IF NOT EXISTS)
+      if [ -f /docker-entrypoint-initdb.d/01_mart.sql ]; then
+        clickhouse-client --host clickhouse --database ${CLICKHOUSE_DB:-trends} --multiquery < /docker-entrypoint-initdb.d/01_mart.sql;
+        echo 'DDL applied.';
+      else
+        echo 'No init SQL found at /docker-entrypoint-initdb.d/01_mart.sql';
+      fi
+      "
+    environment:
+      CLICKHOUSE_DB: trends
+    volumes:
+      - ./clickhouse/init:/docker-entrypoint-initdb.d:ro
+    restart: "no"
+
+  # =========================
+  # Reports backend (FastAPI)
+  # =========================
+  reports-api:
+    build:
+      context: ./reports-api
+      dockerfile: Dockerfile
+    ports:
+      - "8088:8080"
+    environment:
+      CH_HOST: clickhouse
+      CH_PORT: "8123"
+      CH_USER: default
+      CH_PASSWORD: ""
+      CH_DATABASE: trends
+      CH_MART_TABLE: mart_user_daily_report
+
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_BUCKET: reports
+
+      CDN_BASE_URL: http://localhost:8089/reports
+    depends_on:
+      - clickhouse
+      - clickhouse-init
+  # =========================
+  # S3 storage: MinIO
+  # =========================
+  minio:
+    image: minio/minio:RELEASE.2025-01-20T14-49-07Z
+    command: server --console-address ":9001" /data
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - ./minio/data:/data
+    ports:
+      - "19000:9000"  # S3 API (хост 19000 -> контейнер 9000)
+      - "19001:9001"  # Web console (хост 19001 -> контейнер 9001)
+
+  # init bucket + policy (one-shot)
+  minio-mc:
+    image: minio/mc:RELEASE.2025-01-17T23-25-50Z
+    depends_on:
+      - minio
+    entrypoint: ["/bin/sh", "-lc"]
+    command: >
+      "
+      echo 'Waiting for MinIO...';
+      until (mc alias set local http://minio:9000 minioadmin minioadmin) >/dev/null 2>&1; do
+        sleep 2;
+      done;
+      echo 'MinIO is up';
+
+      # bucket for reports
+      mc mb -p local/reports || true;
+
+      # allow public readonly (so nginx can fetch and cache)
+      mc anonymous set download local/reports || true;
+
+      echo 'MinIO init done';
+      "
+    restart: "no"
+
+  # =========================
+  # CDN emulation: Nginx reverse proxy + cache
+  # =========================
+  nginx-cdn:
+    image: nginx:1.25-alpine
+    ports:
+      - "8089:80"
+    volumes:
+      - ./nginx-cdn/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx-cdn/cache:/var/cache/nginx
+    depends_on:
+      - minio
+
+
+  # =========================
+  # CDC stack: Kafka + Debezium Connect
+  # =========================
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    environment:
+      ZOOKEEPER_CLIENT_PORT: "2181"
+      ZOOKEEPER_TICK_TIME: "2000"
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"     # для хоста (локальные утилиты)
+      - "29092:29092"   # для контейнеров в docker-сети (Connect/ClickHouse)
+    environment:
+      KAFKA_BROKER_ID: "1"
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+
+      # listeners: чтобы и хост, и контейнеры могли подключаться
+      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+
+  debezium-connect:
+    image: debezium/connect:2.5
+    depends_on:
+      - kafka
+    ports:
+      - "8083:8083"     # REST API Connect
+    environment:
+      BOOTSTRAP_SERVERS: "kafka:29092"
+      GROUP_ID: "debezium-connect"
+      CONFIG_STORAGE_TOPIC: "connect_configs"
+      OFFSET_STORAGE_TOPIC: "connect_offsets"
+      STATUS_STORAGE_TOPIC: "connect_statuses"
+      KEY_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      VALUE_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      KEY_CONVERTER_SCHEMAS_ENABLE: "false"
+      VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+      # чтобы топики создавались автоматически (для простоты сдачи)
+      CONNECT_TOPIC_CREATION_ENABLE: "true"
+
+
+  crm_db:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: crm
+      POSTGRES_USER: crm_user
+      POSTGRES_PASSWORD: crm_password
+    ports:
+      - "5434:5432"
+    volumes:
+      - ./postgres-crm-data:/var/lib/postgresql/data
+    command:
+      - "postgres"
+      - "-c"
+      - "wal_level=logical"
+      - "-c"
+      - "max_wal_senders=10"
+      - "-c"
+      - "max_replication_slots=10"

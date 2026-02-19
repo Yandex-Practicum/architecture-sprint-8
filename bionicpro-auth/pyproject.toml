@@ -1,0 +1,16 @@
+[project]
+name = "bionicpro-auth"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "cryptography>=46.0.5",
+    "fastapi[all]>=0.129.0",
+    "httpx>=0.28.1",
+    "pydantic-settings>=2.13.0",
+    "python-jose[cryptography]>=3.5.0",
+    "python-keycloak>=7.1.1",
+    "redis>=7.1.1",
+    "uvicorn>=0.40.0",
+]

@@ -1,2 +1,12 @@
 /postgres-keycloak-data
 2024__yandex-architecture-sso.code-workspace
+
+
+cat >> .gitignore <<'EOF'
+
+clickhouse/data/
+clickhouse/logs/
+postgres-crm-data/
+minio/data/
+**/.minio.sys/
+EOF

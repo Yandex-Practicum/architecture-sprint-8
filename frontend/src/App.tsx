@@ -9,6 +9,18 @@ const keycloakConfig: KeycloakConfig = {
   clientId: process.env.REACT_APP_KEYCLOAK_CLIENT_ID||""
 };
 
+import ReportButton from "./components/ReportButton";
+
+function App() {
+  return (
+    <div style={{ padding: 24 }}>
+      <h2>Reports</h2>
+      <ReportButton />
+    </div>
+  );
+}
+
+export default App;
 
 
 const keycloak = new Keycloak(keycloakConfig);

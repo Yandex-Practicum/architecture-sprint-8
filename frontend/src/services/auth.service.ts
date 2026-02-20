@@ -35,7 +35,7 @@ export class AuthService {
     /**
      * Получить URL для авторизации в Keycloak с PKCE
      */
-    static async getAuthorizationUrl(idpHint?: string): Promise<string> {
+    static async getAuthorizationUrl(): Promise<string> {
         const pkce = this.generatePKCE();
         const state = this.generateState();
 
@@ -55,11 +55,6 @@ export class AuthService {
             code_challenge_method: 'S256',
             state: state,
         });
-
-        // Добавляем kc_idp_hint для прямого редиректа на внешний IdP
-        if (idpHint) {
-            params.append('kc_idp_hint', idpHint);
-        }
 
         return `${KEYCLOAK_URL}/realms/${REALM}/protocol/openid-connect/auth?${params.toString()}`;
     }
@@ -89,18 +84,10 @@ export class AuthService {
     }
 
     /**
-     * Начать процесс аутентификации (стандартный Keycloak)
+     * Начать процесс аутентификации
      */
     static async login(): Promise<void> {
         const authUrl = await this.getAuthorizationUrl();
-        window.location.href = authUrl;
-    }
-
-    /**
-     * Начать процесс аутентификации через Яндекс ID
-     */
-    static async loginWithYandex(): Promise<void> {
-        const authUrl = await this.getAuthorizationUrl('yandex');
         window.location.href = authUrl;
     }
 

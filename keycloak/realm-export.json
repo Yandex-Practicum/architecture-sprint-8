@@ -540,6 +540,7 @@
       "config": {
         "userInfoUrl": "https://login.yandex.ru/info",
         "validateSignature": "false",
+        "defaultScope": "",
         "pkceEnabled": "false",
         "tokenUrl": "https://oauth.yandex.ru/token",
         "clientId": "6e5a03e10317442698d3727a00f79657",

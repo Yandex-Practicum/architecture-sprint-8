@@ -31,10 +31,6 @@ const App: React.FC = () => {
     AuthService.login();
   };
 
-  const handleLoginWithYandex = () => {
-    AuthService.loginWithYandex();
-  };
-
   const handleLogout = async () => {
     await AuthService.logout();
     setIsAuthenticated(false);
@@ -48,7 +44,7 @@ const App: React.FC = () => {
 
   // Not authenticated
   if (!isAuthenticated) {
-    return <LoginPage onLogin={handleLogin} onLoginWithYandex={handleLoginWithYandex} />;
+    return <LoginPage onLogin={handleLogin} />;
   }
 
   // Authenticated

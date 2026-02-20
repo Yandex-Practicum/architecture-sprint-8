@@ -1,6 +1,7 @@
 services:
   keycloak_db:
     image: postgres:14
+    container_name: keycloak_db
     environment:
       POSTGRES_DB: keycloak_db
       POSTGRES_USER: keycloak_user
@@ -18,6 +19,7 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:21.1
+    container_name: keycloak
     environment:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
@@ -103,6 +105,7 @@ services:
 
   crm_db:
     image: postgres:14
+    container_name: crm_db
     environment:
       POSTGRES_DB: crm_db
       POSTGRES_USER: crm_user
@@ -121,6 +124,7 @@ services:
 
   olap_db:
     image: clickhouse/clickhouse-server:latest
+    container_name: olap_db
     ports:
       - "8123:8123"
       - "9431:9000"
@@ -137,6 +141,7 @@ services:
 
   minio:
     image: minio/minio
+    container_name: minio
     ports:
       - "9000:9000"
       - "9001:9001"

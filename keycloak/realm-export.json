@@ -439,5 +439,141 @@
         }
       }
     ]
-  }
+  },
+  "requiredActions": [
+    {
+      "alias": "CONFIGURE_TOTP",
+      "name": "Configure OTP",
+      "providerId": "CONFIGURE_TOTP",
+      "enabled": true,
+      "defaultAction": true,
+      "priority": 10,
+      "config": {}
+    },
+    {
+      "alias": "TERMS_AND_CONDITIONS",
+      "name": "Terms and Conditions",
+      "providerId": "TERMS_AND_CONDITIONS",
+      "enabled": false,
+      "defaultAction": false,
+      "priority": 20,
+      "config": {}
+    },
+    {
+      "alias": "UPDATE_PASSWORD",
+      "name": "Update Password",
+      "providerId": "UPDATE_PASSWORD",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 30,
+      "config": {}
+    },
+    {
+      "alias": "UPDATE_PROFILE",
+      "name": "Update Profile",
+      "providerId": "UPDATE_PROFILE",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 40,
+      "config": {}
+    },
+    {
+      "alias": "VERIFY_EMAIL",
+      "name": "Verify Email",
+      "providerId": "VERIFY_EMAIL",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 50,
+      "config": {}
+    },
+    {
+      "alias": "delete_account",
+      "name": "Delete Account",
+      "providerId": "delete_account",
+      "enabled": false,
+      "defaultAction": false,
+      "priority": 60,
+      "config": {}
+    },
+    {
+      "alias": "webauthn-register",
+      "name": "Webauthn Register",
+      "providerId": "webauthn-register",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 70,
+      "config": {}
+    },
+    {
+      "alias": "webauthn-register-passwordless",
+      "name": "Webauthn Register Passwordless",
+      "providerId": "webauthn-register-passwordless",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 80,
+      "config": {}
+    },
+    {
+      "alias": "update_user_locale",
+      "name": "Update User Locale",
+      "providerId": "update_user_locale",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 1000,
+      "config": {}
+    }
+  ],
+  "identityProviders": [
+    {
+      "alias": "yandex-id",
+      "displayName": "YandexID",
+      "internalId": "4f36514c-2a02-4191-aa48-bbe7de3af21a",
+      "providerId": "oidc",
+      "enabled": true,
+      "updateProfileFirstLoginMode": "on",
+      "trustEmail": true,
+      "storeToken": true,
+      "addReadTokenRoleOnCreate": false,
+      "authenticateByDefault": false,
+      "linkOnly": false,
+      "firstBrokerLoginFlowAlias": "first broker login",
+      "config": {
+        "userInfoUrl": "https://auth.yandex.cloud/oauth/userinfo",
+        "validateSignature": "true",
+        "hideOnLoginPage": "false",
+        "tokenUrl": "https://auth.yandex.cloud/oauth/token",
+        "acceptsPromptNoneForwardFromClient": "false",
+        "clientId": "ajeh9l9dsc5uiesh21t1",
+        "uiLocales": "false",
+        "jwksUrl": "https://auth.yandex.cloud/oauth/jwks/keys",
+        "backchannelSupported": "false",
+        "issuer": "https://auth.yandex.cloud",
+        "useJwksUrl": "true",
+        "loginHint": "false",
+        "pkceEnabled": "false",
+        "clientAuthMethod": "client_secret_post",
+        "authorizationUrl": "https://auth.yandex.cloud/oauth/authorize",
+        "disableUserInfo": "false",
+        "logoutUrl": "https://auth.yandex.cloud/oauth/end_session",
+        "syncMode": "IMPORT",
+        "clientSecret": "**********",
+        "passMaxAge": "false",
+        "allowedClockSkew": "0",
+        "defaultScope": "login:email login:info"
+      }
+    }
+  ],
+  "identityProviderMappers": [
+    {
+      "id": "7b31e6b0-b7c1-4f03-9d59-b76ce9c6424a",
+      "name": "mapper1",
+      "identityProviderAlias": "yandex-id",
+      "identityProviderMapper": "oidc-advanced-group-idp-mapper",
+      "config": {
+        "claims": "[{\"key\":\"login\",\"value\":\"username\"},{\"key\":\"default_email\",\"value\":\"email\"},{\"key\":\"first_name\",\"value\":\"firstName\"},{\"key\":\"last_name\",\"value\":\"lastName\"}]",
+        "syncMode": "INHERIT",
+        "are.claim.values.regex": "false"
+      }
+    }
+  ]
 }

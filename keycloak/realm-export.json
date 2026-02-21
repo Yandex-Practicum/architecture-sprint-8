@@ -540,13 +540,16 @@
       "config": {
         "userInfoUrl": "https://login.yandex.ru/info",
         "validateSignature": "false",
-        "defaultScope": "",
+        "defaultScope": "login:email login:info",
         "pkceEnabled": "false",
         "tokenUrl": "https://oauth.yandex.ru/token",
         "clientId": "6e5a03e10317442698d3727a00f79657",
         "authorizationUrl": "https://oauth.yandex.ru/authorize",
         "clientAuthMethod": "client_secret_post",
-        "clientSecret": "**********"
+        "clientSecret": "**********",
+        "sendIdTokenHint": "false",
+        "forwardParameters": "",
+        "promptUnspecified": "false"
       }
     }
   ],

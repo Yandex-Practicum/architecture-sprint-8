@@ -578,7 +578,7 @@
       "alias": "yandex-cloud-oidc",
       "displayName": "YandexCloud",
       "internalId": "eb6577da-ca1c-415a-99db-9811bfde7853",
-      "providerId": "keycloak-oidc",
+      "providerId": "oidc",
       "enabled": true,
       "config": {
         "defaultScope": "openid email profile",

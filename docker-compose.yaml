@@ -164,16 +164,7 @@ services:
       AIRFLOW__CORE__FERNET_KEY: ''
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     entrypoint: >
-      bash -c "
-        airflow db init &&
-        airflow users create
-          --username admin
-          --firstname Admin
-          --lastname Admin
-          --role Admin
-          --email admin@example.com
-          --password admin
-      "
+      bash -c "airflow db init && airflow users create --username admin --firstname Admin --lastname Admin --role Admin --email admin@example.com --password admin"
     depends_on:
       airflow_db:
         condition: service_healthy

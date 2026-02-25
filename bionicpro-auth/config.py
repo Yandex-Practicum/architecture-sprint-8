@@ -33,7 +33,7 @@ class Config:
         self.CLICKHOUSE_HTTP_URL = os.getenv('CLICKHOUSE_HTTP_URL', 'http://localhost:8123')
 
         # S3 (Minio) settings
-        self.S3_ENDPOINT_URL = os.getenv('S3_ENDPOINT_URL', 'http://minio:9000')
+        self.S3_ENDPOINT_URL = os.getenv('S3_ENDPOINT_URL', 'http://localhost:9000')
         self.S3_ACCESS_KEY = os.getenv('S3_ACCESS_KEY', 'minio_user')
         self.S3_SECRET_KEY = os.getenv('S3_SECRET_KEY', 'minio_password')
         self.S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME', 'bionicpro-reports')

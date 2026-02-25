@@ -46,54 +46,6 @@ services:
       timeout: 5s
       retries: 10
 
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
-    environment:
-      - REACT_APP_KEYCLOAK_URL=http://localhost:8080
-      - REACT_APP_KEYCLOAK_REALM=reports-realm
-      - REACT_APP_KEYCLOAK_CLIENT_ID=reports-frontend
-      - REACT_APP_BACKEND_URL=http://localhost:5050
-    depends_on:
-      bionicpro-auth:
-        condition: service_started
-      keycloak:
-        condition: service_healthy
-
-  bionicpro-auth:
-    build:
-      context: ./bionicpro-auth
-      dockerfile: Dockerfile
-    ports:
-      - "5050:5050"
-    environment:
-      - SECRET_KEY=${SECRET_KEY:-your-secret-key}
-      - KEYCLOAK_URL=http://keycloak:8080
-      - KEYCLOAK_REALM=reports-realm
-      - KEYCLOAK_CLIENT_ID=reports-backend
-      - KEYCLOAK_CLIENT_SECRET=your-client-secret
-      - FRONTEND_URL=http://localhost:3000
-      - BACKEND_URL=http://localhost:5050
-      - SESSION_COOKIE_SECURE=False
-      - CLICKHOUSE_HTTP_URL=http://olap_db:8123
-      - S3_ENDPOINT_URL=http://minio:9000
-      - S3_ACCESS_KEY=minio_user
-      - S3_SECRET_KEY=minio_password
-      - S3_BUCKET_NAME=bionicpro-reports
-      - CDN_BASE_URL=http://localhost:8888
-    depends_on:
-      keycloak:
-        condition: service_healthy
-      olap_db:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    networks:
-      - default
-
   openldap:
     image: osixia/openldap:1.5.0
     container_name: openldap

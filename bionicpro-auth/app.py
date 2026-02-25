@@ -8,21 +8,16 @@ from config import Config
 from services.keycloak import KeycloakService
 from services.session import SessionStore
 from services.olap import OlapService
+from services.s3 import S3Service
 
-# Загрузка переменных окружения
 load_dotenv()
 
-# Настройка логирования
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Инициализация Flask
 app = Flask(__name__)
-
-# Создаем экземпляр конфигурации
 config = Config()
 
-# Применяем конфигурацию к Flask app
 app.config['SECRET_KEY'] = config.SECRET_KEY
 app.config['SESSION_COOKIE_NAME'] = config.SESSION_COOKIE_NAME
 app.config['SESSION_COOKIE_HTTPONLY'] = config.SESSION_COOKIE_HTTPONLY
@@ -31,7 +26,6 @@ app.config['SESSION_COOKIE_SAMESITE'] = config.SESSION_COOKIE_SAMESITE
 app.config['SESSION_COOKIE_DOMAIN'] = None
 app.config['PERMANENT_SESSION_LIFETIME'] = config.PERMANENT_SESSION_LIFETIME
 
-# CORS с поддержкой credentials (для cookie)
 CORS(
     app,
     supports_credentials=True,
@@ -41,20 +35,18 @@ CORS(
     expose_headers=['Content-Type']
 )
 
-# Инициализация сервисов
 keycloak_service = KeycloakService(config)
 session_store = SessionStore()
 olap_service = OlapService(config)
+s3_service = S3Service(config)
 
-# Временное хранилище для code_verifier (в production использовать Redis)
 pkce_store = {}
 
 
 def _get_valid_access_token(session_id):
     """
-    Вспомогательная функция: получает валидный access_token.
-    Если токен истёк — обновляет через refresh_token.
-    Возвращает (access_token, error_response) — если error_response не None, нужно вернуть его.
+    Get valid access_token. Refresh if expired.
+    Returns (access_token, error_response).
     """
     session_data = session_store.get_session(session_id)
     if not session_data:
@@ -94,16 +86,11 @@ def _get_valid_access_token(session_id):
 
 @app.route('/health', methods=['GET'])
 def health_check():
-    """Health check endpoint"""
     return jsonify({'status': 'healthy', 'service': 'bionicpro-auth'}), 200
 
 
 @app.route('/auth/init', methods=['POST'])
 def auth_init():
-    """
-    Инициализация PKCE flow
-    Frontend вызывает перед редиректом на Keycloak
-    """
     data = request.json
     code_challenge = data.get('code_challenge')
     code_verifier = data.get('code_verifier')
@@ -119,7 +106,6 @@ def auth_init():
         logger.error("Missing PKCE parameters!")
         return jsonify({'error': 'Missing PKCE parameters'}), 400
 
-    # Сохраняем code_verifier в Flask session
     session.permanent = True
     session[f'pkce_verifier_{state}'] = code_verifier
 
@@ -131,10 +117,6 @@ def auth_init():
 
 @app.route('/auth/callback', methods=['GET'])
 def auth_callback():
-    """
-    Callback endpoint после авторизации в Keycloak
-    Обменивает authorization code на токены
-    """
     code = request.args.get('code')
     state = request.args.get('state')
 
@@ -151,7 +133,6 @@ def auth_callback():
         logger.error("No authorization code received")
         return redirect(f"{config.FRONTEND_URL}?error=no_code")
 
-    # Получаем code_verifier для PKCE
     code_verifier = session.pop(f'pkce_verifier_{state}', '')
 
     logger.info(f"Code verifier retrieved: {code_verifier[:20] if code_verifier else 'EMPTY'}...")
@@ -162,22 +143,18 @@ def auth_callback():
         return redirect(f"{config.FRONTEND_URL}?error=no_verifier")
 
     try:
-        # Обмен code на токены
         tokens = keycloak_service.exchange_code_for_tokens(code, code_verifier)
 
         access_token = tokens['access_token']
         refresh_token = tokens['refresh_token']
 
-        # Создаем сессию и сохраняем токены
         session_id = session_store.create_session(access_token, refresh_token)
 
-        # Устанавливаем session cookie
         session.permanent = True
         session['session_id'] = session_id
 
         logger.info(f"User authenticated successfully, session: {session_id[:8]}...")
 
-        # Редирект на frontend
         return redirect(config.FRONTEND_URL)
 
     except Exception as e:
@@ -187,7 +164,6 @@ def auth_callback():
 
 @app.route('/auth/logout', methods=['POST'])
 def logout():
-    """Выход из системы"""
     session_id = session.get('session_id')
 
     if session_id:
@@ -200,23 +176,22 @@ def logout():
 @app.route('/api/reports', methods=['GET'])
 def get_reports():
     """
-    Защищённый endpoint для получения отчёта текущего пользователя.
-    Задача 3: Получение отчёта из OLAP (витрина customer_telemetry_datamart).
-    Задача 4: Доступ ограничен — пользователь видит только свои данные.
+    Get user report with S3 caching:
+    1. Get datamart version (last ETL update time)
+    2. Check if report exists in S3 for email + version
+    3. If found in S3 -> return CDN link (no OLAP query)
+    4. If not found -> query OLAP, save to S3, return CDN link
     """
     session_id = session.get('session_id')
 
-    # Проверка наличия сессии (аутентификация)
     if not session_id:
         logger.warning("Request without session")
         return jsonify({'error': 'Unauthorized', 'code': 'NO_SESSION'}), 401
 
-    # Получаем валидный access_token
     access_token, error_response = _get_valid_access_token(session_id)
     if error_response:
         return error_response
 
-    # Ротация сессии для защиты от session fixation
     try:
         new_session_id = session_store.rotate_session(session_id)
         session['session_id'] = new_session_id
@@ -224,7 +199,6 @@ def get_reports():
     except Exception as e:
         logger.error(f"Session rotation failed: {str(e)}")
 
-    # Получаем информацию о пользователе из Keycloak
     user_info = keycloak_service.get_user_info(access_token)
     if not user_info:
         return jsonify({'error': 'Failed to get user info'}), 500
@@ -232,9 +206,8 @@ def get_reports():
     user_email = user_info.get('email', '')
     username = user_info.get('preferred_username', 'unknown')
 
-    # Проверяем, существует ли витрина с данными (обработал ли Airflow)
     if not olap_service.check_datamart_exists():
-        logger.warning("Datamart is empty or does not exist — Airflow has not processed data yet")
+        logger.warning("Datamart is empty or does not exist")
         return jsonify({
             'user': username,
             'reports': [],
@@ -242,7 +215,33 @@ def get_reports():
             'message': 'Данные ещё не обработаны. Airflow ETL-процесс не завершён. Попробуйте позже.'
         }), 200
 
-    # Задача 4: Получаем отчёт ТОЛЬКО по email текущего пользователя
+    datamart_updated_at = olap_service.get_datamart_last_updated() or 'unknown'
+
+    # Step 1: check S3 cache
+    cached_report = s3_service.get_report(user_email, datamart_updated_at)
+
+    if cached_report:
+        logger.info(f"Cache HIT for user {username}, serving from S3/CDN")
+        cdn_url = s3_service.get_cdn_url(user_email, datamart_updated_at)
+
+        reports_list = []
+        for idx, telemetry in enumerate(cached_report.get('telemetry_summary', []), start=1):
+            reports_list.append({
+                'id': idx,
+                'name': f"Телеметрия: {telemetry['prosthesis_type']} — {telemetry['muscle_group']}",
+                'date': telemetry.get('last_signal_time', 'N/A')
+            })
+
+        return jsonify({
+            'user': username,
+            'reports': reports_list,
+            'report_data': cached_report,
+            'cdn_url': cdn_url,
+            'cache_status': 'HIT'
+        }), 200
+
+    # Step 2: cache MISS, query OLAP
+    logger.info(f"Cache MISS for user {username}, querying OLAP")
     report = olap_service.get_user_report_by_email(user_email)
 
     if not report:
@@ -254,7 +253,9 @@ def get_reports():
             'message': 'Отчёт для вашего пользователя не найден. Возможно, ваши данные ещё не обработаны Airflow.'
         }), 200
 
-    # Формируем список отчётов для отображения на frontend
+    # Step 3: save to S3 and get CDN URL
+    cdn_url = s3_service.put_report(user_email, datamart_updated_at, report)
+
     reports_list = []
     for idx, telemetry in enumerate(report.get('telemetry_summary', []), start=1):
         reports_list.append({
@@ -266,30 +267,27 @@ def get_reports():
     return jsonify({
         'user': username,
         'reports': reports_list,
-        'report_data': report
+        'report_data': report,
+        'cdn_url': cdn_url,
+        'cache_status': 'MISS'
     }), 200
 
 
 @app.route('/api/reports/generate', methods=['POST'])
 def generate_report():
     """
-    Генерация отчёта по запросу пользователя.
-    Задача 3: Отчёт запрашивается из OLAP без сложных вычислений в реальном времени.
-    Задача 4: Авторизованный пользователь может генерировать только собственный отчёт.
+    Generate report: check S3 -> if not found, generate from OLAP -> save to S3 -> return CDN URL.
     """
     session_id = session.get('session_id')
 
-    # Проверка аутентификации
     if not session_id:
         logger.warning("Generate report request without session")
         return jsonify({'error': 'Unauthorized', 'code': 'NO_SESSION'}), 401
 
-    # Получаем валидный access_token
     access_token, error_response = _get_valid_access_token(session_id)
     if error_response:
         return error_response
 
-    # Получаем информацию о пользователе
     user_info = keycloak_service.get_user_info(access_token)
     if not user_info:
         return jsonify({'error': 'Failed to get user info'}), 500
@@ -297,17 +295,28 @@ def generate_report():
     user_email = user_info.get('email', '')
     username = user_info.get('preferred_username', 'unknown')
 
-    # Проверяем, обработал ли Airflow данные
     if not olap_service.check_datamart_exists():
         return jsonify({
             'error': 'DATA_NOT_READY',
             'message': 'Данные ещё не обработаны ETL-процессом Airflow. Витрина пуста. Попробуйте позже.'
         }), 404
 
-    # Получаем время последнего обновления витрины
-    last_updated = olap_service.get_datamart_last_updated()
+    datamart_updated_at = olap_service.get_datamart_last_updated() or 'unknown'
 
-    # Генерируем отчёт ТОЛЬКО для текущего пользователя (по email)
+    # Check S3 cache first
+    cached_report = s3_service.get_report(user_email, datamart_updated_at)
+    if cached_report:
+        logger.info(f"Report already cached for user {username}, returning CDN URL")
+        cdn_url = s3_service.get_cdn_url(user_email, datamart_updated_at)
+        cached_report['datamart_last_updated'] = datamart_updated_at
+        return jsonify({
+            'status': 'success',
+            'report': cached_report,
+            'cdn_url': cdn_url,
+            'cache_status': 'HIT'
+        }), 200
+
+    # Generate from OLAP
     report = olap_service.get_user_report_by_email(user_email)
 
     if not report:
@@ -315,22 +324,26 @@ def generate_report():
             'error': 'NO_DATA',
             'message': f'Данные для пользователя {username} не найдены в OLAP. '
                        f'Возможно, ETL ещё не обработал ваши данные. '
-                       f'Последнее обновление витрины: {last_updated or "неизвестно"}.'
+                       f'Последнее обновление витрины: {datamart_updated_at}.'
         }), 404
 
-    report['datamart_last_updated'] = last_updated
+    report['datamart_last_updated'] = datamart_updated_at
 
-    logger.info(f"Report generated for user: {username} (email: {user_email})")
+    # Save to S3
+    cdn_url = s3_service.put_report(user_email, datamart_updated_at, report)
+
+    logger.info(f"Report generated and cached for user: {username} (email: {user_email})")
 
     return jsonify({
         'status': 'success',
-        'report': report
+        'report': report,
+        'cdn_url': cdn_url,
+        'cache_status': 'MISS'
     }), 200
 
 
 @app.route('/api/user', methods=['GET'])
 def get_user():
-    """Получить информацию о текущем пользователе"""
     session_id = session.get('session_id')
 
     if not session_id:
@@ -340,7 +353,6 @@ def get_user():
     if error_response:
         return error_response
 
-    # Получаем информацию о пользователе
     user_info = keycloak_service.get_user_info(access_token)
 
     if not user_info:
@@ -354,6 +366,8 @@ if __name__ == '__main__':
     logger.info(f"Frontend URL: {config.FRONTEND_URL}")
     logger.info(f"Keycloak URL: {config.KEYCLOAK_URL}")
     logger.info(f"ClickHouse URL: {config.CLICKHOUSE_HTTP_URL}")
+    logger.info(f"S3 Endpoint: {config.S3_ENDPOINT_URL}")
+    logger.info(f"CDN Base URL: {config.CDN_BASE_URL}")
 
     app.run(
         host='0.0.0.0',

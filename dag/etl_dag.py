@@ -9,7 +9,7 @@ from airflow.providers.postgres.hooks.postgres import PostgresHook
 logger = logging.getLogger(__name__)
 
 # ============================================================
-# Параметры подключений
+# Connection parameters
 # ============================================================
 
 CRM_CONN = {
@@ -22,14 +22,19 @@ CRM_CONN = {
 
 CLICKHOUSE_HTTP_URL = "http://olap_db:8123"
 
+# S3 (Minio) connection parameters for cache invalidation
+S3_ENDPOINT_URL = "http://minio:9000"
+S3_ACCESS_KEY = "minio_user"
+S3_SECRET_KEY = "minio_password"
+S3_BUCKET_NAME = "bionicpro-reports"
+
 
 # ============================================================
-# Функции ETL
+# ETL Functions
 # ============================================================
 
 
 def extract_crm_customers(**kwargs):
-    """Извлекает данные клиентов из CRM (PostgreSQL)."""
     import psycopg2
 
     conn = psycopg2.connect(**CRM_CONN)
@@ -43,17 +48,15 @@ def extract_crm_customers(**kwargs):
     conn.close()
 
     customers = [dict(zip(columns, row)) for row in rows]
-    logger.info(f"Извлечено {len(customers)} клиентов из CRM")
+    logger.info(f"Extracted {len(customers)} customers from CRM")
     kwargs["ti"].xcom_push(key="customers", value=customers)
 
 
 def load_customers_to_clickhouse(**kwargs):
-    """Загружает данные клиентов из CRM в ClickHouse (OLAP)."""
     customers = kwargs["ti"].xcom_pull(
         task_ids="extract_crm_customers", key="customers"
     )
 
-    # Создаём таблицу customers в ClickHouse, если ещё не существует
     create_table_query = """
         CREATE TABLE IF NOT EXISTS customers (
             id UInt32,
@@ -69,10 +72,8 @@ def load_customers_to_clickhouse(**kwargs):
     """
     requests.post(CLICKHOUSE_HTTP_URL, data=create_table_query)
 
-    # Очищаем таблицу перед полной загрузкой (full refresh)
     requests.post(CLICKHOUSE_HTTP_URL, data="TRUNCATE TABLE IF EXISTS customers")
 
-    # Вставляем данные батчами
     batch_size = 500
     for i in range(0, len(customers), batch_size):
         batch = customers[i: i + batch_size]
@@ -98,17 +99,10 @@ def load_customers_to_clickhouse(**kwargs):
         if resp.status_code != 200:
             raise Exception(f"ClickHouse insert error: {resp.text}")
 
-    logger.info(f"Загружено {len(customers)} клиентов в ClickHouse")
+    logger.info(f"Loaded {len(customers)} customers to ClickHouse")
 
 
 def create_customer_telemetry_datamart(**kwargs):
-    """
-    Создаёт витрину — объединяет данные телеметрии (emg_sensor_data)
-    с данными клиентов (customers) из CRM. Группировка по клиентам
-    для быстрого доступа к аналитике по пользователям.
-    """
-
-    # Создаём таблицу-витрину
     create_datamart_query = """
         CREATE TABLE IF NOT EXISTS customer_telemetry_datamart (
             customer_id UInt32,
@@ -140,13 +134,11 @@ def create_customer_telemetry_datamart(**kwargs):
     if resp.status_code != 200:
         raise Exception(f"ClickHouse create datamart error: {resp.text}")
 
-    # Очищаем витрину перед пересозданием
     requests.post(
         CLICKHOUSE_HTTP_URL,
         data="TRUNCATE TABLE IF EXISTS customer_telemetry_datamart",
     )
 
-    # Заполняем витрину: JOIN телеметрии с клиентами, группировка по клиенту
     fill_datamart_query = """
         INSERT INTO customer_telemetry_datamart (
             customer_id,
@@ -201,16 +193,64 @@ def create_customer_telemetry_datamart(**kwargs):
     if resp.status_code != 200:
         raise Exception(f"ClickHouse fill datamart error: {resp.text}")
 
-    # Проверяем количество записей
     count_resp = requests.post(
         CLICKHOUSE_HTTP_URL,
         data="SELECT count() FROM customer_telemetry_datamart",
     )
-    logger.info(f"Витрина заполнена: {count_resp.text.strip()} строк")
+    logger.info(f"Datamart filled: {count_resp.text.strip()} rows")
+
+
+def invalidate_s3_report_cache(**kwargs):
+    """
+    Invalidate S3 report cache after ETL datamart update.
+
+    Cache update mechanism:
+    1. Primary: versioning by datamart_updated_at — new reports automatically
+       get a different URL (version hash), so old CDN cache doesn't interfere.
+    2. Additional: this function deletes old reports from S3 to free storage.
+    3. CDN (Nginx) cache is invalidated automatically via proxy_cache_valid TTL
+       or through URL change.
+    """
+    import boto3
+    from botocore.exceptions import ClientError
+
+    try:
+        s3_client = boto3.client(
+            's3',
+            endpoint_url=S3_ENDPOINT_URL,
+            aws_access_key_id=S3_ACCESS_KEY,
+            aws_secret_access_key=S3_SECRET_KEY,
+            region_name='us-east-1',
+        )
+
+        prefix = "reports/"
+        deleted_count = 0
+
+        try:
+            paginator = s3_client.get_paginator('list_objects_v2')
+            for page in paginator.paginate(Bucket=S3_BUCKET_NAME, Prefix=prefix):
+                objects = page.get('Contents', [])
+                if objects:
+                    delete_keys = [{'Key': obj['Key']} for obj in objects]
+                    s3_client.delete_objects(
+                        Bucket=S3_BUCKET_NAME,
+                        Delete={'Objects': delete_keys}
+                    )
+                    deleted_count += len(delete_keys)
+        except ClientError as e:
+            if e.response['Error']['Code'] == 'NoSuchBucket':
+                logger.info(f"Bucket '{S3_BUCKET_NAME}' does not exist yet, skipping")
+                return
+            raise
+
+        logger.info(f"S3 cache invalidation complete: deleted {deleted_count} old reports")
+
+    except Exception as e:
+        logger.warning(f"S3 cache invalidation failed (non-critical): {str(e)}")
 
 
 # ============================================================
-# Определение DAG
+# DAG Definition
 # ============================================================
 
 default_args = {
@@ -225,11 +265,11 @@ default_args = {
 with DAG(
         dag_id="bionicpro_crm_to_olap_etl",
         default_args=default_args,
-        description="ETL: CRM (PostgreSQL) → OLAP (ClickHouse) + витрина телеметрии",
-        schedule_interval="0 2 * * *",  # каждый день в 02:00 UTC
+        description="ETL: CRM (PostgreSQL) -> OLAP (ClickHouse) + datamart + S3 cache invalidation",
+        schedule_interval="0 2 * * *",
         start_date=datetime(2025, 1, 1),
         catchup=False,
-        tags=["bionicpro", "etl", "crm", "olap"],
+        tags=["bionicpro", "etl", "crm", "olap", "cache"],
 ) as dag:
     task_extract = PythonOperator(
         task_id="extract_crm_customers",
@@ -246,5 +286,10 @@ with DAG(
         python_callable=create_customer_telemetry_datamart,
     )
 
-    # Последовательность: извлечь → загрузить → построить витрину
-    task_extract >> task_load >> task_datamart
+    task_invalidate_cache = PythonOperator(
+        task_id="invalidate_s3_report_cache",
+        python_callable=invalidate_s3_report_cache,
+    )
+
+    # Sequence: extract -> load -> build datamart -> invalidate cache
+    task_extract >> task_load >> task_datamart >> task_invalidate_cache

@@ -28,3 +28,6 @@ class Config:
 
         # Token настройки
         self.ACCESS_TOKEN_LIFETIME = 120
+
+        # ClickHouse (OLAP) настройки
+        self.CLICKHOUSE_HTTP_URL = os.getenv('CLICKHOUSE_HTTP_URL', 'http://localhost:8123')

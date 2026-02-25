@@ -207,7 +207,7 @@ services:
       AIRFLOW__CORE__FERNET_KEY: ''
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     volumes:
-      - ./dags:/opt/airflow/dags
+      - ./dag:/opt/airflow/dags
       - airflow_logs:/opt/airflow/logs
     ports:
       - "8081:8080"
@@ -231,7 +231,7 @@ services:
       AIRFLOW__CORE__FERNET_KEY: ''
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     volumes:
-      - ./dags:/opt/airflow/dags
+      - ./dag:/opt/airflow/dags
       - airflow_logs:/opt/airflow/logs
     command: airflow scheduler
     depends_on:

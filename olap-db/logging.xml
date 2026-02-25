@@ -1,0 +1,50 @@
+<?xml version="1.0"?>
+<clickhouse>
+    <logger>
+        <!-- Уровень логирования: trace, debug, information, warning, error, fatal -->
+        <level>trace</level>
+
+        <!-- Путь к файлу лога -->
+        <log>/var/log/clickhouse-server/clickhouse-server.log</log>
+
+        <!-- Путь к файлу ошибок -->
+        <errorlog>/var/log/clickhouse-server/clickhouse-server.err.log</errorlog>
+
+        <!-- Размер файла лога для ротации (байты) -->
+        <size>100M</size>
+
+        <!-- Количество файлов лога для хранения -->
+        <count>3</count>
+
+        <!-- Вывод логов в консоль (stderr) -->
+        <console>true</console>
+    </logger>
+
+    <!-- Логирование запросов -->
+    <query_log>
+        <database>system</database>
+        <table>query_log</table>
+        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+    </query_log>
+
+    <!-- Логирование частей таблиц -->
+    <part_log>
+        <database>system</database>
+        <table>part_log</table>
+        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+    </part_log>
+
+    <!-- Логирование метрик -->
+    <metric_log>
+        <database>system</database>
+        <table>metric_log</table>
+        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+    </metric_log>
+
+    <!-- Логирование асинхронных метрик -->
+    <asynchronous_metric_log>
+        <database>system</database>
+        <table>asynchronous_metric_log</table>
+        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+    </asynchronous_metric_log>
+</clickhouse>

@@ -10,6 +10,8 @@ logger = logging.getLogger(__name__)
 # Connection parameters
 # ============================================================
 
+CLICKHOUSE_HTTP_URL = "http://olap_db:8123"
+
 # S3 (Minio) connection parameters for cache invalidation
 S3_ENDPOINT_URL = "http://minio:9000"
 S3_ACCESS_KEY = "minio_user"
@@ -20,13 +22,6 @@ S3_BUCKET_NAME = "bionicpro-reports"
 # ============================================================
 # ETL Functions
 # ============================================================
-
-
-
-
-
-
-
 
 def invalidate_s3_report_cache(**kwargs):
     """

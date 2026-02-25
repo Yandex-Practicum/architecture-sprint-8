@@ -73,6 +73,7 @@ services:
       POSTGRES_DB: crm_db
       POSTGRES_USER: crm_user
       POSTGRES_PASSWORD: crm_password
+    command: postgres -c wal_level=logical -c max_replication_slots=10 -c max_wal_senders=10
     volumes:
         - ./crm-db:/docker-entrypoint-initdb.d
         - postgres_crm_data:/var/lib/postgresql/data
@@ -85,9 +86,82 @@ services:
       retries: 5
       start_period: 10s
 
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_log:/var/lib/zookeeper/log
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - "9093:9093"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: [ "CMD-SHELL", "kafka-topics --bootstrap-server kafka:9092 --list" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  debezium-connect:
+    image: debezium/connect:2.5
+    container_name: debezium-connect
+    depends_on:
+      - kafka
+      - crm_db
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: 1
+      CONFIG_STORAGE_TOPIC: connect_configs
+      OFFSET_STORAGE_TOPIC: connect_offsets
+      STATUS_STORAGE_TOPIC: connect_status
+      KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      ENABLE_DEBEZIUM_SCRIPTING: "true"
+    ports:
+      - "8083:8083"
+    restart: on-failure
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:8083/connectors" ]
+      interval: 30s
+      timeout: 30s
+      retries: 10
+      start_period: 60s
+
+  debezium-connector-init:
+    image: curlimages/curl:latest
+    container_name: debezium-connector-init
+    depends_on:
+      debezium-connect:
+        condition: service_healthy
+    volumes:
+      - ./debezium-connectors:/scripts
+    working_dir: /scripts
+    command: [ "/bin/sh", "-c", "echo 'Ожидание Debezium Connect...'; until curl -f http://debezium-connect:8083/connectors; do sleep 5; done; echo 'Регистрация коннектора...'; curl -X POST -H 'Content-Type: application/json' --data @crm-connector.json http://debezium-connect:8083/connectors; echo 'Коннектор зарегистрирован'" ]
+
   olap_db:
-    image: clickhouse/clickhouse-server:latest
+    image: clickhouse/clickhouse-server:26.1
     container_name: olap_db
+    depends_on:
+      kafka:
+        condition: service_healthy
     ports:
       - "8123:8123"
       - "9431:9000"
@@ -96,11 +170,13 @@ services:
       - ./olap-db:/docker-entrypoint-initdb.d
       - ./olap-db:/var/lib/clickhouse/user_files
       - ./olap-db/users.xml:/etc/clickhouse-server/users.d/users.xml
+      - ./olap-db/logging.xml:/etc/clickhouse-server/config.d/logging.xml
     healthcheck:
       test: ["CMD-SHELL", "clickhouse-client --query 'SELECT 1'"]
-      interval: 1s
-      timeout: 3s
-      retries: 30
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   minio:
     image: minio/minio
@@ -225,3 +301,6 @@ volumes:
   airflow_logs: {}
   postgres_airflow_data: {}
   nginx_cache: {}
+  zookeeper_data: { }
+  zookeeper_log: { }
+  kafka_data: { }

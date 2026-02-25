@@ -84,19 +84,4 @@ export class ApiService {
             throw error;
         }
     }
-
-    /**
-     * Скачать отчёт (PDF)
-     */
-    static async downloadReport(reportId: number): Promise<Blob> {
-        try {
-            const response = await apiClient.get(`/api/reports/${reportId}/download`, {
-                responseType: 'blob',
-            });
-            return response.data;
-        } catch (error) {
-            console.error('Failed to download report:', error);
-            throw error;
-        }
-    }
 }

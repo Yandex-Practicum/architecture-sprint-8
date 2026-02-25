@@ -75,26 +75,6 @@ const ReportPage: React.FC<ReportPageProps> = ({ user, onLogout }) => {
     }
   };
 
-  const handleDownload = async (reportId: number, reportName: string) => {
-    try {
-      setLoading(true);
-      const blob = await ApiService.downloadReport(reportId);
-
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${reportName}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      setError('Не удалось скачать отчёт');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Header */}
@@ -192,15 +172,6 @@ const ReportPage: React.FC<ReportPageProps> = ({ user, onLogout }) => {
                     </h3>
                     <p className="text-sm text-gray-600">{report.date}</p>
                   </div>
-                  <button
-                    onClick={() => handleDownload(report.id, report.name)}
-                    disabled={loading}
-                    className={`px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors ${
-                      loading ? 'opacity-50 cursor-not-allowed' : ''
-                    }`}
-                  >
-                    Скачать
-                  </button>
                 </div>
               ))}
             </div>

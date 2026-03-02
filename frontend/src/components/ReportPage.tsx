@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
 import { useKeycloak } from '@react-keycloak/web';
+import React, { useState } from 'react';
 
 const ReportPage: React.FC = () => {
   const { keycloak, initialized } = useKeycloak();
@@ -18,11 +18,9 @@ const ReportPage: React.FC = () => {
 
       const response = await fetch(`${process.env.REACT_APP_API_URL}/reports`, {
         headers: {
-          'Authorization': `Bearer ${keycloak.token}`
-        }
+          Authorization: `Bearer ${keycloak.token}`,
+        },
       });
-
-      
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -31,15 +29,15 @@ const ReportPage: React.FC = () => {
   };
 
   if (!initialized) {
-    return <div>Loading...</div>;
+    return <div>Loading...123</div>;
   }
 
   if (!keycloak.authenticated) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
+      <div className='flex flex-col items-center justify-center min-h-screen bg-gray-100'>
         <button
           onClick={() => keycloak.login()}
-          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          className='px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600'
         >
           Login
         </button>
@@ -48,10 +46,10 @@ const ReportPage: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
-      <div className="p-8 bg-white rounded-lg shadow-md">
-        <h1 className="text-2xl font-bold mb-6">Usage Reports</h1>
-        
+    <div className='flex flex-col items-center justify-center min-h-screen bg-gray-100'>
+      <div className='p-8 bg-white rounded-lg shadow-md'>
+        <h1 className='text-2xl font-bold mb-6'>Usage Reports</h1>
+
         <button
           onClick={downloadReport}
           disabled={loading}
@@ -63,7 +61,7 @@ const ReportPage: React.FC = () => {
         </button>
 
         {error && (
-          <div className="mt-4 p-4 bg-red-100 text-red-700 rounded">
+          <div className='mt-4 p-4 bg-red-100 text-red-700 rounded'>
             {error}
           </div>
         )}

@@ -29,8 +29,6 @@ async def login(request: Request):
     """Начинает OAuth2 flow с PKCE, редиректит на Keycloak"""
     state = secrets.token_urlsafe(32)
     code_verifier, code_challenge = keycloak_client.generate_pkce_pair()
-    request.session["oauth_state"] = state
-    request.session["code_verifier"] = code_verifier
     pending_states[state] = (code_verifier, settings.frontend_url)
     auth_url = keycloak_client.get_authorization_url(state, code_challenge)
     return RedirectResponse(auth_url)
@@ -45,7 +43,7 @@ async def callback(request: Request, code: str, state: str):
 
     try:
         token_data = await keycloak_client.exchange_code(code, code_verifier)
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=400, detail="Token exchange failed")
 
     userinfo = await keycloak_client.get_userinfo(token_data["access_token"])
@@ -66,7 +64,7 @@ async def callback(request: Request, code: str, state: str):
         key="session_id",
         value=session_id,
         httponly=True,
-        secure=True,
+        # secure=True,
         samesite="lax",
         max_age=settings.session_ttl,
     )

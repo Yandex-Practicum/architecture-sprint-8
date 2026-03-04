@@ -59,7 +59,7 @@ async def get_current_session(request: Request, response: Response):
         key="session_id",
         value=new_sid,
         httponly=True,
-        secure=True,
+        # secure=True,
         samesite="lax",
         max_age=settings.session_ttl,
     )

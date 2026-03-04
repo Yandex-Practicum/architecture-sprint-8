@@ -39,9 +39,8 @@ services:
     ports:
       - "3000:3000"
     environment:
-      REACT_APP_API_URL: "${API_URL:-http://localhost:8001}"
-      REACT_APP_AUTH_URL: "${AUTH_URL:-http://localhost:8000}"
-      REACT_APP_KEYCLOAK_URL: "${KEYCLOAK_URL:-http://localhost:8080}"
+      REACT_APP_API_URL: http://192.168.0.208:8000
+      REACT_APP_KEYCLOAK_URL: http://192.168.0.208:8080
       REACT_APP_KEYCLOAK_REALM: reports-realm
       REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
 
@@ -49,10 +48,6 @@ services:
     build:
       context: ./bionicpro-auth
       dockerfile: Dockerfile
-    command: ["python3", "main.py"]
-    volumes:
-      - ./bionicpro-auth/main.py:/app/main.py
-      - ./bionicpro-auth/app:/app/app
     ports:
       - "8000:8000"
     env_file: "./bionicpro-auth/.env"
@@ -76,54 +71,3 @@ services:
     ports:
       - "389:389"
       - "636:636"
-
-  crm_db:
-    image: postgres:14
-    environment:
-      POSTGRES_DB: crm_db
-      POSTGRES_USER: crm_user
-      POSTGRES_PASSWORD: crm_password
-    volumes:
-      - ./crm-db:/docker-entrypoint-initdb.d
-      - ./postgres-crm-data:/var/lib/postgresql/data
-    ports:
-      - "5444:5432"
-
-  telemetry_db:
-    image: postgres:14
-    environment:
-      POSTGRES_DB: telemetry_db
-      POSTGRES_USER: telemetry_user
-      POSTGRES_PASSWORD: telemetry_password
-    volumes:
-      - ./telemetry-db:/docker-entrypoint-initdb.d
-      - ./postgres-telemetry-data:/var/lib/postgresql/data
-    ports:
-      - "5445:5432"
-
-  olap_db:
-    image: clickhouse/clickhouse-server:latest
-    ports:
-      - "8123:8123"
-      - "9431:9000"
-    volumes:
-      - ./clickhouse-data:/var/lib/clickhouse
-      - ./olap-db:/docker-entrypoint-initdb.d
-      - ./olap-db:/var/lib/clickhouse/user_files
-      - ./olap-db/users.xml:/etc/clickhouse-server/users.d/users.xml
-    healthcheck:
-      test: ["CMD-SHELL", "clickhouse-client --query 'SELECT 1'"]
-      interval: 1s
-      timeout: 3s
-      retries: 30
-
-  reports-api:
-    build:
-      context: ./reports-api
-      dockerfile: Dockerfile
-    command: ["python3", "main.py"]
-    volumes:
-      - ./reports-api/main.py:/app/main.py
-    ports:
-      - "8001:8001"
-    env_file: "./reports-api/.env"

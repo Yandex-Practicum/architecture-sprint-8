@@ -1,21 +1,41 @@
+
 export const UserCard = ({ userinfo }) => {
 
     const login = () => {
-        window.location.replace(`${process.env.REACT_APP_API_URL}/auth/login`);
+        window.location.replace(`${process.env.REACT_APP_AUTH_URL}/auth/login`);
     };
 
     const logout = () => {
-        window.location.replace(`${process.env.REACT_APP_API_URL}/auth/logout`);
+        window.location.replace(`${process.env.REACT_APP_AUTH_URL}/auth/logout`);
     };
 
     const downloadReport = async () => {
         const response = await fetch(`${process.env.REACT_APP_API_URL}/reports`, {
             credentials: "include"
         });
+        response.json().then(data => downloadJSON(data))
         if (response.status === 401) {
             login();
             return;
         }
+    };
+
+    const downloadJSON = (data) => {
+        const jsonString = JSON.stringify(data, null, 2);
+
+        const blob = new Blob([jsonString], { type: 'application/json' });
+
+        const url = URL.createObjectURL(blob);
+
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'report.json';
+
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        URL.revokeObjectURL(url);
     };
 
     return (

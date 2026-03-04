@@ -20,17 +20,17 @@ import { UserCard } from './components/UserCard';
 const App: React.FC = () => {
 
   const login = () => {
-    window.location.replace(`${process.env.REACT_APP_API_URL}/auth/login`);
+    window.location.replace(`${process.env.REACT_APP_AUTH_URL}/auth/login`);
   };
 
-  const [userinfo, setUserinfo] = useState(null);
+  const [userinfo, setUserinfo] = useState<any|null>(null);
 
 
   const fetchMe = async () => {
     // const response = await fetch(`${process.env.REACT_APP_API_URL}/auth/me`, {
     //   credentials: "include"
     // });
-    const response = await fetch(`${process.env.REACT_APP_API_URL}/auth/userinfo`, {
+    const response = await fetch(`${process.env.REACT_APP_AUTH_URL}/auth/userinfo`, {
       credentials: "include"
     });
     if (response.status === 401) {

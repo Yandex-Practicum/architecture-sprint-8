@@ -10,14 +10,17 @@ export const UserCard = ({ userinfo }) => {
     };
 
     const downloadReport = async () => {
-        const response = await fetch(`${process.env.REACT_APP_API_URL}/reports`, {
+        const url_response = await fetch(`${process.env.REACT_APP_API_URL}/reports`, {
             credentials: "include"
         });
-        response.json().then(data => downloadJSON(data))
-        if (response.status === 401) {
+        if (url_response.status === 401) {
             login();
             return;
         }
+
+        const data = await url_response.json()
+        const report_response = await fetch(data.report_url);
+        report_response.json().then(data => downloadJSON(data))
     };
 
     const downloadJSON = (data) => {

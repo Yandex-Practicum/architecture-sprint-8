@@ -1,11 +1,14 @@
 from datetime import datetime, timedelta
 import logging
+import time
 from airflow import DAG
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 from airflow.operators.python import PythonOperator
 from airflow_clickhouse_plugin.operators.clickhouse import ClickHouseOperator
 from airflow_clickhouse_plugin.hooks.clickhouse import ClickHouseHook
 import pandas as pd
+from airflow.hooks.base import BaseHook
+import valkey
 
 
 default_args = {
@@ -185,9 +188,7 @@ def load_to_clickhouse(**context):
         logging.info("DataFrame пуст")
         return
 
-    ch_hook = ClickHouseHook(
-        clickhouse_conn_id="olap_db", database="default"
-    )
+    ch_hook = ClickHouseHook(clickhouse_conn_id="olap_db", database="default")
 
     df["report_date"] = pd.to_datetime(df["report_date"]).dt.date
     df["last_signal_time"] = pd.to_datetime(df["last_signal_time"])
@@ -203,6 +204,23 @@ def load_to_clickhouse(**context):
     ch_hook.execute("INSERT INTO user_reports VALUES", records)
 
     logging.info(f"Загружено {len(records)} записей в ClickHouse")
+
+
+def update_etl_date(**context):
+    conn = BaseHook.get_connection("valkey_db")
+
+    host = conn.host
+    port = conn.port
+    extra = conn.extra_dejson
+    db = extra.get("db", 0)
+    decode_responses = extra.get("decode_responses", True)
+
+    valkey_client = valkey.Valkey(
+        host=host, port=port, db=db, decode_responses=decode_responses
+    )
+
+    latest_date = str(int(time.time()))
+    valkey_client.set("latest_etl_date", latest_date)
 
 
 with DAG(
@@ -260,7 +278,12 @@ with DAG(
         trigger_rule="all_done",
     )
 
+    update_task = PythonOperator(
+        task_id="update_etl_date", python_callable=update_etl_date
+    )
+
     extract_crm_task >> transform_task
     extract_telemetry_task >> transform_task
     create_table >> load_using_hook
     transform_task >> load_using_hook >> cleanup_task
+    cleanup_task >> update_task

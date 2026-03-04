@@ -206,6 +206,81 @@ async def get_report(request: Request, response: Response):
 
     return {"report_url": cdn_url}
 
+@app.get("/reports/v2")
+async def get_report_v2(request: Request, response: Response):
+
+    session_id = request.cookies.get("session_id")
+    user_response = requests.get(
+        f"{AUTH_SERVICE_URL}/auth/userinfo",
+        cookies={"session_id": session_id},
+        timeout=5,
+    )
+    if user_response.status_code == 200:
+        data = user_response.json()
+        email = data.get("email", None)
+    else:
+        raise HTTPException(
+            status_code=user_response.status_code, detail=user_response.text
+        )
+
+    if not email:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    response.set_cookie(
+        key="session_id",
+        value=user_response.cookies.get("session_id"),
+        httponly=True,
+        # secure=True,
+        samesite="lax",
+        max_age=SESSION_TTL,
+    )
+
+    query = f"""
+    SELECT 
+        c.id,
+        c.name,
+        c.email,
+        c.age,
+        c.gender,
+        c.country,
+        r.prosthesis_type,
+        r.avg_signal_frequency,
+        r.avg_signal_duration,
+        r.avg_signal_amplitude,
+        r.total_signals,
+        r.last_signal_time,
+        r.report_date
+    FROM crm_customers c
+    LEFT JOIN user_reports r ON c.id = r.user_id
+    WHERE c.email = '{email}'
+    ORDER BY r.report_date DESC
+    LIMIT 1
+    """
+    rows = ch_client.execute(query)
+
+    if not rows:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    row = rows[0]
+
+    report = ReportResponse(
+        user_id=row[0],
+        full_name=row[1],
+        email=row[2],
+        age=row[3],
+        gender=row[4],
+        country=row[5],
+        prosthesis_type=row[6],
+        avg_signal_frequency=row[7],
+        avg_signal_duration=row[8],
+        avg_signal_amplitude=row[9],
+        total_signals=row[10],
+        last_signal_time=row[11],
+        report_date=row[12],
+    )
+
+    return report
+
 
 def main():
     print("Hello from reports-api!")

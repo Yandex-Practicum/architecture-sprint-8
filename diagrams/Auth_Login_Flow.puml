@@ -1,0 +1,66 @@
+@startuml Auth_Login_Flow
+title BionicPRO — Login Flow (BFF + PKCE)
+
+actor "Пользователь" as User
+participant "Browser /\nМобильное приложение" as App
+participant "Nginx\n(Reverse Proxy)" as Nginx
+participant "bionicpro-auth\n(BFF)" as BFF
+participant "Redis /\nIn-Memory" as Redis
+participant "Keycloak" as KC
+
+autonumber
+
+== Инициация логина ==
+
+User -> App: Нажимает "Войти"
+App -> Nginx: GET /auth/login
+Nginx -> BFF: GET /auth/login
+
+BFF -> BFF: Генерирует PKCE:\ncode_verifier = SecureRandom(32)\ncode_challenge = BASE64URL(SHA256(verifier))
+BFF -> BFF: Генерирует state = SecureRandom(32)
+BFF -> Redis: Сохранить {state → code_verifier}\nTTL = 5 минут
+
+BFF -> App: **302 Redirect** →\nKeycloak /auth?\n  response_type=code\n  &client_id=reports-frontend\n  &redirect_uri=http://bff:8000/auth/callback\n  &code_challenge=Xy8s...\n  &code_challenge_method=S256\n  &scope=openid\n  &state=abc123
+
+== Аутентификация в Keycloak ==
+
+App -> KC: GET /auth?... (follow redirect)
+KC -> User: Форма логина (Username + Password)
+User -> KC: Вводит credentials
+
+note over KC: Если включен MFA (задание 1.5):\nKeycloak показывает OTP-форму
+KC -> User: Форма OTP
+User -> KC: Вводит 6-значный код\nиз Google Authenticator
+
+KC -> KC: Проверяет credentials + OTP
+KC -> KC: Генерирует authorization code
+
+== Callback на BFF ==
+
+KC -> App: **302 Redirect** →\nbff:8000/auth/callback?\n  code=AUTH_CODE\n  &state=abc123
+App -> Nginx: GET /auth/callback?code=AUTH_CODE&state=abc123
+Nginx -> BFF: GET /auth/callback?code=AUTH_CODE&state=abc123
+
+== Обмен code на токены ==
+
+BFF -> Redis: Получить code_verifier по state=abc123
+Redis -> BFF: code_verifier
+BFF -> Redis: Удалить {state → code_verifier}
+
+BFF -> KC: **POST /token**\n  grant_type=authorization_code\n  &code=AUTH_CODE\n  &code_verifier=original_verifier\n  &client_id=reports-frontend\n  &client_secret=SECRET\n  &redirect_uri=http://bff:8000/auth/callback
+
+KC -> KC: Проверяет:\n1. code валиден\n2. client_secret совпадает\n3. SHA256(code_verifier) == code_challenge
+
+KC -> BFF: **200 OK**\n{\n  access_token: "eyJhbG...",\n  refresh_token: "dGhpcyB...",\n  id_token: "eyJzdW...",\n  expires_in: 120\n}
+
+== Создание серверной сессии ==
+
+BFF -> BFF: session_id = SecureRandom(32).toHex()
+BFF -> BFF: Парсит id_token → user_id, roles
+BFF -> Redis: Сохранить {\n  session_id → {\n    access_token,\n    refresh_token,\n    user_id,\n    roles,\n    created_at\n  }\n}\nTTL = 30 минут
+
+BFF -> App: **302 Redirect** → http://frontend:3000/\n**Set-Cookie:** BIONIC_SESSION=session_id;\n  HttpOnly; Secure; SameSite=Strict;\n  Path=/; Max-Age=1800
+
+User -> App: Видит главную страницу\n(авторизован)
+
+@enduml

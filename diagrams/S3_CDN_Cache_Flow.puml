@@ -1,0 +1,84 @@
+@startuml S3_CDN_Cache_Flow
+title BionicPRO — Кэширование отчётов через S3 + CDN (Задание 3)
+
+skinparam sequenceArrowThickness 2
+skinparam participantPadding 20
+
+actor "Пилот протеза" as User
+participant "Frontend\n(React)" as FE
+participant "bionicpro-auth\n(BFF)" as BFF
+participant "Report Service\n(Java)" as RS
+database "MinIO\n(S3 API)" as S3
+participant "Nginx\n(CDN cache)" as CDN
+database "ClickHouse\n(витрина)" as CH
+
+== Сценарий 1: Отчёт ещё не сформирован (первый запрос) ==
+
+User -> FE : Клик «Получить отчёт»
+FE -> BFF : GET /api/reports/me\ncookie: BIONIC_SESSION=...
+BFF -> RS : GET /reports/me\nAuthorization: Bearer {token}
+
+note over RS : Извлечь userId из JWT\nСформировать S3 key:\nreports/{userId}/report.json
+
+RS -> S3 : HEAD /reports/512/report.json
+S3 --> RS : 404 Not Found
+
+note over RS : Отчёт не найден в S3\n→ генерируем из ClickHouse
+
+RS -> CH : SELECT * FROM user_reports\nWHERE user_id = 512
+CH --> RS : Данные отчёта
+
+note over RS : Сформировать JSON\n→ сохранить в S3
+
+RS -> S3 : PUT /reports/512/report.json\nContent-Type: application/json\n{report JSON}
+S3 --> RS : 200 OK
+
+RS --> BFF : 200 OK\n{report JSON,\n cdnUrl: "/cdn/reports/512/report.json"}
+BFF --> FE : 200 OK\n{report JSON, cdnUrl}
+FE --> User : Отображение отчёта
+
+== Сценарий 2: Отчёт уже в S3 (повторный запрос) ==
+
+User -> FE : Клик «Получить отчёт»
+FE -> BFF : GET /api/reports/me
+BFF -> RS : GET /reports/me\nAuthorization: Bearer {token}
+
+RS -> S3 : HEAD /reports/512/report.json
+S3 --> RS : 200 OK (exists, size, date)
+
+note over RS : Отчёт найден в S3\n→ читаем из S3 (не трогаем ClickHouse)
+
+RS -> S3 : GET /reports/512/report.json
+S3 --> RS : {report JSON}
+
+RS --> BFF : 200 OK\n{report JSON,\n cdnUrl: "/cdn/reports/512/report.json"}
+BFF --> FE : 200 OK
+FE --> User : Отображение отчёта
+
+== Сценарий 3: Фронтенд запрашивает CDN напрямую (кэш) ==
+
+User -> FE : Повторный просмотр / обновление страницы
+FE -> CDN : GET /cdn/reports/512/report.json
+
+alt Nginx cache HIT
+    CDN --> FE : 200 OK\nX-Cache-Status: HIT\n{report JSON из кэша}
+else Nginx cache MISS
+    CDN -> S3 : GET /reports/512/report.json
+    S3 --> CDN : {report JSON}
+    note over CDN : Сохранить в кэш\n(TTL: 24h)
+    CDN --> FE : 200 OK\nX-Cache-Status: MISS\n{report JSON}
+end
+
+FE --> User : Отображение отчёта
+
+== Фоновый процесс: Обновление данных (Airflow ETL, @daily) ==
+
+participant "Airflow" as AF
+
+note over AF : DAG etl_reports\nобновил витрину user_reports
+
+AF -> S3 : Удалить старые отчёты\n(очистка bucket reports/)
+note over S3 : Объекты удалены
+note over CDN : Кэш устареет по TTL (24h)\nили при следующем MISS\nполучит свежий отчёт
+
+@enduml

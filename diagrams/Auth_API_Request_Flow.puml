@@ -1,0 +1,69 @@
+@startuml Auth_API_Request_Flow
+title BionicPRO — API Request with Session Rotation & Token Refresh
+
+actor "Пользователь" as User
+participant "Browser" as App
+participant "Nginx" as Nginx
+participant "bionicpro-auth\n(BFF)" as BFF
+participant "Redis /\nIn-Memory" as Redis
+participant "Keycloak" as KC
+participant "Report Service /\nMain API" as API
+
+autonumber
+
+== Запрос к защищённому ресурсу ==
+
+User -> App: Нажимает "Скачать отчёт"
+App -> Nginx: GET /api/reports/me\n**Cookie:** BIONIC_SESSION=old_session_id
+Nginx -> BFF: GET /api/reports/me\n**Cookie:** BIONIC_SESSION=old_session_id
+
+== Валидация сессии + Ротация ==
+
+BFF -> BFF: Извлекает session_id из Cookie
+BFF -> Redis: **GETDEL** old_session_id\n(атомарно: получить + удалить)
+Redis -> BFF: {access_token, refresh_token,\nuser_id, roles, ...}
+
+alt Сессия не найдена
+    BFF -> App: **401 Unauthorized**\n(Clear-Cookie: BIONIC_SESSION)
+    App -> App: Redirect на /auth/login
+else Сессия найдена
+end
+
+== Проверка access_token ==
+
+alt access_token ещё валиден (< 2 мин)
+    BFF -> BFF: Токен OK, используем как есть
+else access_token истёк → Refresh
+    BFF -> KC: **POST /token**\n  grant_type=refresh_token\n  &refresh_token=REFRESH_TOKEN\n  &client_id=reports-frontend\n  &client_secret=SECRET
+    
+    alt refresh_token валиден
+        KC -> BFF: **200 OK**\n{new_access_token, new_refresh_token}
+        BFF -> BFF: Обновляет токены в session data
+    else refresh_token истёк
+        BFF -> App: **401 Unauthorized**\n(Clear-Cookie: BIONIC_SESSION)
+        App -> App: Redirect на /auth/login
+    end
+end
+
+== Ротация сессии (Session Fixation Protection) ==
+
+BFF -> BFF: new_session_id = SecureRandom(32).toHex()
+BFF -> Redis: **SET** new_session_id → {\n  (обновлённые) access_token,\n  refresh_token,\n  user_id, roles,\n  last_accessed = now()\n}\nTTL = 30 минут
+
+note over BFF: old_session_id уже удалён (шаг 5).\nТеперь данные привязаны к new_session_id.\nЕсли злоумышленник знал old_session_id —\nон уже невалиден.
+
+== Проксирование к API ==
+
+BFF -> API: GET /api/reports/me\n**Authorization:** Bearer access_token\n**X-User-Id:** user_id
+API -> API: Валидирует JWT (подпись по JWKS)\nПроверяет role: prothetic_user\nПроверяет: user_id запроса == user_id из токена
+API -> BFF: **200 OK** {report data}
+
+== Ответ клиенту с новой сессией ==
+
+BFF -> App: **200 OK** {report data}\n**Set-Cookie:** BIONIC_SESSION=new_session_id;\n  HttpOnly; Secure; SameSite=Strict;\n  Path=/; Max-Age=1800
+
+note over App: Браузер автоматически заменяет\nстарую куку на новую.\nСледующий запрос пойдёт\nс new_session_id.
+
+User -> App: Видит отчёт
+
+@enduml

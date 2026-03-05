@@ -28,7 +28,11 @@ uid: jane.smith
 mail: jane@example.com
 userPassword: password
 
-dn: uid=alex,ou=People,dc=example,dc=com
+# BUG FIX: было uid=alex в DN, но uid=alex.johnson в атрибуте.
+# Группа prothetic_user ссылалась на uid=alex.johnson — member не находился.
+# Исправлено: DN и атрибут uid теперь совпадают.
+dn: uid=alex.johnson,ou=People,dc=example,dc=com
+objectClass: top
 objectClass: inetOrgPerson
 cn: Alex
 sn: Johnson
@@ -36,7 +40,7 @@ uid: alex.johnson
 mail: alex@example.com
 userPassword: password
 
-# Роли
+# Роли (группы)
 dn: cn=user,ou=Groups,dc=example,dc=com
 objectClass: groupOfNames
 cn: user
@@ -46,4 +50,9 @@ dn: cn=prothetic_user,ou=Groups,dc=example,dc=com
 objectClass: groupOfNames
 cn: prothetic_user
 member: uid=alex.johnson,ou=People,dc=example,dc=com
+member: uid=john.doe,ou=People,dc=example,dc=com
+
+dn: cn=administrator,ou=Groups,dc=example,dc=com
+objectClass: groupOfNames
+cn: administrator
 member: uid=john.doe,ou=People,dc=example,dc=com

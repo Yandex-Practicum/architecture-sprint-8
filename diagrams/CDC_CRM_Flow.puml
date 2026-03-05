@@ -1,0 +1,129 @@
+@startuml CDC_CRM_Flow
+!theme plain
+
+title CDC: CRM → Debezium → Kafka → ClickHouse → Report API
+
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 250
+skinparam responseMessageBelowArrow true
+
+actor "Оператор CRM" as Operator
+participant "CRM\n(PostgreSQL)" as CRM #LightBlue
+participant "WAL\n(logical replication)" as WAL #LightGray
+participant "Kafka Connect\n+ Debezium" as Debezium #Orange
+queue "Kafka\nтопик crm.public.customers" as Kafka #LightGreen
+database "ClickHouse" as CH #LightYellow
+participant "Report\nService" as Report #LightCoral
+actor "Пилот протеза" as User
+
+== 1. Первый запуск: Initial Snapshot ==
+
+Debezium -> CRM: Подключение (logical replication slot)
+activate CRM
+CRM --> Debezium: Slot ""debezium_slot"" создан
+deactivate CRM
+
+Debezium -> CRM: SELECT * FROM customers\n(initial snapshot, одноразово)
+activate CRM
+CRM --> Debezium: Все строки (op=""r"")
+deactivate CRM
+
+loop каждая строка snapshot
+    Debezium -> Kafka: JSON event {op: ""r"", after: {...}}
+end
+
+note over Debezium
+    После snapshot Debezium переключается
+    на чтение WAL — больше никаких SELECT
+end note
+
+== 2. Штатная работа: CDC через WAL ==
+
+Operator -> CRM: INSERT INTO customers\n(id=1001, name='Иван Петров', ...)
+activate CRM
+CRM -> WAL: Запись в WAL\n(происходит всегда,\nне только для CDC)
+CRM --> Operator: OK
+deactivate CRM
+
+WAL -> Debezium: Декодированное изменение\n(logical replication stream)
+activate Debezium
+
+Debezium -> Kafka: JSON event\n{op: ""c"", after: {id:1001, name:'Иван Петров', ...}}
+activate Kafka
+Kafka --> Debezium: ACK (offset committed)
+deactivate Debezium
+deactivate Kafka
+
+note over CRM
+    CRM не испытывает нагрузки:
+    WAL пишется в любом случае,
+    Debezium лишь читает поток
+end note
+
+== 3. ClickHouse: KafkaEngine → MV → Target ==
+
+Kafka -> CH: ClickHouse KafkaEngine\nчитает из топика (pull, по расписанию)
+activate CH
+
+note over CH
+    **crm_customers_queue** (KafkaEngine)
+    ↓ автоматически
+    **crm_customers_mv** (MaterializedView)
+    — парсит JSON, извлекает поля
+    ↓ INSERT INTO
+    **crm_customers** (ReplacingMergeTree)
+    — дедупликация по id, свежая версия по _ts
+end note
+
+CH --> Kafka: Consumer offset committed
+deactivate CH
+
+== 4. UPDATE в CRM ==
+
+Operator -> CRM: UPDATE customers\nSET email='new@mail.com'\nWHERE id=1001
+activate CRM
+CRM -> WAL: Запись изменения
+CRM --> Operator: OK
+deactivate CRM
+
+WAL -> Debezium: Изменение (UPDATE)
+Debezium -> Kafka: {op: ""u"",\nbefore: {email:'ivan@...'}, after: {email:'new@...'}}
+Kafka -> CH: KafkaEngine pull
+note over CH
+    ReplacingMergeTree: строка с id=1001
+    заменяется на новую версию (по _ts)
+end note
+
+== 5. Витрина и Report API ==
+
+note over CH
+    **user_reports_cdc** (VIEW или MV):
+    JOIN crm_customers + emg_sensor_data
+    — CRM-данные: near real-time (CDC)
+    — Телеметрия: batch (Airflow, как раньше)
+end note
+
+User -> Report: GET /reports/me\n(через BFF, cookie)
+activate Report
+Report -> CH: SELECT * FROM user_reports_cdc\nWHERE user_id = ?
+activate CH
+CH --> Report: Данные витрины
+deactivate CH
+Report --> User: JSON-отчёт
+deactivate Report
+
+== 6. DELETE в CRM (обработка tombstone) ==
+
+Operator -> CRM: DELETE FROM customers\nWHERE id=1001
+CRM -> WAL: Запись удаления
+WAL -> Debezium: Изменение (DELETE)
+Debezium -> Kafka: {op: ""d"", before: {id:1001, ...}, after: null}
+Kafka -> CH: KafkaEngine pull
+
+note over CH
+    Вставляется строка с _op=""d"".
+    При SELECT витрина фильтрует:
+    WHERE _op != 'd'
+end note
+
+@enduml

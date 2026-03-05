@@ -1,0 +1,65 @@
+@startuml Report_Request_Flow
+title BionicPRO — Получение отчёта (Runtime Flow)
+
+skinparam sequenceArrowThickness 2
+skinparam participantPadding 20
+
+actor "Пилот протеза" as User
+participant "Frontend\n(React)" as FE
+participant "bionicpro-auth\n(BFF)" as BFF
+participant "Keycloak" as KC
+participant "Report Service\n(Java)" as RS
+database "ClickHouse\n(витрина user_reports)" as CH
+
+== Пользователь нажимает «Получить отчёт» ==
+
+User -> FE : Клик «Получить отчёт»
+FE -> BFF : GET /api/reports/me\ncookie: BIONIC_SESSION=abc123
+
+note over BFF : Проверка сессии:\n1. Извлечь session_id из cookie\n2. Найти SessionData\n3. Проверить access_token expiry
+
+alt access_token истёк
+    BFF -> KC : POST /token\ngrant_type=refresh_token\nrefresh_token=...
+    KC --> BFF : 200 OK\n{access_token, refresh_token}
+    note over BFF : Обновить токены в сессии
+end
+
+note over BFF : Ротация сессии:\n1. Удалить старую сессию (abc123)\n2. Создать новую (def456)\n3. Извлечь user_id из JWT claims
+
+BFF -> RS : GET /reports/{userId}\nAuthorization: Bearer {access_token}
+
+note over RS : Проверка авторизации:\n1. Валидация JWT (подпись, expiry)\n2. Извлечь sub (user_id) из токена\n3. Убедиться: запрошенный userId == sub\n   (отчёт только по себе)
+
+RS -> CH : SELECT * FROM user_reports\nWHERE user_id = {userId}
+
+alt Данные найдены
+    CH --> RS : Результат: агрегаты по протезам
+    RS --> BFF : 200 OK\n{report JSON}
+    BFF --> FE : 200 OK\n{report JSON}\nSet-Cookie: BIONIC_SESSION=def456
+    FE --> User : Отображение отчёта
+else Данные не найдены (ещё не обработаны Airflow)
+    CH --> RS : Пустой результат
+    RS --> BFF : 404\n{error: "Отчёт ещё не готов.\nДанные обрабатываются ежедневно."}
+    BFF --> FE : 404\n{error message}
+    FE --> User : "Отчёт пока недоступен.\nДанные обновляются раз в сутки."
+end
+
+== Фоновый процесс: ETL (Airflow, @daily) ==
+
+participant "Airflow\n(Scheduler)" as AF
+database "CRM DB\n(PostgreSQL)" as CRM
+
+note over AF : Запуск DAG etl_reports\n(ежедневно, 00:00 UTC)
+
+AF -> CH : TRUNCATE TABLE user_reports
+AF -> CH : INSERT INTO user_reports\nSELECT ... FROM emg_sensor_data e\nLEFT JOIN postgresql('crm_db:5432',\n  'crm_db','customers',\n  'crm_user','crm_password') AS c\nON e.user_id = c.id\nGROUP BY ...
+
+note over CH : ClickHouse сам читает\nиз CRM PostgreSQL\nчерез табличную функцию
+CH -> CRM : SELECT * FROM customers
+CRM --> CH : Данные клиентов
+
+AF -> CH : SELECT count() FROM user_reports
+CH --> AF : row_count
+note over AF : Верификация: row_count > 0\nЛогирование результата
+
+@enduml

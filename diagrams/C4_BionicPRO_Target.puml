@@ -1,0 +1,109 @@
+@startuml C4_BionicPRO_Target
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+LAYOUT_WITH_LEGEND()
+
+title BionicPRO — Target Architecture (Sprint 9: SSO + OLAP + CDC)
+
+' === Actors (все из оригинальной диаграммы + ML-инженер) ===
+Person(buyer, "Покупатель протеза", "Заказывает и оплачивает протез")
+Person(pilot, "Пилот протеза", "Пользователь протеза, с него считываются данные")
+Person(operator, "Оператор производства", "Работает с CRM")
+Person_Ext(ml_engineer, "ML-инженер", "Анализ данных телеметрии")
+
+' ============================================================
+' === BionicPRO System Boundary ===
+' ============================================================
+System_Boundary(bionic, "BionicPRO") {
+
+    ' --- Frontend Layer ---
+    Container(nginx, "Nginx", "Reverse Proxy", "CDN-эмуляция, кэширование статики и отчётов из S3")
+    Container(spa, "Приложение для донастройки протеза", "iOS, Android", "Управление протезом, просмотр отчётов")
+    Container(frontend, "Frontend (Web)", "React + TypeScript", "Веб-интерфейс для отчётов и управления")
+
+    ' --- Auth Layer (NEW — Sprint 9, Task 1) ---
+    Container(bff, "bionicpro-auth (BFF)", "Java", "PKCE + сессии. Прячет токены от фронтенда, проксирует запросы к API")
+    ContainerDb(redis, "Session Store", "Redis / In-Memory", "Хранение серверных сессий (session_id → tokens)")
+
+    ' --- API Layer ---
+    Container(api, "Main API", "Java / Spring Boot", "Основная бизнес-логика, управление устройствами, приём телеметрии")
+    Container(report_svc, "Report Service", "Java", "Генерация отчётов из OLAP, кэширование в S3")
+
+    ' --- Business Systems ---
+    Container(store, "Интернет-магазин", "Битрикс24", "Заказы, оплата")
+    Container(crm, "CRM", "Битрикс24", "Управление клиентами, заказами")
+
+    ' --- Data Layer (OLTP) ---
+    ContainerDb(main_db, "Main DB", "PostgreSQL", "Операционные данные: профили, настройки протезов")
+    ContainerDb(crm_db, "CRM DB", "PostgreSQL", "Данные клиентов (customers)")
+
+    ' --- Data Layer (OLAP — Sprint 9, Tasks 2-4) ---
+    ContainerDb(olap_db, "Analytical DB", "ClickHouse", "Телеметрия + витрины отчётности")
+    ContainerDb(s3, "Object Storage", "MinIO (S3 API)", "Сгенерированные отчёты (JSON)")
+
+    ' --- Data Pipeline (Sprint 9, Tasks 2+4) ---
+    Container(airflow, "ETL Pipeline", "Apache Airflow", "Батчевая переливка CRM → ClickHouse")
+    ContainerQueue(kafka, "Message Broker", "Apache Kafka", "Телеметрия (real-time) + CDC события")
+    Container(debezium, "CDC Connector", "Debezium", "Захват изменений из CRM DB (WAL)")
+
+    ' --- CLI / Internal Tools ---
+    Container(cli, "cli tool", "Java / Spring Boot", "Внутренний инструмент для работы с данными")
+}
+
+' === External Systems (из оригинала + новые) ===
+System_Ext(chip, "Программа в чипе протеза", "C++ на ESP32. Считывание миосигналов, распознавание движений, передача телеметрии")
+System_Ext(keycloak, "Keycloak", "Identity Provider: SSO, OIDC, PKCE, MFA")
+System_Ext(ldap, "OpenLDAP", "User Directory: пользователи и роли представительств")
+System_Ext(yandex, "Яндекс ID", "Внешний OAuth2 Identity Provider")
+
+' ============================================================
+' === Relationships ===
+' ============================================================
+
+' --- User → System ---
+Rel(buyer, store, "Выбор протеза, заказ, оплата", "HTTPS")
+Rel(pilot, spa, "Управление протезом", "HTTPS")
+Rel(pilot, frontend, "Просмотр отчётов", "HTTPS")
+Rel(pilot, chip, "Предоставление миосигналов")
+Rel(operator, crm, "Управление клиентами", "HTTPS")
+Rel(ml_engineer, cli, "Анализ данных", "CLI")
+
+' --- Frontend → Auth (BFF Pattern) ---
+Rel(frontend, nginx, "HTTPS")
+Rel(spa, nginx, "HTTPS")
+Rel(nginx, bff, "Проксирование auth-запросов")
+Rel(nginx, frontend, "Serve static / SPA")
+Rel(bff, redis, "R/W сессии")
+Rel(bff, keycloak, "OIDC + PKCE", "HTTPS")
+Rel(bff, api, "Проксирование с Bearer Token", "HTTP")
+Rel(bff, report_svc, "Проксирование с Bearer Token", "HTTP")
+
+' --- Keycloak → External Identity ---
+Rel(keycloak, ldap, "User Federation", "LDAP")
+Rel(keycloak, yandex, "Identity Brokering", "OAuth2")
+
+' --- Chip → API (Telemetry) ---
+Rel(chip, api, "Отправка телеметрии", "HTTPS / 4G")
+
+' --- API Layer → Data ---
+Rel(api, main_db, "R/W профили, настройки", "JDBC")
+Rel(api, kafka, "Push телеметрии", "TCP")
+Rel(report_svc, olap_db, "SELECT отчёты", "JDBC/HTTP")
+Rel(report_svc, s3, "Save/Load отчётов", "S3 API")
+Rel(cli, main_db, "R/W", "JDBC")
+
+' --- CDN / Caching ---
+Rel(nginx, s3, "Serve cached reports", "S3 API / HTTP")
+
+' --- Business Systems ---
+Rel(store, crm, "Sync заказов")
+Rel(crm, crm_db, "R/W", "SQL")
+
+' --- Data Pipeline ---
+Rel(debezium, crm_db, "Capture Changes (WAL)", "PostgreSQL replication")
+Rel(debezium, kafka, "Push CDC events")
+Rel(kafka, olap_db, "Ingest via KafkaEngine", "Native")
+Rel(airflow, crm_db, "Batch Extract", "JDBC")
+Rel(airflow, olap_db, "Batch Load", "HTTP/Native")
+
+@enduml

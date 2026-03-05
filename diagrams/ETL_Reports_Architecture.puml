@@ -1,0 +1,56 @@
+@startuml ETL_Reports_Architecture
+!include <C4/C4_Container>
+
+title BionicPRO — Архитектура сервиса отчётов (Задание 2)
+
+LAYOUT_WITH_LEGEND()
+
+' ── Actors ──────────────────────────────────────────────
+Person(pilot, "Пилот протеза", "Просматривает отчёт\nо работе своего протеза")
+
+' ── BionicPRO System Boundary ──────────────────────────
+System_Boundary(bionic, "BionicPRO") {
+
+    ' ── Frontend + Auth ────────────────────────────────
+    Container(frontend, "Frontend", "React, TypeScript", "SPA: кнопка «Получить отчёт»,\nотображение данных")
+    Container(bff, "bionicpro-auth", "Java 25, Javalin", "BFF: сессии, PKCE,\nпроксирование запросов к API")
+
+    ' ── Report Service ─────────────────────────────────
+    Container(report_svc, "Report Service", "Java 25", "API /reports/{userId}\nЧитает витрину из ClickHouse.\nПроверяет авторизацию:\nотчёт только по себе")
+
+    ' ── Data Sources ───────────────────────────────────
+    ContainerDb(crm_db, "CRM DB", "PostgreSQL 14", "Клиенты: id, name, email,\nage, gender, country,\naddress, phone")
+
+    ContainerDb(sensor_db, "Telemetry\n(emg_sensor_data)", "ClickHouse", "Сырые данные датчиков:\nuser_id, prosthesis_type,\nmuscle_group, signal_*")
+
+    ' ── OLAP ───────────────────────────────────────────
+    ContainerDb(olap_view, "Витрина\n(user_reports)", "ClickHouse", "Агрегированные данные:\nuser_id, customer_name,\nprosthesis_type,\ntotal_signals, avg_amplitude,\navg_frequency, avg_duration,\nmin/max signal_time")
+
+    ' ── ETL ────────────────────────────────────────────
+    Container(airflow, "Apache Airflow", "Python, DAG etl_reports", "ETL по расписанию (@daily):\n1. Очистка витрины\n2. JOIN телеметрии + CRM\n3. Запись в витрину\n4. Верификация")
+
+    ' ── Identity ───────────────────────────────────────
+    Container(keycloak, "Keycloak", "Keycloak 21.1", "IdP: OAuth 2.0 + PKCE,\nMFA, LDAP, Яндекс ID")
+}
+
+' ── External: Программа в чипе ─────────────────────────
+System_Ext(chip, "Программа в чипе протеза", "Считывает миосигналы,\nотправляет телеметрию через 4G")
+
+' ── Relationships ──────────────────────────────────────
+
+' User flow
+Rel(pilot, frontend, "Запрашивает отчёт", "HTTPS")
+Rel(frontend, bff, "GET /api/reports/me", "HTTP, cookie")
+Rel(bff, keycloak, "Валидация / refresh токена", "OIDC")
+Rel(bff, report_svc, "GET /reports/{userId}", "HTTP, Bearer token")
+Rel(report_svc, olap_view, "SELECT FROM user_reports\nWHERE user_id = ?", "TCP 9000")
+
+' ETL flow
+Rel(airflow, sensor_db, "Читает телеметрию", "TCP 9000")
+Rel(airflow, crm_db, "Читает клиентов\nчерез postgresql()", "TCP 5432")
+Rel(airflow, olap_view, "INSERT INTO user_reports\n(full refresh @daily)", "TCP 9000")
+
+' Data ingestion
+Rel(chip, sensor_db, "Телеметрия\n(через API → ClickHouse)", "HTTPS / 4G")
+
+@enduml

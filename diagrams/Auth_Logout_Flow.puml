@@ -1,0 +1,31 @@
+@startuml Auth_Logout_Flow
+title BionicPRO — Logout Flow
+
+actor "Пользователь" as User
+participant "Browser" as App
+participant "bionicpro-auth\n(BFF)" as BFF
+participant "Redis /\nIn-Memory" as Redis
+participant "Keycloak" as KC
+
+autonumber
+
+User -> App: Нажимает "Выйти"
+App -> BFF: POST /auth/logout\n**Cookie:** BIONIC_SESSION=session_id
+
+BFF -> Redis: GET session_id
+Redis -> BFF: {access_token, refresh_token, ...}
+BFF -> Redis: DEL session_id
+
+BFF -> KC: GET /logout?\n  id_token_hint=...\n  &post_logout_redirect_uri=http://frontend:3000
+
+note over KC: Keycloak инвалидирует\nсвою SSO-сессию.\nЕсли есть другие клиенты в SSO —\nони тоже будут разлогинены\n(back-channel logout).
+
+KC -> BFF: 302 Redirect → http://frontend:3000
+
+BFF -> App: **302 Redirect** → http://frontend:3000\n**Set-Cookie:** BIONIC_SESSION=;\n  HttpOnly; Secure; SameSite=Strict;\n  Path=/; Max-Age=0
+
+note over App: Max-Age=0 → браузер\nудаляет куку немедленно.
+
+User -> App: Видит страницу логина
+
+@enduml

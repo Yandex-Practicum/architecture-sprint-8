@@ -1,0 +1,49 @@
+# Организационные подразделения (OU)
+dn: ou=People,dc=example,dc=com
+objectClass: top
+objectClass: organizationalUnit
+ou: People
+
+dn: ou=Groups,dc=example,dc=com
+objectClass: top
+objectClass: organizationalUnit
+ou: Groups
+
+# Пользователи
+dn: uid=john.doe,ou=People,dc=example,dc=com
+objectClass: top
+objectClass: inetOrgPerson
+cn: John
+sn: Doe
+uid: john.doe
+mail: john@example.com
+userPassword: password
+
+dn: uid=jane.smith,ou=People,dc=example,dc=com
+objectClass: top
+objectClass: inetOrgPerson
+cn: Jane
+sn: Smith
+uid: jane.smith
+mail: jane@example.com
+userPassword: password
+
+dn: uid=alex,ou=People,dc=example,dc=com
+objectClass: inetOrgPerson
+cn: Alex
+sn: Johnson
+uid: alex.johnson
+mail: alex@example.com
+userPassword: password
+
+# Роли
+dn: cn=user,ou=Groups,dc=example,dc=com
+objectClass: groupOfNames
+cn: user
+member: uid=jane.smith,ou=People,dc=example,dc=com
+
+dn: cn=prothetic_user,ou=Groups,dc=example,dc=com
+objectClass: groupOfNames
+cn: prothetic_user
+member: uid=alex.johnson,ou=People,dc=example,dc=com
+member: uid=john.doe,ou=People,dc=example,dc=com

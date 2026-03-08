@@ -8,7 +8,8 @@
 *.out
 /vendor/
 /Godeps/
-
+*.out
+postgres-keycloak-data/
 # Go workspace file
 go.work
 

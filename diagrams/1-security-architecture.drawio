@@ -1,0 +1,112 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/25.0.2 Chrome/128.0.6613.186 Electron/32.2.5 Safari/537.36" version="25.0.2">
+  <diagram id="security-arch" name="Security Architecture">
+    <mxGraphModel dx="2781" dy="1286" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="960" pageHeight="580" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="Задание 1: Архитектура безопасности BionicPRO — BFF + PKCE + LDAP + MFA + Yandex ID" style="text;html=1;fontSize=14;fontStyle=1;fontColor=#333333;align=center;" parent="1" vertex="1">
+          <mxGeometry x="-450" y="10" width="800" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="boundary" value="BionicPRO [Software System]" style="rounded=0;strokeColor=#333333;fillColor=none;dashed=1;fontSize=10;fontColor=#999999;verticalAlign=bottom;align=left;" parent="1" vertex="1">
+          <mxGeometry x="-620" y="43.75" width="1170" height="527.5" as="geometry" />
+        </mxCell>
+        <mxCell id="actor" value="Пользователь&#xa;[Person]&#xa;Пилот / Покупатель" style="rounded=0;strokeColor=#333333;fillColor=none;fontSize=10;fontColor=#333333;fontStyle=1;align=center;" parent="1" vertex="1">
+          <mxGeometry x="-890" y="62.5" width="125" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="yandex-id" value="Yandex ID&#xa;[External System]&#xa;OAuth 2.0 IdP" style="rounded=0;strokeColor=#82b366;fillColor=#d5e8d4;fontSize=10;align=center;" parent="1" vertex="1">
+          <mxGeometry x="410" y="62.5" width="115" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="frontend" value="Frontend&#xa;[Container: React / Nginx]&#xa;Только session cookie. Токены не хранит." style="rounded=0;strokeColor=#333333;fillColor=none;fontSize=10;fontColor=#333333;align=center;" parent="1" vertex="1">
+          <mxGeometry x="-590" y="60" width="230" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="bionicpro-auth" value="bionicpro-auth  [NEW]&#xa;[Container: ASP.NET Core 8]&#xa;BFF: PKCE flow, сессии, ротация токенов" style="rounded=0;strokeColor=#333333;fillColor=none;fontSize=10;fontColor=#333333;fontStyle=1;align=center;" parent="1" vertex="1">
+          <mxGeometry x="-270" y="60" width="220" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="keycloak" value="Keycloak&#xa;[Container: Keycloak 21]&#xa;IdP: MFA / OTP, роли, realm" style="rounded=0;strokeColor=#333333;fillColor=none;fontSize=10;fontColor=#333333;align=center;" parent="1" vertex="1">
+          <mxGeometry x="110" y="60" width="145" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="openldap" value="OpenLDAP&#xa;[Container: OpenLDAP]&#xa;User Federation — зарубежное представительство" style="rounded=0;strokeColor=#333333;fillColor=none;fontSize=10;fontColor=#333333;align=center;" parent="1" vertex="1">
+          <mxGeometry x="52.5" y="180" width="260" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="api" value="API&#xa;[Container: Backend]&#xa;Бизнес-логика протеза" style="rounded=0;strokeColor=#333333;fillColor=none;fontSize=10;fontColor=#333333;align=center;" parent="1" vertex="1">
+          <mxGeometry x="-500" y="280" width="145" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="report-api" value="Report API  [NEW]&#xa;[Container: ASP.NET Core 8]&#xa;/reports + RBAC (только свои данные)" style="rounded=0;strokeColor=#333333;fillColor=none;fontSize=10;fontColor=#333333;fontStyle=1;align=center;" parent="1" vertex="1">
+          <mxGeometry x="-275" y="280" width="230" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="crm-db" value="CRM DB&#xa;[Container: PostgreSQL]" style="shape=cylinder3;size=10;strokeColor=#6c8ebf;fillColor=#dae8fc;fontSize=10;align=center;" parent="1" vertex="1">
+          <mxGeometry x="-505" y="400" width="155" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="clickhouse" value="ClickHouse  [NEW]&#xa;[Container: OLAP]&#xa;Витрина отчётов (агрегаты)" style="shape=cylinder3;size=10;strokeColor=#d6b656;fillColor=#fff2cc;fontSize=10;align=center;" parent="1" vertex="1">
+          <mxGeometry x="-245" y="400" width="170" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="minio" value="Minio S3  [NEW]&#xa;[Container: Object Storage]&#xa;Кеш готовых отчётов" style="rounded=0;strokeColor=#333333;fillColor=none;fontSize=10;fontColor=#333333;align=center;" parent="1" vertex="1">
+          <mxGeometry x="110" y="280" width="145" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="arr-actor-fe" value="HTTPS / session cookie" style="endArrow=classic;strokeColor=#333333;fontSize=9;fontColor=#333333;align=center;verticalAlign=bottom;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" edge="1" target="frontend" source="actor">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-550" y="185" as="sourcePoint" />
+            <mxPoint x="-570" y="87" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arr-fe-auth" value="API + cookie" style="endArrow=classic;strokeColor=#333333;fontSize=9;fontColor=#333333;align=center;verticalAlign=bottom;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" edge="1" target="bionicpro-auth">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-360" y="87" as="sourcePoint" />
+            <mxPoint x="-300" y="87" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arr-auth-kc" value="PKCE (server-to-server)" style="endArrow=classic;strokeColor=#333333;fontSize=9;fontColor=#333333;align=center;verticalAlign=bottom;" parent="1" edge="1" target="keycloak">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-50" y="87" as="sourcePoint" />
+            <mxPoint x="-70" y="87" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arr-yandex-kc" value="Identity Brokering" style="endArrow=classic;strokeColor=#999999;fontSize=9;fontColor=#666666;dashed=1;align=center;verticalAlign=bottom;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" parent="1" edge="1" target="keycloak" source="yandex-id">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="140" y="87" as="sourcePoint" />
+            <mxPoint x="170" y="87" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arr-kc-ldap" value="LDAP user federation" style="endArrow=classic;strokeColor=#333333;fontSize=9;fontColor=#333333;align=right;verticalAlign=middle;entryX=0.5;entryY=0;entryDx=0;entryDy=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" parent="1" edge="1" target="openldap" source="keycloak">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="82.08000000000004" y="115" as="sourcePoint" />
+            <mxPoint x="82.08000000000004" y="175" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arr-auth-api" value="Bearer token (внутри сети)" style="endArrow=classic;strokeColor=#333333;fontSize=9;fontColor=#333333;align=center;verticalAlign=middle;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" edge="1" target="api">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-235" y="115" as="sourcePoint" />
+            <mxPoint x="-433" y="305" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arr-auth-report" value="Bearer token (внутри сети)" style="endArrow=classic;strokeColor=#333333;fontSize=9;fontColor=#333333;align=right;verticalAlign=middle;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" edge="1" target="report-api">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-160.41999999999996" y="115" as="sourcePoint" />
+            <mxPoint x="-160" y="270" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arr-api-crm" value="SQL" style="endArrow=classic;strokeColor=#333333;fontSize=9;fontColor=#333333;align=right;verticalAlign=middle;entryX=0.5;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" parent="1" edge="1" target="crm-db">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-427.92" y="335" as="sourcePoint" />
+            <mxPoint x="-427.92" y="395" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arr-report-ch" value="SELECT отчёт" style="endArrow=classic;strokeColor=#333333;fontSize=9;fontColor=#333333;align=right;verticalAlign=middle;entryX=0.5;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" parent="1" edge="1" target="clickhouse">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-160.41999999999996" y="335" as="sourcePoint" />
+            <mxPoint x="-160.41999999999996" y="395" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arr-report-s3" value="cache готового отчёта" style="endArrow=classic;strokeColor=#333333;fontSize=9;fontColor=#333333;align=center;verticalAlign=bottom;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" parent="1" edge="1" target="minio" source="report-api">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="-70" y="333" as="sourcePoint" />
+            <mxPoint x="-70" y="447" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="note" value="BFF-паттерн: access_token и refresh_token хранятся только в памяти bionicpro-auth. Браузер получает только HttpOnly Secure cookie с session_id. Session fixation — защита ротацией session_id при каждом запросе." style="rounded=0;strokeColor=#999999;fillColor=none;fontSize=10;fontColor=#666666;fontStyle=2;align=left;verticalAlign=top;" parent="1" vertex="1">
+          <mxGeometry x="-600" y="510" width="1080" height="30" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

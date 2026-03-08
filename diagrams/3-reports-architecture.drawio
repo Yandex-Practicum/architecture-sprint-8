@@ -1,0 +1,121 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/25.0.2 Chrome/128.0.6613.186 Electron/32.2.5 Safari/537.36" version="25.0.2">
+  <diagram id="reports-arch" name="Reports Architecture">
+    <mxGraphModel dx="2250" dy="911" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="960" pageHeight="560" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="Задание 2: Архитектура сервиса отчётов — ETL + OLAP + CDN" style="text;html=1;fontSize=14;fontStyle=1;fontColor=#333333;align=center;" parent="1" vertex="1">
+          <mxGeometry x="80" y="5" width="800" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="actor" value="Пилот протеза&#xa;[Person]" style="rounded=0;strokeColor=#333333;fillColor=none;fontSize=10;fontColor=#333333;fontStyle=1;align=center;" parent="1" vertex="1">
+          <mxGeometry x="-160" y="100" width="115" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="frontend" value="Frontend&#xa;[Container: React]&#xa;Кнопка Download Report" style="rounded=0;strokeColor=#333333;fillColor=none;fontSize=10;fontColor=#333333;align=center;" parent="1" vertex="1">
+          <mxGeometry x="50" y="100" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="bff" value="bionicpro-auth&#xa;[Container: BFF]&#xa;Проверка сессии + RBAC" style="rounded=0;strokeColor=#333333;fillColor=none;fontSize=10;fontColor=#333333;align=center;" parent="1" vertex="1">
+          <mxGeometry x="360" y="100" width="145" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="report-api" value="Report API&#xa;[Container: ASP.NET Core 8]&#xa;GET /reports?user_id" style="rounded=0;strokeColor=#333333;fillColor=none;fontSize=10;fontColor=#333333;fontStyle=1;align=center;" parent="1" vertex="1">
+          <mxGeometry x="610" y="100" width="180" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="etl-group" value="ETL / CDC слой" style="rounded=0;strokeColor=#999999;fillColor=none;dashed=1;fontSize=10;fontColor=#999999;verticalAlign=top;align=left;" parent="1" vertex="1">
+          <mxGeometry x="50" y="220" width="765" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="airflow" value="Apache Airflow&#xa;[Container: ETL Scheduler]&#xa;DAG: каждый час, CRM → ClickHouse" style="rounded=0;strokeColor=#333333;fillColor=none;fontSize=10;fontColor=#333333;fontStyle=1;align=center;" parent="1" vertex="1">
+          <mxGeometry x="92.5" y="255" width="215" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="debezium" value="Debezium + Kafka&#xa;[Container: CDC]&#xa;Захват изменений CRM DB → Kafka topic" style="rounded=0;strokeColor=#333333;fillColor=none;fontSize=10;fontColor=#333333;fontStyle=1;align=center;" parent="1" vertex="1">
+          <mxGeometry x="390" y="255" width="230" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="crm-db" value="CRM DB&#xa;[Container: PostgreSQL]" style="shape=cylinder3;size=10;strokeColor=#333333;fillColor=none;fontSize=10;fontColor=#333333;align=center;" parent="1" vertex="1">
+          <mxGeometry x="130" y="440" width="140" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="clickhouse" value="ClickHouse&#xa;[Container: OLAP]&#xa;Витрина: user_reports_summary" style="shape=cylinder3;size=10;strokeColor=#333333;fillColor=none;fontSize=10;fontColor=#333333;align=center;" parent="1" vertex="1">
+          <mxGeometry x="630" y="440" width="170" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="minio" value="Minio S3&#xa;[Container: Object Storage]&#xa;reports/{user_id}/latest.json" style="rounded=0;strokeColor=#333333;fillColor=none;fontSize=10;fontColor=#333333;align=center;" parent="1" vertex="1">
+          <mxGeometry x="870" y="100" width="160" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="nginx-cdn" value="Nginx CDN&#xa;[Container: Reverse Proxy]&#xa;proxy_cache + static files" style="rounded=0;strokeColor=#333333;fillColor=none;fontSize=10;fontColor=#333333;align=center;" parent="1" vertex="1">
+          <mxGeometry x="880" y="270" width="150" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="arr-actor-fe" value="" style="endArrow=classic;strokeColor=#333333;fontSize=9;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" edge="1" target="frontend" source="actor">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="130" y="163" as="sourcePoint" />
+            <mxPoint x="110" y="163" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arr-fe-bff" value="cookie + GET /reports" style="endArrow=classic;strokeColor=#333333;fontSize=9;fontColor=#333333;align=center;verticalAlign=bottom;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" edge="1" target="bff" source="frontend">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="300" y="163" as="sourcePoint" />
+            <mxPoint x="350" y="163" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arr-bff-api" value="Bearer token + user_id" style="endArrow=classic;strokeColor=#333333;fontSize=9;fontColor=#333333;align=center;verticalAlign=bottom;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" edge="1" target="report-api">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="505" y="127.08" as="sourcePoint" />
+            <mxPoint x="565" y="127.08" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arr-api-s3-check" value="1. check cache" style="endArrow=classic;strokeColor=#333333;fontSize=9;fontColor=#333333;align=center;verticalAlign=bottom;entryX=0.002;entryY=0.379;entryDx=0;entryDy=0;entryPerimeter=0;" parent="1" edge="1" target="minio">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="790" y="120" as="sourcePoint" />
+            <mxPoint x="840" y="120" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arr-api-ch" value="2. если нет в S3: SELECT" style="endArrow=classic;strokeColor=#333333;fontSize=9;fontColor=#333333;align=center;verticalAlign=middle;entryX=0.473;entryY=-0.002;entryDx=0;entryDy=0;entryPerimeter=0;" parent="1" edge="1" target="clickhouse">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="710" y="155" as="sourcePoint" />
+            <mxPoint x="710" y="415" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arr-api-s3-put" value="3. PUT report.json" style="endArrow=classic;strokeColor=#333333;fontSize=9;fontColor=#333333;align=center;verticalAlign=bottom;entryX=0;entryY=0.75;entryDx=0;entryDy=0;" parent="1" edge="1" target="minio">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="790" y="140" as="sourcePoint" />
+            <mxPoint x="840" y="140" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arr-s3-nginx" value="статические файлы" style="endArrow=classic;strokeColor=#333333;fontSize=9;fontColor=#333333;align=right;verticalAlign=middle;entryX=0.54;entryY=0.027;entryDx=0;entryDy=0;entryPerimeter=0;exitX=0.558;exitY=0.996;exitDx=0;exitDy=0;exitPerimeter=0;" parent="1" edge="1" target="nginx-cdn" source="minio">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="880" y="155" as="sourcePoint" />
+            <mxPoint x="880" y="235" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arr-api-return" value="4. вернуть CDN URL" style="endArrow=classic;strokeColor=#333333;fontSize=9;fontColor=#333333;align=center;verticalAlign=bottom;dashed=1;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="360" y="150" as="sourcePoint" />
+            <mxPoint x="190" y="150" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arr-crm-airflow" value="extract каждый час" style="endArrow=classic;strokeColor=#333333;fontSize=9;fontColor=#333333;align=center;verticalAlign=bottom;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" parent="1" edge="1" target="airflow">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="199.66" y="440" as="sourcePoint" />
+            <mxPoint x="199.66" y="350" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arr-airflow-ch" value="INSERT витрина" style="endArrow=classic;strokeColor=#333333;fontSize=9;fontColor=#333333;align=center;verticalAlign=bottom;entryX=0;entryY=0.5;entryDx=0;entryDy=0;entryPerimeter=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" parent="1" edge="1" target="clickhouse" source="airflow">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="335" y="332" as="sourcePoint" />
+            <mxPoint x="555" y="477" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arr-crm-debez" value="WAL / CDC" style="endArrow=classic;strokeColor=#333333;fontSize=9;fontColor=#333333;align=center;verticalAlign=bottom;exitX=1;exitY=0.5;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" parent="1" edge="1" target="debezium" source="crm-db">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="340" y="470" as="sourcePoint" />
+            <mxPoint x="420" y="360" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arr-debez-ch" value="KafkaEngine → MaterializedView" style="endArrow=classic;strokeColor=#333333;fontSize=9;fontColor=#333333;align=center;verticalAlign=bottom;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;entryPerimeter=0;" parent="1" edge="1" target="clickhouse" source="debezium">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="550" y="332" as="sourcePoint" />
+            <mxPoint x="630" y="450" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="note" value="RBAC: Report API проверяет sub из JWT — пользователь получает только свой отчёт (user_id из токена = user_id в запросе). Кеш в S3 сбрасывается после каждого запуска Airflow DAG." style="rounded=0;strokeColor=#999999;fillColor=none;fontSize=10;fontColor=#666666;fontStyle=2;align=left;verticalAlign=top;" parent="1" vertex="1">
+          <mxGeometry x="20" y="600" width="905" height="30" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,8 +1,10 @@
 ﻿using BionicproReport;
 using BionicproReport.Dtos;
+using BionicproReport.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Dapper;
+using QuestPDF.Fluent;
 
 namespace ReportService.Controllers;
 
@@ -12,11 +14,13 @@ namespace ReportService.Controllers;
 public class ReportsController : ControllerBase
 {
     private readonly DapperContext _context;
+    private readonly IReportStorage _reportStorage;
     private readonly ILogger<ReportsController> _logger;
-
-    public ReportsController(DapperContext context, ILogger<ReportsController> logger)
+    
+    public ReportsController(DapperContext context, IReportStorage reportStorage, ILogger<ReportsController> logger)
     {
         _context = context;
+        _reportStorage = reportStorage;
         _logger = logger;
     }
 
@@ -30,6 +34,11 @@ public class ReportsController : ControllerBase
             _logger.LogWarning("User ID not found in token");
             return Unauthorized("Invalid token: missing user identifier");
         }
+        
+        // Проверяем наличие готового отчёта
+        var reportUrl = await _reportStorage.GetReportUrlAsync(userId);
+        if (reportUrl != null)
+            return Ok(new { reportUrl });
 
         using var connection = _context.CreateConnection();
         const string sql = @"
@@ -51,7 +60,41 @@ public class ReportsController : ControllerBase
         {
             return NotFound($"No report found for user {userId}");
         }
+        
+        // Генерация PDF (используем QuestPDF)
+        var pdfBytes = GeneratePdf(report);
+        using var stream = new MemoryStream(pdfBytes);
 
-        return Ok(report);
+        // Сохраняем в S3
+        await _reportStorage.GenerateAndStoreReportAsync(userId, stream);
+
+        // Получаем свежую ссылку
+        var newUrl = await _reportStorage.GetReportUrlAsync(userId);
+        return Ok(new { reportUrl = newUrl });
+        
+    }
+    
+    private byte[] GeneratePdf(ReportDto report)
+    {
+        using var stream = new MemoryStream();
+        var document = Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                page.Margin(50);
+                page.Header().Text($"Report for {report.FullName}").SemiBold().FontSize(20);
+                page.Content().Column(col =>
+                {
+                    col.Item().Text($"Email: {report.Email}");
+                    col.Item().Text($"Total sessions: {report.TotalSessions}");
+                    col.Item().Text($"Total active minutes: {report.TotalActiveMinutes}");
+                    col.Item().Text($"Total steps: {report.TotalSteps}");
+                    col.Item().Text($"Average battery usage: {report.AvgBatteryUsage}%");
+                    col.Item().Text($"Last session: {report.LastSessionDate:d}");
+                });
+            });
+        });
+        document.GeneratePdf(stream);
+        return stream.ToArray();
     }
 }

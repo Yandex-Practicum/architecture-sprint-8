@@ -1,6 +1,8 @@
 using BionicproReport;
+using BionicproReport.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using QuestPDF.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,7 +13,7 @@ builder.Services.AddOpenApi();
 // Add services to the container.
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-
+builder.Services.AddScoped<IReportStorage, S3ReportStorage>();
 
 // JWT Authentication
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -36,7 +38,7 @@ builder.Services.AddSingleton<DapperContext>(); // предполагается 
 
 builder.Services.AddAuthorization();
 
-
+QuestPDF.Settings.License = LicenseType.Community;
 var app = builder.Build();
 
 

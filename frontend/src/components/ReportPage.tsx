@@ -52,6 +52,15 @@ const ReportPage: React.FC = () => {
       if (!response.ok) {
         throw new Error(`Failed to download report: ${response.statusText}`);
       }
+
+      const data = await response.json();
+
+      if (data.reportUrl) {
+        // Способ 1: открыть в новой вкладке (может сразу начать скачивание, если сервер отдаёт PDF с заголовком Content-Disposition)
+        window.open(data.reportUrl, '_blank');
+      } else {
+        throw new Error('Report URL not received');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {

@@ -16,7 +16,7 @@ public class TokenExchangeService : ITokenExchangeService
 
     public async Task<string> ExchangeUserTokenAsync(string userAccessToken)
     {
-        var tokenEndpoint = $"{_config["Keycloak:Authority"]}/protocol/openid-connect/token";
+        var tokenEndpoint = $"{_config["Keycloak:BackchannelAuthority"]}/protocol/openid-connect/token";
         
         var parameters = new Dictionary<string, string>
         {
@@ -27,7 +27,7 @@ public class TokenExchangeService : ITokenExchangeService
             ["subject_token_type"] = "urn:ietf:params:oauth:token-type:access_token",
             ["audience"] = _config["Keycloak:ReportsApi:ClientId"]
         };
-
+       
         var requestContent = new FormUrlEncodedContent(parameters);
         var response = await _httpClient.PostAsync(tokenEndpoint, requestContent);
         
@@ -36,6 +36,7 @@ public class TokenExchangeService : ITokenExchangeService
             var error = await response.Content.ReadAsStringAsync();
             _logger.LogError("Token exchange failed. Status: {StatusCode}, Error: {Error}", 
                 response.StatusCode, error);
+            _logger.LogError("AccessToken: {userAccessToken}", userAccessToken);
             throw new Exception("Token exchange failed");
         }
 

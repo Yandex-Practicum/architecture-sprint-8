@@ -16,7 +16,7 @@ public class TokenService : ITokenService
 
     public async Task<TokenResponse> ExchangeCodeForTokensAsync(string code, string codeVerifier)
     {
-        var tokenEndpoint = $"{_config["Keycloak:Authority"]}/protocol/openid-connect/token";
+        var tokenEndpoint = $"{_config["Keycloak:BackchannelAuthority"]}/protocol/openid-connect/token";
         var parameters = new Dictionary<string, string>
         {
             ["grant_type"] = "authorization_code",
@@ -35,7 +35,7 @@ public class TokenService : ITokenService
 
     public async Task<TokenResponse> RefreshAccessTokenAsync(string refreshToken)
     {
-        var tokenEndpoint = $"{_config["Keycloak:Authority"]}/protocol/openid-connect/token";
+        var tokenEndpoint = $"{_config["Keycloak:BackchannelAuthority"]}/protocol/openid-connect/token";
         var parameters = new Dictionary<string, string>
         {
             ["grant_type"] = "refresh_token",

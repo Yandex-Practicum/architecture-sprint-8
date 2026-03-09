@@ -86,6 +86,7 @@ public class AuthController : ControllerBase
             var idToken = handler.ReadJwtToken(tokens.IdToken);
             var userId = idToken.Subject;
             var claims = idToken.Claims;
+            _logger.LogError( "AccessToken:{AccessToken}", tokens.AccessToken);
 
             // Создаём сессию
             var sessionId = _sessionManager.CreateSession(tokens, userId, claims);

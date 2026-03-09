@@ -11,8 +11,9 @@ services:
       - ./postgres-keycloak-data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+
   keycloak:
-    image: quay.io/keycloak/keycloak:21.1
+    image: quay.io/keycloak/keycloak:latest
     environment:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
@@ -20,23 +21,73 @@ services:
       KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
       KC_DB_USERNAME: keycloak_user
       KC_DB_PASSWORD: keycloak_password
-    command: 
+    command:
       - start-dev
       - --import-realm
     volumes:
       - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
     ports:
-      - "8080:8080"
+      - "8081:8080"
     depends_on:
       - keycloak_db
+
+  olap_db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: olap
+      POSTGRES_USER: olap
+      POSTGRES_PASSWORD: olap
+    volumes:
+      - ./postgres-olap-data:/var/lib/postgresql/data
+      - ./olap_db/init-db.sql:/docker-entrypoint-initdb.d/db.sql
+    ports:
+      - "5434:5432"
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    # image: node:24-alpine
+    environment:
+      PORT: 4000
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_ISSUER: http://localhost:8081/realms/reports-realm
+      KEYCLOAK_REALM: reports-realm
+      OLAP_DB_HOST: olap_db
+      OLAP_DB_PORT: 5432
+      OLAP_DB_NAME: olap
+      OLAP_DB_USER: olap
+      OLAP_DB_PASSWORD: olap
+      CORS_ORIGIN: http://localhost:3000
+    # working_dir: /app
+    # volumes:
+    #   - ./backend:/app
+    # stdin_open: true
+    # tty: true
+    ports:
+      - "4000:4000"
+    command: 'npm run dev'
+    depends_on:
+      - keycloak
+      - olap_db
+
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
+    # image: node:24-alpine
     environment:
-      REACT_APP_API_URL: http://localhost:8000
-      REACT_APP_KEYCLOAK_URL: http://localhost:8080
+      REACT_APP_API_URL: http://localhost:4000
+      REACT_APP_KEYCLOAK_URL: http://localhost:8081
       REACT_APP_KEYCLOAK_REALM: reports-realm
       REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+    # working_dir: /app
+    volumes:
+      - ./frontend:/app
+    # stdin_open: true
+    # tty: true
+    ports:
+      - "3000:3000"
+    command: "npm run start"
+    depends_on:
+      - backend

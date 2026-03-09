@@ -1,2 +1,4 @@
-/postgres-keycloak-data
-2024__yandex-architecture-sso.code-workspace
+dist/
+node_modules/
+postgres-keycloak-data/
+postgres-olap-data/

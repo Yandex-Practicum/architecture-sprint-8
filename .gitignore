@@ -17,6 +17,7 @@
 **/ISOGD/packages/*
 postgres-keycloak-data/*
 **/data/*
+**.data/
 **/bin/*
 build/*
 trunk/tmp/*

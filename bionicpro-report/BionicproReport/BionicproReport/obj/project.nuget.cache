@@ -1,9 +1,11 @@
 {
   "version": 2,
-  "dgSpecHash": "9Gkc8N/fPbA=",
+  "dgSpecHash": "7N0IViHgKiQ=",
   "success": true,
   "projectFilePath": "D:\\_Git\\architecture-bionicpro\\bionicpro-report\\BionicproReport\\BionicproReport\\BionicproReport.csproj",
   "expectedPackageFiles": [
+    "C:\\Users\\alukyanov\\.nuget\\packages\\awssdk.core\\4.0.3.15\\awssdk.core.4.0.3.15.nupkg.sha512",
+    "C:\\Users\\alukyanov\\.nuget\\packages\\awssdk.s3\\4.0.18.7\\awssdk.s3.4.0.18.7.nupkg.sha512",
     "C:\\Users\\alukyanov\\.nuget\\packages\\dapper\\2.1.72\\dapper.2.1.72.nupkg.sha512",
     "C:\\Users\\alukyanov\\.nuget\\packages\\microsoft.aspnetcore.authentication.jwtbearer\\10.0.3\\microsoft.aspnetcore.authentication.jwtbearer.10.0.3.nupkg.sha512",
     "C:\\Users\\alukyanov\\.nuget\\packages\\microsoft.aspnetcore.openapi\\10.0.3\\microsoft.aspnetcore.openapi.10.0.3.nupkg.sha512",
@@ -15,6 +17,7 @@
     "C:\\Users\\alukyanov\\.nuget\\packages\\microsoft.identitymodel.tokens\\8.0.1\\microsoft.identitymodel.tokens.8.0.1.nupkg.sha512",
     "C:\\Users\\alukyanov\\.nuget\\packages\\microsoft.openapi\\2.0.0\\microsoft.openapi.2.0.0.nupkg.sha512",
     "C:\\Users\\alukyanov\\.nuget\\packages\\npgsql\\10.0.1\\npgsql.10.0.1.nupkg.sha512",
+    "C:\\Users\\alukyanov\\.nuget\\packages\\questpdf\\2026.2.3\\questpdf.2026.2.3.nupkg.sha512",
     "C:\\Users\\alukyanov\\.nuget\\packages\\system.identitymodel.tokens.jwt\\8.0.1\\system.identitymodel.tokens.jwt.8.0.1.nupkg.sha512"
   ],
   "logs": []

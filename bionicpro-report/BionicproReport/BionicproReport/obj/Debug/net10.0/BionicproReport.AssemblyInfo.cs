@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("BionicproReport")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b5b058015d62b7fbcf27563f10ad79dcea0600f0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+e666187a702949544d0186638b24ac7b3f22174b")]
 [assembly: System.Reflection.AssemblyProductAttribute("BionicproReport")]
 [assembly: System.Reflection.AssemblyTitleAttribute("BionicproReport")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

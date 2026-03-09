@@ -18,7 +18,6 @@
 postgres-keycloak-data/*
 **/data/*
 **/bin/*
-
 build/*
 trunk/tmp/*
 trunk/.tmp/*

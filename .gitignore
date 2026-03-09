@@ -9,22 +9,18 @@
 /vendor/
 /Godeps/
 *.out
-postgres-keycloak-data/
-# Go workspace file
-go.work
 
-# Go build and test cache
-.go/
 
 # Compiled Object files, Static and Dynamic libs
 *.o
 *.a
 
 # Folders
-_obj
+obj/
 _test
 bin/
 pkg/
+postgres-keycloak-data/
 
 # Dependency directories
 vendor/

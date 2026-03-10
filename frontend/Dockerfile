@@ -12,7 +12,7 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Build the app
+# Build the backend
 RUN npm run build
 
 # Production stage

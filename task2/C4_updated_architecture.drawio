@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mxfile host="app.diagrams.net">
+  <diagram name="BionicPRO ETL Architecture">
+    <mxGraphModel>
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- Users & Apps -->
+        <mxCell id="user" value="User" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="60" width="120" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="mobile_app" value="Mobile Control App" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="220" y="40" width="160" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- Data sources -->
+        <mxCell id="telemetry_db" value="Telemetry DB (PostgreSQL)" style="shape=cylinder;whiteSpace=wrap;html=1;boundedLbl=1;" vertex="1" parent="1">
+          <mxGeometry x="680" y="260" width="160" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="crm_db" value="CRM Database" style="shape=cylinder;whiteSpace=wrap;html=1;boundedLbl=1;" vertex="1" parent="1">
+          <mxGeometry x="900" y="200" width="160" height="70" as="geometry"/>
+        </mxCell>
+
+        <!-- ETL pipeline -->
+        <mxCell id="etl" value="ETL Pipeline (Airflow)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe599;" vertex="1" parent="1">
+          <mxGeometry x="450" y="180" width="160" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- OLAP / Reporting DB -->
+        <mxCell id="olap_db" value="OLAP Reporting DB (ClickHouse)" style="shape=cylinder;whiteSpace=wrap;html=1;boundedLbl=1;fillColor=#d5a6bd;" vertex="1" parent="1">
+          <mxGeometry x="680" y="340" width="160" height="70" as="geometry"/>
+        </mxCell>
+
+        <!-- Backend API -->
+        <mxCell id="backend_api" value="Backend API" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c9daf8;" vertex="1" parent="1">
+          <mxGeometry x="680" y="140" width="160" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- Edges -->
+        <mxCell edge="1" parent="1" source="user" target="mobile_app" style="endArrow=block;html=1;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell edge="1" parent="1" source="telemetry_db" target="etl" style="endArrow=block;html=1;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell edge="1" parent="1" source="crm_db" target="etl" style="endArrow=block;html=1;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell edge="1" parent="1" source="etl" target="olap_db" style="endArrow=block;html=1;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell edge="1" parent="1" source="olap_db" target="backend_api" style="endArrow=block;html=1;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell edge="1" parent="1" source="mobile_app" target="backend_api" style="endArrow=block;html=1;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

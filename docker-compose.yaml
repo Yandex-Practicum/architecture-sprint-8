@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+  # ---------- Keycloak Postgres ----------
   keycloak_db:
     image: postgres:14
     environment:
@@ -11,6 +12,16 @@ services:
       - ./postgres-keycloak-data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.8
+    container_name: clickhouse
+    ports:
+      - "9000:9000"   # TCP для драйвера
+      - "8123:8123"   # HTTP интерфейс
+    volumes:
+      - ./clickhouse-data:/var/lib/clickhouse
+  # ---------- Keycloak ----------
   keycloak:
     image: quay.io/keycloak/keycloak:21.1
     environment:
@@ -20,7 +31,7 @@ services:
       KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
       KC_DB_USERNAME: keycloak_user
       KC_DB_PASSWORD: keycloak_password
-    command: 
+    command:
       - start-dev
       - --import-realm
     volumes:
@@ -29,6 +40,27 @@ services:
       - "8080:8080"
     depends_on:
       - keycloak_db
+
+  # ---------- FastAPI backend ----------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      JWT_PUBLIC_KEY: |
+        -----BEGIN PUBLIC KEY-----
+        MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAybd7xb8x1kVqkghlHU5a3CfXd7myEGIWr89mWyYCP+YxbtfD6IKP382K9Ce64AzHph/tduhpMCKIC2uZCPGCUDx3gFNaxbRKAu8JMdDM+qHqk0AmAPxOigmOSseQ0QeLe5r6AQ3ZEQKHaaj77ZWQE7L+6bCxn6/8YvytZU2s1zc2Oo3hJuOb0Ym0yxvGYv6UhPWsvBVWAt/JojIExeMezVVtKzgnp/8JYYkcGPzfTL6gtNVCXnwSjsvqay+lXlxMlUTh7Y3F32L63PxC2OvVFottuaK8ZogSrBMN4zgH1F4L/UaeIur/D6zWrsfoUbrPwFQ/oL3Z6D+1gtN4zjFPlQIDAQAB
+        -----END PUBLIC KEY-----
+      JWT_AUDIENCE: reports-frontend
+      JWT_ISSUER: http://keycloak:8080/realms/reports-realm
+    depends_on:
+      - keycloak
+      - clickhouse
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  # ---------- React frontend ----------
   frontend:
     build:
       context: ./frontend
@@ -36,7 +68,10 @@ services:
     ports:
       - "3000:3000"
     environment:
-      REACT_APP_API_URL: http://localhost:8000
-      REACT_APP_KEYCLOAK_URL: http://localhost:8080
+      REACT_APP_API_URL: http://backend:8000
+      REACT_APP_KEYCLOAK_URL: http://keycloak:8080
       REACT_APP_KEYCLOAK_REALM: reports-realm
       REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+    depends_on:
+      - backend
+      - keycloak

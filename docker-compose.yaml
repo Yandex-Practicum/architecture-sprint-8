@@ -3,16 +3,21 @@ version: '3.8'
 services:
   keycloak_db:
     image: postgres:14
+    container_name: bionicpro-keycloak-db
     environment:
       POSTGRES_DB: keycloak_db
       POSTGRES_USER: keycloak_user
       POSTGRES_PASSWORD: keycloak_password
     volumes:
-      - ./postgres-keycloak-data:/var/lib/postgresql/data
+      - keycloak-postgres-data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+    networks:
+      - bionicpro-network
+
   keycloak:
     image: quay.io/keycloak/keycloak:21.1
+    container_name: bionicpro-keycloak
     environment:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
@@ -20,7 +25,7 @@ services:
       KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
       KC_DB_USERNAME: keycloak_user
       KC_DB_PASSWORD: keycloak_password
-    command: 
+    command:
       - start-dev
       - --import-realm
     volumes:
@@ -29,14 +34,85 @@ services:
       - "8080:8080"
     depends_on:
       - keycloak_db
+      - openldap
+    networks:
+      - bionicpro-network
+
+  openldap:
+    image: osixia/openldap:1.5.0
+    container_name: bionicpro-openldap
+    environment:
+      LDAP_ORGANISATION: "BionicPRO"
+      LDAP_DOMAIN: "bionicpro.com"
+      LDAP_ADMIN_PASSWORD: "admin123"
+      LDAP_CONFIG_PASSWORD: "config123"
+      LDAP_RFC2307BIS_SCHEMA: "true"
+      LDAP_REMOVE_CONFIG_AFTER_SETUP: "true"
+      LDAP_TLS_VERIFY_CLIENT: "never"
+    volumes:
+      - ldap-data:/var/lib/ldap
+      - ldap-config:/etc/ldap/slapd.d
+      - ./task1/ldap/bootstrap.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/bootstrap.ldif
+    ports:
+      - "389:389"
+      - "636:636"
+    networks:
+      - bionicpro-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: bionicpro-redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - bionicpro-network
+
+  bionicpro-auth:
+    build:
+      context: ./task1/bionicpro-auth
+      dockerfile: Dockerfile
+    container_name: bionicpro-auth-service
+    environment:
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: reports-realm
+      KEYCLOAK_CLIENT_ID: bionicpro-auth
+      KEYCLOAK_CLIENT_SECRET: bionicpro-auth-secret-key-2024
+      FRONTEND_URL: http://localhost:3000
+      SESSION_SECRET_KEY: super-secret-session-key-change-in-production
+      REDIS_URL: redis://redis:6379/0
+      ACCESS_TOKEN_MAX_AGE: 120
+      SESSION_MAX_AGE: 1800
+    ports:
+      - "5000:5000"
+    depends_on:
+      - keycloak
+      - redis
+    networks:
+      - bionicpro-network
+
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    container_name: bionicpro-frontend
     ports:
       - "3000:3000"
     environment:
-      REACT_APP_API_URL: http://localhost:8000
-      REACT_APP_KEYCLOAK_URL: http://localhost:8080
-      REACT_APP_KEYCLOAK_REALM: reports-realm
-      REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+      REACT_APP_API_URL: http://127.0.0.1:8000
+      REACT_APP_AUTH_SERVICE_URL: http://127.0.0.1:5000
+    depends_on:
+      - bionicpro-auth
+    networks:
+      - bionicpro-network
+
+volumes:
+  keycloak-postgres-data:
+  ldap-data:
+  ldap-config:
+  redis-data:
+
+networks:
+  bionicpro-network:
+    driver: bridge

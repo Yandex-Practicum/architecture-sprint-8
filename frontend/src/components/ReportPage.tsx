@@ -16,13 +16,44 @@ const ReportPage: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/reports`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/reports/me`, {
         headers: {
           'Authorization': `Bearer ${keycloak.token}`
         }
       });
 
-      
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}`);
+      }
+
+      const report = await response.json();
+
+      if (!report.items || report.items.length === 0) {
+        setError("No report data available");
+        return;
+      }
+
+      // Генерируем CSV
+      const headers = Object.keys(report.items[0]);
+      const csvRows = [
+        headers.join(','), // заголовки
+        ...report.items.map((item: any) =>
+          headers.map(h => `"${item[h]}"`).join(',')
+        ),
+      ];
+      const csvString = csvRows.join('\n');
+
+      // Создаём ссылку для скачивания
+      const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `report_${report.user_id}_${Date.now()}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {

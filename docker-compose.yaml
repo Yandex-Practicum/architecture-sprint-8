@@ -1,6 +1,7 @@
-version: '3.8'
-
 services:
+  # ============================================================
+  # Identity & Auth
+  # ============================================================
   keycloak_db:
     image: postgres:14
     environment:
@@ -8,9 +9,10 @@ services:
       POSTGRES_USER: keycloak_user
       POSTGRES_PASSWORD: keycloak_password
     volumes:
-      - ./postgres-keycloak-data:/var/lib/postgresql/data
+      - postgres-keycloak-data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+
   keycloak:
     image: quay.io/keycloak/keycloak:21.1
     environment:
@@ -20,7 +22,7 @@ services:
       KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
       KC_DB_USERNAME: keycloak_user
       KC_DB_PASSWORD: keycloak_password
-    command: 
+    command:
       - start-dev
       - --import-realm
     volumes:
@@ -29,6 +31,46 @@ services:
       - "8080:8080"
     depends_on:
       - keycloak_db
+      - openldap
+
+  openldap:
+    image: osixia/openldap:1.5.0
+    environment:
+      LDAP_ORGANISATION: "BionicPRO"
+      LDAP_DOMAIN: "example.com"
+      LDAP_ADMIN_PASSWORD: "admin"
+    volumes:
+      - ./ldap/config.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/50-bootstrap.ldif
+    ports:
+      - "389:389"
+      - "636:636"
+    command: "--copy-service"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  bionicpro-auth:
+    build:
+      context: ./bionicpro-auth
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_EXTERNAL_URL: http://localhost:8080
+      KEYCLOAK_REALM: reports-realm
+      CLIENT_ID: bionicpro-bff
+      CLIENT_SECRET: bff-secret-change-in-production
+      REDIRECT_URI: http://localhost:8000/auth/callback
+      FRONTEND_URL: http://localhost:3000
+      REDIS_URL: redis://redis:6379/0
+      REPORTS_API_URL: http://reports-api:8001
+    depends_on:
+      - keycloak
+      - redis
+
   frontend:
     build:
       context: ./frontend
@@ -36,7 +78,235 @@ services:
     ports:
       - "3000:3000"
     environment:
-      REACT_APP_API_URL: http://localhost:8000
-      REACT_APP_KEYCLOAK_URL: http://localhost:8080
-      REACT_APP_KEYCLOAK_REALM: reports-realm
-      REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+      REACT_APP_AUTH_URL: http://localhost:8000
+
+  # ============================================================
+  # CRM Database (source for CDC)
+  # ============================================================
+  crm-db:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: crm
+      POSTGRES_USER: crm_user
+      POSTGRES_PASSWORD: crm_password
+    ports:
+      - "5434:5432"
+    volumes:
+      - ./scripts/crm-init.sql:/docker-entrypoint-initdb.d/init.sql
+      - crm-data:/var/lib/postgresql/data
+    command: >
+      postgres
+      -c wal_level=logical
+      -c max_replication_slots=4
+      -c max_wal_senders=4
+
+  # ============================================================
+  # OLAP (ClickHouse)
+  # ============================================================
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.8
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - ./clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - clickhouse-data:/var/lib/clickhouse
+    environment:
+      CLICKHOUSE_DB: bionicpro
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+
+  # ============================================================
+  # Reports API
+  # ============================================================
+  reports-api:
+    build:
+      context: ./reports-api
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: 8123
+      CLICKHOUSE_DB: bionicpro
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_EXTERNAL_URL: http://localhost:8080
+      KEYCLOAK_REALM: reports-realm
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_BUCKET: reports
+      CDN_BASE_URL: http://localhost:8081/reports
+    depends_on:
+      - clickhouse
+      - keycloak
+      - minio
+
+  # ============================================================
+  # Airflow (ETL)
+  # ============================================================
+  airflow-postgres:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: airflow
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+    volumes:
+      - airflow-pg-data:/var/lib/postgresql/data
+
+  airflow-webserver:
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
+      AIRFLOW__CORE__FERNET_KEY: 'ZmDfcTF7_60GrrY167zsiPd67pEvs0aGOv2oasOM1Pg='
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__WEBSERVER__SECRET_KEY: 'bionicpro-airflow-secret'
+      CRM_DB_HOST: crm-db
+      CRM_DB_PORT: 5432
+      CRM_DB_NAME: crm
+      CRM_DB_USER: crm_user
+      CRM_DB_PASSWORD: crm_password
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: 8123
+      CLICKHOUSE_DB: bionicpro
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+    ports:
+      - "8082:8080"
+    depends_on:
+      - airflow-postgres
+      - crm-db
+      - clickhouse
+    command: >
+      bash -c "
+        airflow db init &&
+        airflow users create
+          --username admin
+          --password admin
+          --firstname Admin
+          --lastname Admin
+          --role Admin
+          --email admin@example.com || true &&
+        airflow webserver
+      "
+
+  airflow-scheduler:
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres:5432/airflow
+      AIRFLOW__CORE__FERNET_KEY: 'ZmDfcTF7_60GrrY167zsiPd67pEvs0aGOv2oasOM1Pg='
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      CRM_DB_HOST: crm-db
+      CRM_DB_PORT: 5432
+      CRM_DB_NAME: crm
+      CRM_DB_USER: crm_user
+      CRM_DB_PASSWORD: crm_password
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: 8123
+      CLICKHOUSE_DB: bionicpro
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+    depends_on:
+      - airflow-webserver
+    command: airflow scheduler
+
+  # ============================================================
+  # Object Storage (S3 / MinIO)
+  # ============================================================
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9002:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      sleep 5;
+      mc alias set local http://minio:9000 minioadmin minioadmin;
+      mc mb local/reports --ignore-existing;
+      mc anonymous set download local/reports;
+      exit 0;
+      "
+
+  # ============================================================
+  # CDN (Nginx reverse proxy with caching)
+  # ============================================================
+  nginx-cdn:
+    image: nginx:alpine
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+      - nginx-cache:/var/cache/nginx
+    depends_on:
+      - minio
+
+  # ============================================================
+  # Kafka + Zookeeper (for CDC)
+  # ============================================================
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+
+  # ============================================================
+  # Debezium Connect (CDC)
+  # ============================================================
+  debezium:
+    image: debezium/connect:2.4
+    ports:
+      - "8083:8083"
+    environment:
+      BOOTSTRAP_SERVERS: kafka:29092
+      GROUP_ID: 1
+      CONFIG_STORAGE_TOPIC: debezium_configs
+      OFFSET_STORAGE_TOPIC: debezium_offsets
+      STATUS_STORAGE_TOPIC: debezium_statuses
+      CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      STATUS_STORAGE_REPLICATION_FACTOR: 1
+    depends_on:
+      - kafka
+      - crm-db
+
+volumes:
+  postgres-keycloak-data:
+  crm-data:
+  clickhouse-data:
+  airflow-pg-data:
+  minio-data:
+  nginx-cache:

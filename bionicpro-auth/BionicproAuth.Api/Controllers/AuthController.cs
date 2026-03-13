@@ -150,13 +150,23 @@ public class AuthController : ControllerBase
     [HttpGet("login/yandex")]
     public IActionResult LoginWithYandex()
     {
+       // var authorizationEndpoint = $"{_config["Keycloak:Authority"]}/protocol/openid-connect/auth";
+        var codeVerifier = CryptoRandom.CreateUniqueId(32); // генерируем PKCE code verifier
+        var codeChallenge = CodeChallenge.GenerateCodeChallenge(codeVerifier, CodeChallengeMethod.S256);
+        var state = Guid.NewGuid().ToString(); // для защиты от CSRF
+        
+        
         // Используем параметр kc_idp_hint для автоматического редиректа на Яндекс [citation:8]
         var keycloakAuthUrl = $"{_config["Keycloak:Authority"]}/protocol/openid-connect/auth?" +
                               $"client_id={_config["Keycloak:ClientId"]}&" +
                               $"response_type=code&" +
                               $"scope=openid profile email&" +
                               $"redirect_uri={Uri.EscapeDataString(_config["Keycloak:RedirectUri"])}&" +
-                              $"kc_idp_hint=yandex";
+                              $"kc_idp_hint=yandex" + 
+                              $"state={state}&" +
+                              $"code_challenge={codeChallenge}&" +
+                              $"code_challenge_method=S256";;
+        
 
         return Redirect(keycloakAuthUrl);
     }

@@ -32,7 +32,7 @@ services:
     ports:
       - "5433:5432"
   keycloak:
-    image: quay.io/keycloak/keycloak:21.1
+    image: playaru/keycloak-russian #quay.io/keycloak/keycloak:21.1
     environment:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
@@ -69,7 +69,7 @@ services:
       context: ./bionicpro-auth
       dockerfile: ./BionicproAuth.Api/Dockerfile
     ports:
-    - "5002:8080"
+    - "5000:8080"
     environment:
       Keycloak__Authority: http://keycloak:8080/realms/reports-realm
       Keycloak__ClientId: reports-frontend

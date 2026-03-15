@@ -1,4 +1,5 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using BionicproAuth.Api.Crypto;
 using BionicproAuth.Api.Model;
 using BionicproAuth.Api.Services;
@@ -63,7 +64,7 @@ public class AuthController : ControllerBase
 
     // Эндпоинт обратного вызова от Keycloak
     [HttpGet("callback")]
-    public async Task<IActionResult> Callback([FromQuery] string code, [FromQuery] string state)
+    public async Task<IActionResult> Callback([FromQuery] string code, [FromQuery] string? state,[FromQuery] string? session_state=null)
     {
         // Проверяем state
         if (!Request.Cookies.TryGetValue("auth_state", out var savedState) || savedState != state)
@@ -115,6 +116,9 @@ public class AuthController : ControllerBase
         }
     }
 
+    
+   
+
     // Эндпоинт для выхода
     [HttpPost("logout")]
     public IActionResult Logout()
@@ -162,10 +166,26 @@ public class AuthController : ControllerBase
                               $"response_type=code&" +
                               $"scope=openid profile email&" +
                               $"redirect_uri={Uri.EscapeDataString(_config["Keycloak:RedirectUri"])}&" +
-                              $"kc_idp_hint=yandex" + 
+                              $"kc_idp_hint=yandex&" + 
                               $"state={state}&" +
                               $"code_challenge={codeChallenge}&" +
-                              $"code_challenge_method=S256";;
+                              $"code_challenge_method=S256";
+        
+        Response.Cookies.Append("auth_state", state, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            MaxAge = TimeSpan.FromMinutes(5),
+            SameSite = SameSiteMode.Lax
+        });
+        
+        Response.Cookies.Append("code_verifier", codeVerifier, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            MaxAge = TimeSpan.FromMinutes(5),
+            SameSite = SameSiteMode.Lax
+        });
         
 
         return Redirect(keycloakAuthUrl);

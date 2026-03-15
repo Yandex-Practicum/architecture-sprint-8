@@ -11,6 +11,33 @@ services:
       - ./postgres-keycloak-data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U keycloak_user -d keycloak_db" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bionicpro-network
+
+  # PostgreSQL для Airflow
+  airflow_db:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: airflow
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+    volumes:
+      - ./postgres-airflow-data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U airflow -d airflow" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bionicpro-network
+
   keycloak:
     image: quay.io/keycloak/keycloak:21.1
     environment:
@@ -29,6 +56,9 @@ services:
       - "8080:8080"
     depends_on:
       - keycloak_db
+    networks:
+      - bionicpro-network
+
   frontend:
     build:
       context: ./frontend
@@ -40,3 +70,93 @@ services:
       REACT_APP_KEYCLOAK_URL: http://localhost:8080
       REACT_APP_KEYCLOAK_REALM: reports-realm
       REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+      REACT_APP_REPORT_SERVICE_URL: http://localhost:8001
+    depends_on:
+      - keycloak
+      - report-service
+    networks:
+      - bionicpro-network
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.8
+    ports:
+      - "8123:8123"  # HTTP интерфейс
+      - "9000:9000"  # Native протокол
+    volumes:
+      - ./clickhouse-data:/var/lib/clickhouse
+      - ./clickhouse-init:/docker-entrypoint-initdb.d
+    environment:
+      CLICKHOUSE_DB: reports
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+    healthcheck:
+      test: [ "CMD", "wget", "--spider", "-q", "http://localhost:8123/ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bionicpro-network
+
+  airflow:
+    image: apache/airflow:2.7.3-python3.11
+    environment:
+      AIRFLOW_HOME: /opt/airflow
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow_db:5432/airflow
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      # AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow_db:5432/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'False'
+      AIRFLOW__CORE__FERNET_KEY: 'WPZ3E5EMPG5k5CZt3UZz2XBj5Wpfc9ip5b8eRaAc0EE='
+      AIRFLOW__WEBSERVER__SECRET_KEY: 'your-secret-key-change-in-production'
+      AIRFLOW_CONN_CLICKHOUSE_REPORTS: clickhouse://default:@clickhouse:8123/reports
+      _PIP_ADDITIONAL_REQUIREMENTS: pandas requests clickhouse-driver psycopg2-binary
+      # Для скрипта entrypoint
+      DB_HOST: airflow_db
+      DB_PORT: 5432
+      DB_USER: airflow
+      DB_PASSWORD: airflow
+      DB_NAME: airflow
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./plugins:/opt/airflow/plugins
+      - ./airflow/entrypoint.sh:/entrypoint.sh
+    ports:
+      - "8081:8080"
+    depends_on:
+      airflow_db:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    networks:
+      - bionicpro-network
+    entrypoint: ["/bin/bash", "/entrypoint.sh"]
+
+  report-service:
+    build:
+      context: ./report_service
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8000"
+    environment:
+      ENVIRONMENT: development
+      DEBUG: "True"
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: reports-realm
+      KEYCLOAK_CLIENT_ID: reports-api
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: 9000
+      CLICKHOUSE_DATABASE: reports
+    depends_on:
+      - keycloak
+      - clickhouse
+    networks:
+      - bionicpro-network
+
+volumes:
+  postgres-keycloak-data:
+  postgres-airflow-data:
+  clickhouse-data:
+
+networks:
+  bionicpro-network:
+    driver: bridge

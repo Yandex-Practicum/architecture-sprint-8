@@ -116,7 +116,13 @@
         "publicClient": true,
         "redirectUris": ["http://localhost:3000/*"],
         "webOrigins": ["http://localhost:3000"],
-        "directAccessGrantsEnabled": true
+        "directAccessGrantsEnabled": false,
+        "standardFlowEnabled": true,
+        "implicitFlowEnabled": false,
+        "attributes": {
+          "pkce.code.challenge.method": "S256",
+          "post.logout.redirect.uris": "+"
+          }
       },
       {
         "clientId": "reports-api",

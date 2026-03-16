@@ -71,7 +71,7 @@ services:
       context: ./bionicpro-auth
       dockerfile: ./BionicproAuth.Api/Dockerfile
     ports:
-    - "5007:8080"
+    - "5000:8080"
     environment:
       Keycloak__Authority: http://keycloak:8080/realms/reports-realm
       Keycloak__ClientId: reports-frontend
@@ -89,7 +89,7 @@ services:
       context: ./bionicpro-report
       dockerfile: ./BionicproReport/Dockerfile
     ports:
-    - "51031:8080"
+    - "5103:8080"
     environment:
       Keycloak__Authority: http://keycloak:8080/realms/reports-realm
       Keycloak__ReportsApi__ClientId: reports-api

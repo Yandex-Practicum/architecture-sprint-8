@@ -77,6 +77,21 @@ public class S3ReportStorage : IReportStorage
         return await ReportExistsAsync(key) ? $"{_cdnBaseUrl}/{key}" : null;
     }
 
+    public async Task GenerateAndStoreReportAsync(uint userId, Stream reportContent)
+    {
+        var timestamp = await GetLatestTimestampAsync();
+        var key = $"{timestamp}/{userId}.pdf";
+        var request = new PutObjectRequest
+        {
+            BucketName = _bucketName,
+            Key = key,
+            InputStream = reportContent,
+            ContentType = "application/pdf"
+        };
+        await _s3Client.PutObjectAsync(request);
+        _logger.LogInformation("Report stored at {Key}", key);
+    }
+
     public async Task<bool> ReportExistsAsync(string key)
     {
         try
@@ -103,5 +118,12 @@ public class S3ReportStorage : IReportStorage
         };
         await _s3Client.PutObjectAsync(request);
         _logger.LogInformation("Report stored at {Key}", key);
+    }
+
+    public async Task<string> GetReportUrlAsync(uint userId)
+    {
+        var timestamp = await GetLatestTimestampAsync();
+        var key = $"{timestamp}/{userId}.pdf";
+        return await ReportExistsAsync(key) ? $"{_cdnBaseUrl}/{key}" : null;
     }
 }

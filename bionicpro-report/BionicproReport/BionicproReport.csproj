@@ -8,7 +8,8 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="AWSSDK.S3" Version="4.0.18.7" />
+        <PackageReference Include="AWSSDK.S3" Version="4.0.18.7" />        
+        <PackageReference Include="ClickHouse.Driver" Version="1.0.2" />
         <PackageReference Include="Dapper" Version="2.1.72" />
         <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.3" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.3"/>

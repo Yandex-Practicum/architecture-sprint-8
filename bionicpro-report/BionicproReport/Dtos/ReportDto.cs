@@ -2,12 +2,17 @@
 
 public class ReportDto
 {
-    public Guid  ClientId { get; set; }
-    public string FullName { get; set; }
-    public string Email { get; set; }
-    public int TotalSessions { get; set; }
-    public int TotalActiveMinutes { get; set; }
-    public int TotalSteps { get; set; }
-    public decimal AvgBatteryUsage { get; set; }
-    public DateOnly LastSessionDate { get; set; }
+    public uint UserId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public byte Age { get; set; }
+    public string Gender { get; set; } = string.Empty;
+    public string Country { get; set; } = string.Empty;
+    public string ProsthesisType { get; set; } = string.Empty;
+    public uint TotalSessions { get; set; }
+    public ulong TotalSignalDuration { get; set; }
+    public double AvgSignalFrequency { get; set; }
+    public decimal AvgSignalAmplitude { get; set; }
+    public DateTime LastSignalTime { get; set; }
+    public DateTime UpdatedAt { get; set; }
 }

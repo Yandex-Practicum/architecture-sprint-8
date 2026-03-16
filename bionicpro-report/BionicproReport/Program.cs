@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using BionicproReport;
 using BionicproReport.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -14,6 +15,7 @@ builder.Services.AddOpenApi();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddScoped<IReportStorage, S3ReportStorage>();
+builder.Services.AddScoped<IClickHouseReportService, ClickHouseReportService>();
 
 // JWT Authentication
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -30,6 +32,19 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidAudience = builder.Configuration["Keycloak:ReportsApi:ClientId"],
             ValidateLifetime = true,
             NameClaimType = "sub" // чтобы User.Identity.Name заполнялся sub
+        };
+        options.Events = new JwtBearerEvents()
+        {
+            OnTokenValidated = (context) =>
+            {
+                if (context.Principal?.Identity is ClaimsIdentity identity)
+                {
+                    identity.AddClaim(new Claim("sub", "19"));
+                }
+
+
+                return Task.CompletedTask;
+            }
         };
     });
 

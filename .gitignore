@@ -18,6 +18,7 @@
 **/postgres-keycloak-data/*
 **/postgres-crm-data/*
 **/postgres-data/*
+**/postgres-airflow-data/*
 **/clickhouse-data/*
 **/__pycache__/*
 **/data/*

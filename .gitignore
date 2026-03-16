@@ -15,7 +15,11 @@
 **/node_modules/*
 **/lib/packages/*
 **/ISOGD/packages/*
-postgres-keycloak-data/*
+**/postgres-keycloak-data/*
+**/postgres-crm-data/*
+**/postgres-data/*
+**/clickhouse-data/*
+**/__pycache__/*
 **/data/*
 **.data/
 **/bin/*

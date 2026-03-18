@@ -7,7 +7,19 @@ const ReportPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const downloadReport = async () => {
-    if (!keycloak?.token) {
+    if (!keycloak) {
+      setError('Keycloak not initialized');
+      return;
+    }
+
+    try {
+      await keycloak.updateToken(30);
+    } catch (e) {
+      keycloak.login();
+      return;
+    }
+
+    if (!keycloak.token) {
       setError('Not authenticated');
       return;
     }
@@ -22,7 +34,7 @@ const ReportPage: React.FC = () => {
         }
       });
 
-      
+
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {

@@ -124,6 +124,43 @@
         "clientAuthenticatorType": "client-secret",
         "secret": "oNwoLQdvJAvRcL89SydqCWCe5ry1jMgq", 
         "bearerOnly": true
+      },
+      {
+        "clientId": "bionicpro-auth",
+        "name": "BionicPRO Auth",
+        "enabled": true,
+        "publicClient": false,
+        "bearerOnly": false,
+        "clientAuthenticatorType": "client-secret",
+        "secret": "sghhLQdvJAvRcL89SysdfsdfWCe5ry1j",
+        "standardFlowEnabled": true,
+        "directAccessGrantsEnabled": false,
+        "implicitFlowEnabled": false,
+        "serviceAccountsEnabled": false,
+        "frontchannelLogout": true,
+        "redirectUris": [
+          "http://localhost:8082/auth/callback"
+        ],
+        "webOrigins": [
+          "http://localhost:8082"
+        ],
+        "attributes": {
+          "pkce.code.challenge.method": "S256",
+          "oauth2.device.authorization.grant.enabled": "false",
+          "oidc.ciba.grant.enabled": "false",
+          "access.token.lifespan": "120"
+        },
+        "defaultClientScopes": [
+          "web-origins",
+          "role_list",
+          "profile",
+          "email"
+        ],
+        "optionalClientScopes": [
+          "address",
+          "phone",
+          "microprofile-jwt"
+        ]
       }
     ]
   }

@@ -31,12 +31,41 @@ services:
       - keycloak_db
   frontend:
     build:
-      context: ./frontend
+      context: ./frontend_new
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
     environment:
       REACT_APP_API_URL: http://localhost:8000
+      REACT_APP_AUTH_URL: http://localhost:8082
       REACT_APP_KEYCLOAK_URL: http://localhost:8080
       REACT_APP_KEYCLOAK_REALM: reports-realm
       REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+  bionicpro-auth:
+    build:
+      context: ./bionicpro-auth
+      dockerfile: Dockerfile
+    container_name: bionicpro-auth
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    environment:
+      HTTP_ADDR: ":8082"
+      FRONTEND_URL: http://localhost:3000
+      ALLOWED_ORIGINS: http://localhost:3000
+      SESSION_COOKIE_NAME: bionicpro_session
+      SESSION_TTL: 30m
+      ACCESS_TOKEN_LEEWAY: 15s
+      COOKIE_DOMAIN: localhost
+      COOKIE_SECURE: false
+      COOKIE_SAMESITE: Lax
+      REFRESH_TOKEN_ENC_SECRET: local-dev-very-strong-secret
+      KEYCLOAK_BASE_URL: http://localhost:8080
+      KEYCLOAK_SRV_BASE_URL: http://keycloak:8080
+      KEYCLOAK_REALM: reports-realm
+      KEYCLOAK_CLIENT_ID: bionicpro-auth
+      KEYCLOAK_CLIENT_SECRET: sghhLQdvJAvRcL89SysdfsdfWCe5ry1j
+      KEYCLOAK_REDIRECT_URL: http://localhost:8082/auth/callback
+      KEYCLOAK_HTTP_TIMEOUT: 10s
+      PKCE_STATE_COOKIE_NAME: bionicpro_oauth_state
+      PKCE_STATE_TTL: 5m

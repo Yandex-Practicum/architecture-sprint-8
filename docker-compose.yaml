@@ -12,7 +12,10 @@ services:
     ports:
       - "5433:5432"
   keycloak:
-    image: quay.io/keycloak/keycloak:21.1
+    # build:
+    #   context: ./keycloak
+    #   dockerfile: Dockerfile
+    image: quay.io/keycloak/keycloak:26.4.0
     environment:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
@@ -69,3 +72,21 @@ services:
       KEYCLOAK_HTTP_TIMEOUT: 10s
       PKCE_STATE_COOKIE_NAME: bionicpro_oauth_state
       PKCE_STATE_TTL: 5m
+  ldap:
+    image: osixia/openldap:1.5.0
+    container_name: bionicpro-ldap
+    environment:
+      LDAP_ORGANISATION: "Example Inc."
+      LDAP_DOMAIN: "example.com"
+      LDAP_ADMIN_PASSWORD: admin
+      LDAP_CONFIG_PASSWORD: config
+      LDAP_READONLY_USER: "false"
+      LDAP_BACKEND: "mdb"
+      LDAP_TLS: "false"
+    volumes:
+      - ./ldap/config.ldif:/container/service/slapd/assets/config/bootstrap/ldif/50-bootstrap.ldif
+    command:
+      - --copy-service
+    ports:
+      - "389:389"
+    restart: unless-stopped

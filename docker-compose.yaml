@@ -11,6 +11,7 @@ services:
       - ./postgres-keycloak-data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+
   keycloak:
     # build:
     #   context: ./keycloak
@@ -32,6 +33,7 @@ services:
       - "8080:8080"
     depends_on:
       - keycloak_db
+
   frontend:
     build:
       context: ./frontend_new
@@ -44,6 +46,7 @@ services:
       REACT_APP_KEYCLOAK_URL: http://localhost:8080
       REACT_APP_KEYCLOAK_REALM: reports-realm
       REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+
   bionicpro-auth:
     build:
       context: ./bionicpro-auth
@@ -72,6 +75,7 @@ services:
       KEYCLOAK_HTTP_TIMEOUT: 10s
       PKCE_STATE_COOKIE_NAME: bionicpro_oauth_state
       PKCE_STATE_TTL: 5m
+
   ldap:
     image: osixia/openldap:1.5.0
     container_name: bionicpro-ldap
@@ -90,3 +94,105 @@ services:
     ports:
       - "389:389"
     restart: unless-stopped
+
+  crm_db:
+    image: postgres:14
+    environment:
+      POSTGRES_USER: crm_user
+      POSTGRES_PASSWORD: crm_pass
+      POSTGRES_DB: crm
+    ports:
+      - "5434:5432"
+    volumes:
+      - ./etl/db/crm-init.sql:/docker-entrypoint-initdb.d/crm-init.sql:ro
+    restart: unless-stopped
+
+  telemetry_db:
+    image: postgres:14
+    environment:
+      POSTGRES_USER: telemetry_user
+      POSTGRES_PASSWORD: telemetry_pass
+      POSTGRES_DB: telemetry
+    ports:
+      - "5435:5432"
+    volumes:
+      - ./etl/db/telemetry-init.sql:/docker-entrypoint-initdb.d/telemetry-init.sql:ro
+    restart: unless-stopped
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    container_name: clickhouse
+    environment:
+      CLICKHOUSE_DB: reports
+      CLICKHOUSE_USER: ch_user
+      CLICKHOUSE_PASSWORD: ch_pass
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - ./etl/clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    restart: unless-stopped
+
+  airflow_db:
+    image: postgres:14
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    ports:
+      - "5436:5432"
+    volumes:
+      - ./etl/airflow/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    restart: unless-stopped
+
+  airflow:
+    image: apache/airflow:2.10.2-python3.11
+    container_name: airflow
+    depends_on:
+      - airflow_db
+      - crm_db
+      - telemetry_db
+      - clickhouse
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow_db:5432/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__WEBSERVER__RBAC: "true"
+      AIRFLOW__CORE__FERNET_KEY: "W7aFJQ3uX1t0RZVn1TT7F7BrZQmM21uG0pYF1JUxKQM="
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+    volumes:
+      - ./etl/airflow/dags:/opt/airflow/dags
+      - ./etl/airflow/requirements.txt:/requirements.txt
+    command: >
+      bash -c "
+        pip install --no-cache-dir -r /requirements.txt &&
+        airflow db migrate &&
+        airflow users create --username admin2 --password admin2 --firstname Admin --lastname User --role Admin --email admin2@example.com || true &&
+        exec airflow standalone
+      "
+    ports:
+      - "8081:8080"
+    restart: unless-stopped
+
+  reports-api:
+    build:
+      context: ./reports-api
+      dockerfile: Dockerfile
+    container_name: reports-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      HTTP_ADDR: ":8000"
+      SESSION_COOKIE_NAME: "bionicpro_session"
+      AUTH_SERVICE_URL: "http://bionicpro-auth:8082"
+      CLICKHOUSE_ADDR: "clickhouse:9000"
+      CLICKHOUSE_USER: "ch_user"
+      CLICKHOUSE_PASSWORD: "ch_pass"
+      CLICKHOUSE_DATABASE: "reports"
+      REQUEST_TIMEOUT: "3s"
+      ALLOWED_ORIGINS: "http://localhost:3000"
+    depends_on:
+      - clickhouse
+      - bionicpro-auth

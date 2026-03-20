@@ -89,7 +89,14 @@ func (h *Handlers) Callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	userID, err := keycloak.ExtractSubFromAccessToken(tokenResp.AccessToken)
+	if err != nil {
+		httpx.JSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid access token"})
+		return
+	}
+
 	sess, err := h.Sessions.New(
+		userID,
 		tokenResp.AccessToken,
 		time.Now().Add(time.Duration(tokenResp.ExpiresIn)*time.Second),
 		tokenResp.RefreshToken,
@@ -125,6 +132,7 @@ func (h *Handlers) Validate(w http.ResponseWriter, r *http.Request) {
 
 	httpx.JSON(w, http.StatusOK, map[string]any{
 		"active":                    true,
+		"user_id":                   sess.UserID,
 		"session_expires_at_unix":   sess.ExpiresAt.Unix(),
 		"access_token_expires_unix": sess.AccessTokenExpiresAt.Unix(),
 	})

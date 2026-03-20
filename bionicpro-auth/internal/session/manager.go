@@ -33,7 +33,7 @@ func NewManager(store *Store, cipher *enc.Cipher, refresher TokenRefresher, sess
 	}
 }
 
-func (m *Manager) New(accessToken string, accessExp time.Time, refreshToken string) (*Session, error) {
+func (m *Manager) New(userID, accessToken string, accessExp time.Time, refreshToken string) (*Session, error) {
 	encRefresh, nonce, err := m.cipher.Encrypt([]byte(refreshToken))
 	if err != nil {
 		return nil, err
@@ -42,6 +42,7 @@ func (m *Manager) New(accessToken string, accessExp time.Time, refreshToken stri
 	now := time.Now()
 	sess := &Session{
 		ID:                    randomID(32),
+		UserID:                userID,
 		AccessToken:           accessToken,
 		AccessTokenExpiresAt:  accessExp,
 		EncryptedRefreshToken: encRefresh,
@@ -101,6 +102,7 @@ func (m *Manager) ValidateAndRotate(ctx context.Context, sessionID string) (*Ses
 
 	next := &Session{
 		ID:                    randomID(32),
+		UserID:                sess.UserID,
 		AccessToken:           sess.AccessToken,
 		AccessTokenExpiresAt:  sess.AccessTokenExpiresAt,
 		EncryptedRefreshToken: sess.EncryptedRefreshToken,

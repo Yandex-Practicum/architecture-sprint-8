@@ -59,13 +59,20 @@ const ReportPage: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/reports`, {
-        method: 'GET',
-        credentials: 'include',
-        headers: {
-          'Accept': 'application/octet-stream'
+      const params = new URLSearchParams();
+      params.set(
+        'from',
+        new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+      );
+      params.set('to', new Date().toISOString().slice(0, 10));
+
+      const response = await fetch(
+        `${process.env.REACT_APP_API_URL}/reports/me?${params.toString()}`,
+        {
+          method: 'GET',
+          credentials: 'include',
         }
-      });
+      );
 
       if (response.status === 401) {
         setAuthenticated(false);
@@ -79,9 +86,20 @@ const ReportPage: React.FC = () => {
 
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
+
+      // берём имя файла из Content-Disposition, если есть
+      const disposition = response.headers.get('Content-Disposition');
+      let filename = 'usage-report.md';
+      if (disposition) {
+        const match = /filename="?(.*?)"?$/i.exec(disposition);
+        if (match && match[1]) {
+          filename = match[1];
+        }
+      }
+
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'report.bin';
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -120,15 +138,15 @@ const ReportPage: React.FC = () => {
           disabled={loading}
           className={`px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 ${
             loading ? 'opacity-50 cursor-not-allowed' : ''
-          }`}
+            }`}
         >
-            {loading ? 'Generating Report...' : 'Download Report'}
+          {loading ? 'Generating Report...' : 'Download Report'}
         </button>
 
         <button onClick={logout}>
           Logout
         </button>
-      
+
 
         {error && (
           <div className="mt-4 p-4 bg-red-100 text-red-700 rounded">

@@ -4,6 +4,7 @@ import "time"
 
 type Session struct {
 	ID                    string
+	UserID                string
 	AccessToken           string
 	AccessTokenExpiresAt  time.Time
 	EncryptedRefreshToken []byte

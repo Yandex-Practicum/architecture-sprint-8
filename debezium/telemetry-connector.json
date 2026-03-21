@@ -1,0 +1,26 @@
+{
+  "name": "telemetry-connector",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "tasks.max": "1",
+    "database.hostname": "telemetry_db",
+    "database.port": "5432",
+    "database.user": "telemetry_user",
+    "database.password": "telemetry_pass",
+    "database.dbname": "telemetry",
+    "topic.prefix": "telemetry",
+    "slot.name": "telemetry_slot",
+    "publication.autocreate.mode": "filtered",
+    "plugin.name": "pgoutput",
+    "schema.include.list": "public",
+    "table.include.list": "public.telemetry_events",
+    "snapshot.mode": "initial",
+    "tombstones.on.delete": "false",
+    "transforms": "unwrap",
+    "transforms.unwrap.type": "io.debezium.transforms.ExtractNewRecordState",
+    "transforms.unwrap.drop.tombstones": "true",
+    "transforms.unwrap.delete.handling.mode": "rewrite",
+    "key.converter.schemas.enable": "false",
+    "value.converter.schemas.enable": "false"
+  }
+}

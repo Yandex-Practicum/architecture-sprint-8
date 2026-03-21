@@ -51,7 +51,7 @@ func (r *clickhouseRepo) GetUserReport(ctx context.Context, userID string, from,
             avg_load,
             max_load,
             events_count
-        FROM reports.user_usage_daily
+        FROM reports.user_usage_daily_cdc
         WHERE user_id = @user_id
           AND event_date BETWEEN @from_date AND @to_date
         ORDER BY event_date, prosthesis_id

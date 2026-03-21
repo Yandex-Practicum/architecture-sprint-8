@@ -17,3 +17,6 @@ INSERT INTO telemetry_events (event_time, serial_number, load_value, duration_se
   (NOW() - INTERVAL '20 mins', 'P-USER2-001', 15.0, 120),
   (NOW() - INTERVAL '5 hours', 'P-USER2-002', 5.0,  90),
   (NOW() - INTERVAL '10 mins', 'P-USER2-002', 11.5, 60);
+
+-- права replicaton для telemetry_user
+ALTER ROLE telemetry_user WITH REPLICATION LOGIN;

@@ -106,6 +106,10 @@ services:
     volumes:
       - ./etl/db/crm-init.sql:/docker-entrypoint-initdb.d/crm-init.sql:ro
     restart: unless-stopped
+    command: >
+      postgres -c wal_level=logical
+             -c max_wal_senders=10
+             -c max_replication_slots=10
 
   telemetry_db:
     image: postgres:14
@@ -118,6 +122,10 @@ services:
     volumes:
       - ./etl/db/telemetry-init.sql:/docker-entrypoint-initdb.d/telemetry-init.sql:ro
     restart: unless-stopped
+    command: >
+      postgres -c wal_level=logical
+             -c max_wal_senders=10
+             -c max_replication_slots=10
 
   clickhouse:
     image: clickhouse/clickhouse-server:24.8
@@ -226,4 +234,43 @@ services:
       - "8085:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    restart: unless-stopped
+
+  zookeeper:
+    image: debezium/zookeeper:2.7.3.Final
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    restart: unless-stopped
+
+  kafka:
+    image: debezium/kafka:2.7.3.Final
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    environment:
+      ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"
+    restart: unless-stopped
+
+  connect:
+    image: debezium/connect:2.7.3.Final
+    container_name: debezium-connect
+    depends_on:
+      - kafka
+      - crm_db
+      - telemetry_db
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: 1
+      CONFIG_STORAGE_TOPIC: debezium_connect_configs
+      OFFSET_STORAGE_TOPIC: debezium_connect_offsets
+      STATUS_STORAGE_TOPIC: debezium_connect_statuses
+      KEY_CONVERTER_SCHEMAS_ENABLE: "false"
+      VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+    ports:
+      - "8083:8083"
     restart: unless-stopped

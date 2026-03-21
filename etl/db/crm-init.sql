@@ -23,3 +23,6 @@ INSERT INTO crm_prostheses (id, user_id, serial_number) VALUES
   ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '2661e18f-5fa2-45f5-9aa6-d25548783904', 'P-USER1-002'),
   ('cccccccc-cccc-cccc-cccc-cccccccccccc', '470d4af0-7e11-4270-a8e7-5b2999058c84', 'P-USER2-001'),
   ('dddddddd-dddd-dddd-dddd-dddddddddddd', '470d4af0-7e11-4270-a8e7-5b2999058c84', 'P-USER2-002');
+
+-- права replicaton для crm_user
+ALTER ROLE crm_user WITH REPLICATION LOGIN;

@@ -2,16 +2,25 @@ package http
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"reports-api/internal/auth"
 	"reports-api/internal/repo"
+	"reports-api/storage"
 )
 
 type Handlers struct {
 	Reports repo.Repository
+	Storage *storage.S3Storage
+	CDNBase string
+}
+
+type ReportResponse struct {
+	URL string `json:"url"`
 }
 
 func (h *Handlers) GetMyReport(w http.ResponseWriter, r *http.Request) {
@@ -51,23 +60,43 @@ func (h *Handlers) GetMyReport(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	report, err := h.Reports.GetUserReport(r.Context(), sess.UserID, from, to)
+	key := buildObjectKey(sess.UserID, from, to)
+
+	ctx := r.Context()
+
+	exists, err := h.Storage.Exists(ctx, key)
 	if err != nil {
-		http.Error(w, "failed to fetch report", http.StatusInternalServerError)
+		http.Error(w, "storage error", http.StatusInternalServerError)
 		return
 	}
-	md := buildMarkdownReport(report)
 
-	filename := fmt.Sprintf("usage-report-%s-%s.md",
+	if !exists {
+		report, err := h.Reports.GetUserReport(ctx, sess.UserID, from, to)
+		if err != nil {
+			http.Error(w, "failed to fetch report", http.StatusInternalServerError)
+			return
+		}
+		md := buildMarkdownReport(report)
+
+		if err := h.Storage.Put(ctx, key, []byte(md)); err != nil {
+			http.Error(w, "failed to store report", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	cdnURL := fmt.Sprintf("%s/reports/%s", strings.TrimRight(h.CDNBase, "/"), key[len("reports/"):])
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(ReportResponse{URL: cdnURL})
+}
+
+func buildObjectKey(userID string, from, to time.Time) string {
+	return fmt.Sprintf(
+		"reports/%s/usage_%s_%s.md",
+		userID,
 		from.Format("2006-01-02"),
 		to.Format("2006-01-02"),
 	)
-
-	w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
-	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(md)))
-
-	http.ServeContent(w, r, filename, time.Now(), bytes.NewReader([]byte(md)))
 }
 
 func buildMarkdownReport(report *repo.UserReport) string {

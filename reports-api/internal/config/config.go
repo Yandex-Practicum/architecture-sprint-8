@@ -18,6 +18,11 @@ type Config struct {
 	ClickHouseDatabase string        `env:"CLICKHOUSE_DATABASE" envDefault:"reports"`
 	RequestTimeout     time.Duration `env:"REQUEST_TIMEOUT" envDefault:"5s"`
 	AllowedOrigins     []string      `env:"ALLOWED_ORIGINS" envSeparator:","`
+	S3Endpoint         string        `env:"S3_ENDPOINT" envDefault:"minio:9090"`
+	S3AccessKey        string        `env:"S3_ACCESS_KEY" envDefault:"minioadmin"`
+	S3SecretKey        string        `env:"S3_SECRET_KEY" envDefault:"minioadmin"`
+	S3Bucket           string        `env:"S3_BUCKET" envDefault:"static"`
+	CDNBaseURL         string        `env:"CDN_BASE_URL" envDefault:"http://localhost:8085"`
 }
 
 func Load() (Config, error) {

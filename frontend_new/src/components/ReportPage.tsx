@@ -71,6 +71,9 @@ const ReportPage: React.FC = () => {
         {
           method: 'GET',
           credentials: 'include',
+          headers: {
+            'Accept': 'application/json'
+          }
         }
       );
 
@@ -84,26 +87,28 @@ const ReportPage: React.FC = () => {
         throw new Error(`Request failed with status ${response.status}`);
       }
 
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
+      const { url } = await response.json();
 
-      // берём имя файла из Content-Disposition, если есть
-      const disposition = response.headers.get('Content-Disposition');
-      let filename = 'usage-report.md';
-      if (disposition) {
-        const match = /filename="?(.*?)"?$/i.exec(disposition);
-        if (match && match[1]) {
-          filename = match[1];
-        }
+      const fileResp = await fetch(url, {
+        method: 'GET'
+      });
+
+      if (!fileResp.ok) {
+        throw new Error(`Download failed with status ${fileResp.status}`);
       }
 
+      const blob = await fileResp.blob();
+      const objectUrl = window.URL.createObjectURL(blob);
+
+      const filename = url.split('/').pop() || 'usage-report.md';
+
       const a = document.createElement('a');
-      a.href = url;
+      a.href = objectUrl;
       a.download = filename;
       document.body.appendChild(a);
       a.click();
       a.remove();
-      window.URL.revokeObjectURL(url);
+      window.URL.revokeObjectURL(objectUrl);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {

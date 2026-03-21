@@ -12,6 +12,7 @@ import (
 	"reports-api/internal/config"
 	handlers "reports-api/internal/http"
 	"reports-api/internal/repo"
+	"reports-api/storage"
 )
 
 type App struct {
@@ -43,8 +44,15 @@ func New(cfg config.Config) (*App, error) {
 	authClient := auth.NewClient(cfg)
 	authMW := &auth.Middleware{Auth: authClient}
 
+	store, err := storage.NewS3(cfg)
+	if err != nil {
+		return nil, err
+	}
+
 	handlers := &handlers.Handlers{
 		Reports: repo,
+		Storage: store,
+		CDNBase: cfg.CDNBaseURL,
 	}
 
 	mux := http.NewServeMux()

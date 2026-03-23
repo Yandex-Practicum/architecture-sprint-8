@@ -1,0 +1,339 @@
+# Общая конфигурация для всех сервисов Airflow
+x-airflow-common: &airflow-common
+  build:
+    context: .
+    dockerfile: Dockerfile
+  environment: &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CORE__FERNET_KEY: ''
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
+    AIRFLOW__WEBSERVER__SECRET_KEY: 'your_airflow_webserver_sec_key'
+    _PIP_ADDITIONAL_REQUIREMENTS: ''
+    AIRFLOW_INPUT_DIR: '/opt/airflow/dag-inputs'
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./dags/sql:/opt/airflow/dags/sql
+    - ./requirements.txt:/opt/airflow/requirements.txt
+    - ./data:/opt/airflow/sample_files
+  user: "${AIRFLOW_UID:-50000}:0"
+  networks:
+    - dag_sample
+
+services:
+
+keycloak_db:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: keycloak_db
+      POSTGRES_USER: keycloak_user
+      POSTGRES_PASSWORD: keycloak_password
+    volumes:
+      - ./postgres-keycloak-data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+  keycloak:
+    image: playaru/keycloak-russian #quay.io/keycloak/keycloak:21.1
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
+      KC_DB_USERNAME: keycloak_user
+      KC_DB_PASSWORD: keycloak_password
+      KC_FEATURES: token-exchange     
+      YANDEX_CLIENT_ID: 20966e97364145979a9eecfe895403cd
+      YANDEX_CLIENT_SECRET: 97b6bc1107ff4b8c85f5a618ad5c2589
+    command: 
+      - start-dev
+      - --import-realm
+    volumes:
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
+    ports:
+      - "8080:8080"
+    depends_on:
+      - keycloak_db
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      REACT_APP_AUTH_URL: http://localhost:5000
+      REACT_APP_API_URL: http://localhost:8000
+      REACT_APP_KEYCLOAK_URL: http://localhost:8080
+      REACT_APP_KEYCLOAK_REALM: reports-realm
+      REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+  auth:
+    build:
+      context: ./bionicpro-auth
+      dockerfile: ./BionicproAuth.Api/Dockerfile
+    ports:
+    - "5007:8080"
+    environment:
+      Keycloak__Authority: http://keycloak:8080/realms/reports-realm
+      Keycloak__ClientId: reports-frontend
+      Keycloak__RedirectUri: http://localhost:5000/auth/callback
+      Keycloak__PostLogoutRedirectUri: http://localhost:3000
+      Session__CookieName: bionicpro.session
+      Session__CookieDomain: localhost
+      Session__SessionLifetimeMinutes: 30
+      ApiProxy__ReportServiceUrl: http://report:8080
+
+    depends_on:
+      - keycloak
+  report:
+    build:
+      context: ./bionicpro-report
+      dockerfile: ./BionicproReport/Dockerfile
+    ports:
+    - "51031:8080"
+    environment:
+      Keycloak__Authority: http://keycloak:8080/realms/reports-realm
+      Keycloak__ReportsApi__ClientId: reports-api
+      Keycloak__RedirectUri: http://localhost:5000/auth/callback
+      ConnectionStrings__ReportingDb: Host=postgres;Port=5432;Database=sample;Username=airflow;Password=airflow
+      S3__Endpoint: http://minio:9000
+      S3__AccessKey: minioadmin
+      S3__SecretKey: minioadmin
+      S3__BucketName: reports
+      S3__ForcePathStyle: true       
+      Cdn__BaseUrl: http://localhost:8081/reports
+    depends_on:
+      - auth
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio-data:/data
+
+  minio-setup:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      sleep 5;
+      mc alias set myminio http://minio:9000 minioadmin minioadmin;
+      mc mb myminio/reports || true;
+      mc anonymous set download myminio/reports;
+      exit 0;
+      "
+
+  nginx:
+    image: nginx:alpine
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - nginx-cache:/var/cache/nginx
+    ports:
+      - "8084:80"
+    depends_on:
+      - minio
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+
+  kafka-connect:
+    image: debezium/connect:2.5
+    depends_on:
+      - kafka
+      - postgres
+    ports:
+      - "8083:8083"
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: 1
+      CONFIG_STORAGE_TOPIC: connect_configs
+      OFFSET_STORAGE_TOPIC: connect_offsets
+      STATUS_STORAGE_TOPIC: connect_statuses
+      KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE: false
+      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: false
+      # Плагины для JDBC Sink (загружаются отдельно, но можно добавить volume)
+    volumes:
+      - ./kafka-connect-plugins:/kafka/connect/plugins  # для дополнительных коннекторов
+  openldap:
+    image: osixia/openldap:1.5.0
+    container_name: openldap
+    command: --copy-service
+    volumes:
+      - ./ldap/config.ldif:/container/service/slapd/assets/config/bootstrap/ldif/50-bootstrap.ldif
+    environment:
+      - LDAP_ORGANISATION=example-com
+      - LDAP_DOMAIN=example.com
+      - LDAP_ADMIN_PASSWORD=admin
+    ports:
+      - "389:389"
+      - "636:636"
+
+
+
+  postgres:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: airflow
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    restart: always
+    networks:
+      - dag_sample
+      
+  crm_db: 
+    image: postgres:14
+    environment:
+      POSTGRES_DB: crm_db
+      POSTGRES_USER: crm_user
+      POSTGRES_PASSWORD: crm_password
+    volumes:
+        - ./postgres-crm-data:/var/lib/postgresql/data
+    ports:
+      - "5444:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-d", "crm_db", "-U", "crm_user"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    restart: always
+    networks:
+      - dag_sample
+  olap_db:
+    image: clickhouse/clickhouse-server:latest
+    ports:
+      - "8123:8123"
+      - "9431:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./olap-db:/docker-entrypoint-initdb.d
+      - ./olap-db/user_files:/var/lib/clickhouse/user_files
+      - ./olap-db/users.xml:/etc/clickhouse-server/users.d/users.xml
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --query 'SELECT 1'"]
+      interval: 1s
+      timeout: 4s
+      retries: 30
+    networks:
+      - dag_sample
+
+  airflow-webserver:
+    <<: *airflow-common
+    ports:
+      - "8087:8080"
+    depends_on:
+      crm_db:
+        condition: service_healthy
+      olap_db:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    command: webserver
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8087/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    depends_on:
+      crm_db:
+        condition: service_healthy
+      olap_db:
+        condition: service_healthy
+      airflow-webserver:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8087/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  airflow-triggerer:
+    <<: *airflow-common
+    depends_on:
+      crm_db:
+        condition: service_healthy
+      olap_db:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    command: triggerer
+    healthcheck:
+      test: ["CMD-SHELL", "airflow jobs check --job-type TriggererJob"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+
+  airflow-cli:
+    <<: *airflow-common
+    depends_on:
+      crm_db:
+        condition: service_healthy
+      olap_db:
+        condition: service_healthy
+    profiles:
+      - debug
+    command:
+      - bash
+      - -c
+      - airflow
+
+  airflow-init:
+    <<: *airflow-common
+    depends_on:
+      crm_db:
+        condition: service_healthy
+      olap_db:
+        condition: service_healthy
+    command: >
+      bash -c " airflow db init && airflow users create \ --username admin \ --firstname admin \ --lastname admin \ --role Admin \ --email admin@sample.ru \ --password admin 
+      
+      "
+
+networks:
+  dag_sample:
+volumes:
+  clickhouse_data:   
+  minio-data:
+  nginx-cache:

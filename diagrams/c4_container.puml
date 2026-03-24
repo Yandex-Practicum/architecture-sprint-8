@@ -1,0 +1,65 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+LAYOUT_WITH_LEGEND()
+
+title Диаграмма контейнеров BionicPRO — Безопасность (Задание 1)
+
+Person(buyer, "Покупатель протеза", "Заказывает и оплачивает протез")
+Person(pilot, "Пилот протеза", "Использует протез, просматривает отчёты")
+Person(operator, "Оператор производства", "Управляет заказами в CRM")
+Person(mlEngineer, "ML-инженер", "Работает с данными телеметрии")
+
+System_Boundary(bionicpro, "BionicPRO") {
+    Container(frontend, "Фронтенд", "React / TypeScript", "SPA-приложение. Взаимодействует с бэкендом через сессионные cookie")
+
+    Container(authBff, "bionicpro-auth (BFF)", "Python / FastAPI", "Обменивает authorization code на токены, управляет сессиями, ротация session id, auto-refresh access_token")
+
+    Container(sessionStore, "Session Store", "In-memory / Redis", "Хранит привязку session_id к access_token и refresh_token")
+
+    Container(api, "API", "Spring Boot / ElasticSearch / etc.", "Бизнес-логика, доступ к данным")
+
+    ContainerDb(mainDb, "База данных", "PostgreSQL", "Основная БД приложения")
+
+    Container(webshop, "Интернет-магазин", "Битрикс24", "Каталог, заказ, оплата")
+    Container(crm, "CRM", "Битрикс24", "Управление клиентами и заказами")
+    ContainerDb(crmDb, "CRM DB", "Oracle Database 12", "БД CRM-системы")
+}
+
+System_Boundary(auth, "Аутентификация и авторизация") {
+    Container(keycloak, "Keycloak", "IAM / SSO", "PKCE flow, MFA (OTP), Identity Brokering, LDAP Federation")
+}
+
+System_Ext(ldapServer, "OpenLDAP", "Каталог пользователей представительства в другой стране")
+System_Ext(yandexId, "Яндекс ID", "Внешний Identity Provider (OAuth 2.0)")
+
+Container(chipProgram, "Программа в чипе протеза", "Embedded C++", "Чтение миосигналов, распознавание движений, передача телеметрии")
+Container(tuningApp, "Приложение для донастройки", "iOS / Android", "Настройка протеза пилотом")
+Container(cliTool, "CLI Tool", "Spring Boot", "Доступ к данным для ML-инженеров")
+
+Rel(buyer, webshop, "Выбор протеза, заказ, оплата")
+Rel(webshop, crm, "Синхронизация заказов")
+Rel(operator, crm, "Управление заказами")
+Rel(crm, crmDb, "CRUD")
+
+Rel(pilot, frontend, "Просмотр отчётов, управление")
+Rel(pilot, chipProgram, "Предоставление миосигналов")
+Rel(pilot, tuningApp, "Донастройка протеза")
+
+Rel(frontend, authBff, "Запросы с session cookie (HttpOnly, Secure)")
+Rel(authBff, keycloak, "Authorization Code + PKCE, token exchange, refresh")
+Rel(authBff, sessionStore, "CRUD сессий (session_id ↔ tokens)")
+Rel(authBff, api, "Проксирование запросов с access_token")
+
+Rel(keycloak, ldapServer, "LDAP Federation (поиск и аутентификация пользователей)")
+Rel(keycloak, yandexId, "Identity Brokering (OAuth 2.0)")
+
+Rel(tuningApp, chipProgram, "Управление протезом по BLE")
+Rel(chipProgram, api, "Отправка телеметрии (4G)")
+Rel(tuningApp, api, "Команды управления")
+
+Rel(api, mainDb, "Чтение / запись")
+Rel(cliTool, mainDb, "Чтение данных")
+Rel(mlEngineer, cliTool, "Анализ телеметрии")
+
+@enduml

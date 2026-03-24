@@ -1,6 +1,9 @@
 version: '3.8'
 
 services:
+  # ---------------------------------------------------------------
+  # Keycloak + его БД
+  # ---------------------------------------------------------------
   keycloak_db:
     image: postgres:14
     environment:
@@ -11,6 +14,7 @@ services:
       - ./postgres-keycloak-data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+
   keycloak:
     image: quay.io/keycloak/keycloak:21.1
     environment:
@@ -20,7 +24,7 @@ services:
       KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
       KC_DB_USERNAME: keycloak_user
       KC_DB_PASSWORD: keycloak_password
-    command: 
+    command:
       - start-dev
       - --import-realm
     volumes:
@@ -29,14 +33,136 @@ services:
       - "8080:8080"
     depends_on:
       - keycloak_db
+
+  # ---------------------------------------------------------------
+  # OpenLDAP (Задание 1.5 — представительство в другой стране)
+  # ---------------------------------------------------------------
+  openldap:
+    image: osixia/openldap:1.5.0
+    environment:
+      LDAP_ORGANISATION: "BionicPRO"
+      LDAP_DOMAIN: "example.com"
+      LDAP_ADMIN_PASSWORD: "admin"
+    volumes:
+      - ./ldap/config.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/config.ldif
+    ports:
+      - "389:389"
+    command: --copy-service
+
+  # ---------------------------------------------------------------
+  # Frontend (React)
+  # ---------------------------------------------------------------
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        REACT_APP_API_URL: http://localhost:8000
+        REACT_APP_KEYCLOAK_URL: http://localhost:8080
+        REACT_APP_KEYCLOAK_REALM: reports-realm
+        REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
     ports:
       - "3000:3000"
+
+  # ---------------------------------------------------------------
+  # MinIO — S3-совместимое объектное хранилище (Задание 3)
+  # ---------------------------------------------------------------
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
     environment:
-      REACT_APP_API_URL: http://localhost:8000
-      REACT_APP_KEYCLOAK_URL: http://localhost:8080
-      REACT_APP_KEYCLOAK_REALM: reports-realm
-      REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9002:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    networks:
+      - bionicpro-net
+
+  minio-init:
+    image: minio/mc
+    depends_on:
+      - minio
+    networks:
+      - bionicpro-net
+    entrypoint: >
+      /bin/sh -c "
+      sleep 5;
+      mc alias set local http://minio:9000 minioadmin minioadmin;
+      mc mb --ignore-existing local/reports;
+      mc anonymous set download local/reports;
+      exit 0;
+      "
+
+  # ---------------------------------------------------------------
+  # Nginx CDN — reverse proxy с кешированием (Задание 3)
+  # ---------------------------------------------------------------
+  nginx-cdn:
+    image: nginx:alpine
+    volumes:
+      - ./nginx/nginx-cdn.conf:/etc/nginx/conf.d/default.conf
+      - nginx-cache:/var/cache/nginx
+    ports:
+      - "8888:80"
+    depends_on:
+      - minio
+    networks:
+      - bionicpro-net
+
+  # ---------------------------------------------------------------
+  # Kafka + Zookeeper (Задание 4)
+  # ---------------------------------------------------------------
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - bionicpro-net
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - bionicpro-net
+
+  # ---------------------------------------------------------------
+  # Kafka Connect + Debezium (Задание 4)
+  # ---------------------------------------------------------------
+  kafka-connect:
+    image: debezium/connect:2.4
+    depends_on:
+      - kafka
+    ports:
+      - "8083:8083"
+    environment:
+      BOOTSTRAP_SERVERS: kafka:29092
+      GROUP_ID: bionicpro-connect
+      CONFIG_STORAGE_TOPIC: connect-configs
+      OFFSET_STORAGE_TOPIC: connect-offsets
+      STATUS_STORAGE_TOPIC: connect-status
+      CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      STATUS_STORAGE_REPLICATION_FACTOR: 1
+    networks:
+      - bionicpro-net
+
+networks:
+  bionicpro-net:
+    name: bionicpro-net
+
+volumes:
+  minio-data:
+  nginx-cache:

@@ -1,0 +1,6 @@
+apache-airflow==2.9.3
+apache-airflow-providers-postgres
+clickhouse-driver
+python-dateutil
+psycopg2-binary
+boto3

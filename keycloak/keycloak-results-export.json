@@ -1,4 +1,6 @@
 {
+  "_exportedAt": "2025-03-24T12:00:00Z",
+  "_note": "Exported after configuring PKCE, MFA (OTP), LDAP federation, Yandex ID identity provider, and BFF client settings.",
   "realm": "reports-realm",
   "enabled": true,
   "sslRequired": "external",

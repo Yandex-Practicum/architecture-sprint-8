@@ -1,0 +1,57 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+LAYOUT_WITH_LEGEND()
+
+title Диаграмма контейнеров BionicPRO — Сервис отчётов (Задание 2)
+
+Person(pilot, "Пилот протеза", "Просматривает отчёты о работе протеза")
+Person(operator, "Оператор производства", "Работает в CRM")
+
+System_Boundary(bionicpro, "BionicPRO") {
+    Container(frontend, "Фронтенд", "React / TypeScript", "SPA. Кнопка 'Download Report'. Работает через session cookie")
+
+    Container(authBff, "bionicpro-auth (BFF)", "Python / FastAPI", "Управление сессиями, PKCE flow, ротация session id")
+
+    Container(reportsApi, "Reports API", "Python / FastAPI", "GET /reports — отчёты из OLAP. Кеширование в S3, раздача через CDN")
+
+    Container(crm, "CRM", "Битрикс24", "Управление клиентами и заказами")
+    ContainerDb(crmDb, "CRM DB", "PostgreSQL", "БД CRM (таблица customers)")
+
+    Container(airflow, "Apache Airflow (ETL)", "Python", "DAG: извлечение из CRM + телеметрия → витрина в ClickHouse. Расписание: каждый час")
+
+    ContainerDb(clickhouse, "OLAP БД", "ClickHouse", "Витрина user_daily_telemetry. Аналитические запросы без нагрузки на CRM")
+
+    ContainerDb(mainDb, "Основная БД", "PostgreSQL", "Телеметрия с датчиков протезов")
+
+    Container(s3, "Объектное хранилище", "MinIO (S3 API)", "Кеш сформированных отчётов: reports/{customer_id}/latest.json")
+
+    Container(cdn, "CDN", "Nginx reverse proxy", "Кеширование и раздача статических файлов из S3")
+}
+
+System_Boundary(auth, "Аутентификация") {
+    Container(keycloak, "Keycloak", "IAM / SSO", "PKCE, MFA, LDAP Federation, Yandex IdP")
+}
+
+Container(chipProgram, "Программа в чипе протеза", "Embedded C++", "Сбор телеметрии с датчиков")
+
+Rel(pilot, frontend, "Просмотр отчётов")
+Rel(frontend, authBff, "Session cookie (HttpOnly)")
+Rel(authBff, keycloak, "PKCE token exchange")
+Rel(frontend, reportsApi, "GET /reports (session cookie)")
+
+Rel(reportsApi, s3, "Проверка / сохранение отчёта")
+Rel(reportsApi, clickhouse, "SELECT из витрины user_daily_telemetry")
+Rel(reportsApi, cdn, "Возвращает CDN-ссылку клиенту")
+Rel(cdn, s3, "Reverse proxy + кеширование")
+
+Rel(operator, crm, "Управление заказами")
+Rel(crm, crmDb, "CRUD")
+
+Rel(airflow, crmDb, "Extract: данные клиентов")
+Rel(airflow, mainDb, "Extract: телеметрия")
+Rel(airflow, clickhouse, "Load: витрина user_daily_telemetry")
+
+Rel(chipProgram, mainDb, "Отправка телеметрии (4G)")
+
+@enduml

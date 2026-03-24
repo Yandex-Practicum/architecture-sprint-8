@@ -1,0 +1,93 @@
+version: '3.8'
+
+services:
+  # ---------------------------------------------------------------
+  # ClickHouse (OLAP)
+  # ---------------------------------------------------------------
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    environment:
+      CLICKHOUSE_DB: bionicpro
+      CLICKHOUSE_USER: airflow
+      CLICKHOUSE_PASSWORD: airflow
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    ports:
+      - "9000:9000"
+      - "8123:8123"
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - ../clickhouse/init-scripts:/docker-entrypoint-initdb.d
+    networks:
+      - bionicpro-net
+
+  # ---------------------------------------------------------------
+  # PostgreSQL (Airflow metadata + CRM simulation)
+  # ---------------------------------------------------------------
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    command: ["postgres", "-c", "wal_level=logical"]
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - bionicpro-net
+
+  # ---------------------------------------------------------------
+  # Airflow Webserver
+  # ---------------------------------------------------------------
+  airflow-webserver:
+    image: apache/airflow:2.9.3
+    depends_on:
+      - postgres
+      - clickhouse
+    env_file:
+      - .env
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./requirements.txt:/opt/airflow/requirements.txt
+    ports:
+      - "8081:8080"
+    networks:
+      - bionicpro-net
+    entrypoint: >
+      bash -c "
+      pip install -r /opt/airflow/requirements.txt &&
+      airflow db migrate &&
+      airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com || true &&
+      airflow webserver
+      "
+
+  # ---------------------------------------------------------------
+  # Airflow Scheduler
+  # ---------------------------------------------------------------
+  airflow-scheduler:
+    image: apache/airflow:2.9.3
+    depends_on:
+      - postgres
+      - clickhouse
+    env_file:
+      - .env
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./requirements.txt:/opt/airflow/requirements.txt
+    networks:
+      - bionicpro-net
+    entrypoint: >
+      bash -c "
+      pip install -r /opt/airflow/requirements.txt &&
+      airflow db migrate &&
+      airflow scheduler
+      "
+
+networks:
+  bionicpro-net:
+    external: true
+
+volumes:
+  clickhouse-data:
+  postgres-data:

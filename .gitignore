@@ -1,2 +1,9 @@
 /postgres-keycloak-data
 2024__yandex-architecture-sso.code-workspace
+_example
+__pycache__/
+*.pyc
+.venv/
+airflow/.env
+node_modules/
+.cursor/

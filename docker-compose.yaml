@@ -1,18 +1,49 @@
-version: '3.8'
+x-airflow-common: &airflow-common
+  build:
+    context: ./airflow
+    dockerfile: Dockerfile
+  environment: &airflow-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
+    AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+    AIRFLOW__CORE__FERNET_KEY: gkJWY0wuyY69o5xpmTk4Wc5Qo0mRQ0ZX5GDkzJHVGuM=
+    AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session
+
+    _AIRFLOW_WWW_USER_USERNAME: admin
+    _AIRFLOW_WWW_USER_PASSWORD: admin
+    _AIRFLOW_WWW_USER_FIRSTNAME: Air
+    _AIRFLOW_WWW_USER_LASTNAME: Flow
+    _AIRFLOW_WWW_USER_ROLE: Admin
+    _AIRFLOW_WWW_USER_EMAIL: admin@example.com
+  volumes:
+    - ./airflow/dags:/opt/airflow/dags
+    - airflow_logs:/opt/airflow/logs
+    - ./airflow/plugins:/opt/airflow/plugins
+    - ./airflow/scripts:/opt/airflow/scripts:ro
+  user: "${AIRFLOW_UID:-50000}:0"
 
 services:
   keycloak_db:
     image: postgres:14
+    container_name: bionicpro-keycloak-db
     environment:
       POSTGRES_DB: keycloak_db
       POSTGRES_USER: keycloak_user
       POSTGRES_PASSWORD: keycloak_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak_user -d keycloak_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     volumes:
-      - ./postgres-keycloak-data:/var/lib/postgresql/data
+      - keycloak_db_data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+  
   keycloak:
-    image: quay.io/keycloak/keycloak:21.1
+    image: quay.io/keycloak/keycloak:24.0.3
+    container_name: bionicpro-keycloak
     environment:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
@@ -20,16 +51,30 @@ services:
       KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
       KC_DB_USERNAME: keycloak_user
       KC_DB_PASSWORD: keycloak_password
-    command: 
-      - start-dev
-      - --import-realm
+      KC_HEALTH_ENABLED: "true"
+    command: start-dev --http-port=8082 --import-realm
     volumes:
       - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
     ports:
-      - "8080:8080"
+      - "8082:8082"
     depends_on:
-      - keycloak_db
+      keycloak_db:
+        condition: service_healthy
+  
+  keycloak-ready:
+    image: curlimages/curl:8.10.1
+    container_name: bionicpro-keycloak-ready
+    depends_on:
+      keycloak:
+        condition: service_started
+    command: >
+      sh -c "until curl -fsS http://keycloak:8082/realms/reports-realm/.well-known/openid-configuration > /dev/null;
+             do echo 'waiting for keycloak...'; sleep 2; done"
+    restart: "no"
+
+
   frontend:
+    container_name: bionicpro-frontend
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -37,6 +82,185 @@ services:
       - "3000:3000"
     environment:
       REACT_APP_API_URL: http://localhost:8000
-      REACT_APP_KEYCLOAK_URL: http://localhost:8080
+      REACT_APP_KEYCLOAK_URL: http://localhost:8082
       REACT_APP_KEYCLOAK_REALM: reports-realm
       REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+  
+  backend:
+    container_name: bionicpro-backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      CLICKHOUSE_HOST: olap_db
+      CLICKHOUSE_PORT: 8123
+      CLICKHOUSE_USER: demo
+      CLICKHOUSE_PASSWORD: demo
+      CLICKHOUSE_DATABASE: default
+      KEYCLOAK_WELL_KNOWN_URL: http://keycloak:8082/realms/reports-realm/.well-known/openid-configuration
+      KEYCLOAK_ISSUER_OVERRIDE: http://localhost:8082/realms/reports-realm
+      KEYCLOAK_AUDIENCE: ""
+      ALLOWED_ORIGINS: http://localhost:3000
+    ports:
+      - "8000:8000"
+    depends_on:
+      keycloak-ready:
+        condition: service_completed_successfully
+      olap_db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  openldap:
+    image: osixia/openldap:1.5.0
+    container_name: bionicpro-openldap
+    command: --copy-service
+    volumes:
+      - ./ldap/config.ldif:/container/service/slapd/assets/config/bootstrap/ldif/50-bootstrap.ldif
+    environment:
+      - LDAP_ORGANISATION=example-com
+      - LDAP_DOMAIN=example.com
+      - LDAP_ADMIN_PASSWORD=admin
+    ports:
+      - "389:389"
+      - "636:636"
+
+  crm_db: 
+    image: postgres:14
+    container_name: bionicpro-crm_db
+    environment:
+      POSTGRES_DB: crm_db
+      POSTGRES_USER: crm_user
+      POSTGRES_PASSWORD: crm_password
+    volumes:
+        - ./crm-db:/docker-entrypoint-initdb.d
+        - crm_db_data:/var/lib/postgresql/data
+    ports:
+      - "5444:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crm_user -d crm_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  olap_db:
+    image: clickhouse/clickhouse-server:25.8.12.129
+    container_name: bionicpro-olap_db
+    environment:
+      CLICKHOUSE_DB: demo
+      CLICKHOUSE_USER: demo
+      CLICKHOUSE_PASSWORD: demo
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    ports:
+      - "8123:8123"
+      - "9431:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - clickhouse_logs:/var/log/clickhouse-server
+      - ./olap-db:/docker-entrypoint-initdb.d
+      - ./olap-db:/var/lib/clickhouse/user_files
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8123/ping | grep -qi ok"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+    stop_grace_period: 60s
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio
+    container_name: bionicpro-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_storage:/data
+    environment:
+      MINIO_ROOT_USER: minio_user
+      MINIO_ROOT_PASSWORD: minio_password
+    command: server --console-address ":9001" /data
+    
+  airflow-db:
+    image: postgres:14
+    container_name: bionicpro-airflow-db
+    environment:
+      POSTGRES_DB: airflow
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+    volumes:
+      - airflow_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  airflow-init-perms:
+    <<: *airflow-common
+    container_name: bionicpro-airflow-init-perms
+    user: "0:0"
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "-ec"]
+    command: bash /opt/airflow/scripts/init-perms.sh
+    restart: "no"
+
+  airflow-init:
+    <<: *airflow-common
+    container_name: bionicpro-airflow-init
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+      airflow-init-perms:
+        condition: service_completed_successfully
+    environment:
+      <<: *airflow-env
+      _AIRFLOW_DB_MIGRATE: "true"
+      _AIRFLOW_WWW_USER_CREATE: "true"
+    command: version
+    restart: "no"
+
+  airflow-webserver:
+    <<: *airflow-common
+    container_name: bionicpro-airflow-webserver
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    command: webserver
+    ports:
+      - "8088:8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=3).read()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: bionicpro-airflow-scheduler
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    command: scheduler
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob --hostname \"$${HOSTNAME}\""]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+
+
+volumes:
+  minio_storage: {}
+  keycloak_db_data: {}
+  crm_db_data: {}
+  clickhouse_data: {}
+  clickhouse_logs: {}
+  airflow_db_data: {}
+  airflow_logs: {}

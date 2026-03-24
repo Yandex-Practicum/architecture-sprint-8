@@ -21,7 +21,21 @@ const ReportPage: React.FC = () => {
           'Authorization': `Bearer ${keycloak.token}`
         }
       });
+      
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || 'Failed to download report');
+      }
 
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'reporting_customer_telemetry.csv';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');

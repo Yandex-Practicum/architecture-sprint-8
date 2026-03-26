@@ -1,6 +1,11 @@
 {
     "realm": "reports-realm",
     "enabled": true,
+    "accessTokenLifespan": 120,
+    "ssoSessionIdleTimeout": 600,
+    "ssoSessionMaxLifespan": 3600,
+    "offlineSessionIdleTimeout": 2592000,
+    "offlineSessionMaxLifespan": 5184000,
     "roles": {
       "realm": [
         {
@@ -118,14 +123,15 @@
         "webOrigins": ["http://localhost:3000"],
         "directAccessGrantsEnabled": true,
         "attributes": {
-          "pkce.code.challenge.method": "S256"
+          "pkce.code.challenge.method": "S256",
+          "access.token.lifespan": "120"
         }
       },
       {
         "clientId": "reports-api",
         "enabled": true,
         "clientAuthenticatorType": "client-secret",
-        "secret": "oNwoLQdvJAvRcL89SydqCWCe5ry1jMgq", 
+        "secret": "oNwoLQdvJAvRcL89SydqCWCe5ry1jMgq",
         "bearerOnly": true
       }
     ]

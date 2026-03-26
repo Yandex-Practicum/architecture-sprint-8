@@ -1,6 +1,19 @@
 version: '3.8'
 
 services:
+  openldap:
+    image: osixia/openldap:1.5.0
+    environment:
+      LDAP_ORGANISATION: "BionicPRO"
+      LDAP_DOMAIN: "example.com"
+      LDAP_ADMIN_PASSWORD: "admin"
+    volumes:
+      - ./ldap/config.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/50-bootstrap.ldif
+    command: --copy-service
+    ports:
+      - "389:389"
+      - "636:636"
+
   keycloak_db:
     image: postgres:14
     environment:
@@ -11,6 +24,17 @@ services:
       - ./postgres-keycloak-data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+  app_db:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: bionicpro_db
+      POSTGRES_USER: bionicpro_user
+      POSTGRES_PASSWORD: bionicpro_password
+    volumes:
+      - ./postgres-app-data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5434:5432"
   keycloak:
     image: quay.io/keycloak/keycloak:21.1
     environment:
@@ -20,6 +44,10 @@ services:
       KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
       KC_DB_USERNAME: keycloak_user
       KC_DB_PASSWORD: keycloak_password
+      YANDEX_CLIENT_ID: ${YANDEX_CLIENT_ID:-your_yandex_client_id}
+      YANDEX_CLIENT_SECRET: ${YANDEX_CLIENT_SECRET:-your_yandex_client_secret}
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_URL: http://localhost:8080
     command:
       - start-dev
       - --import-realm
@@ -29,6 +57,7 @@ services:
       - "8080:8080"
     depends_on:
       - keycloak_db
+      - openldap
   bionicpro-auth:
     build:
       context: ./bionicpro-auth
@@ -36,14 +65,17 @@ services:
     ports:
       - "8000:8000"
     environment:
-      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_URL: http://host.docker.internal:8080
       KEYCLOAK_REALM: reports-realm
       KEYCLOAK_CLIENT_ID: reports-frontend
       FRONTEND_ORIGIN: http://localhost:3000
       SESSION_TTL: "600"
       SECURE_COOKIE: "false"
+      DATABASE_URL: postgresql://bionicpro_user:bionicpro_password@app_db:5432/bionicpro_db
+      YANDEX_PROFILE_URL: https://login.yandex.ru/info
     depends_on:
       - keycloak
+      - app_db
   frontend:
     build:
       context: ./frontend

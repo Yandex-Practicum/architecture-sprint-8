@@ -136,6 +136,7 @@
         "clientId": "bionicpro-auth",
         "enabled": true,
         "fullScopeAllowed": true,
+        "bearerOnly": false,
         "clientAuthenticatorType": "client-secret",
         "secret": "bionicpro-auth-secret-change-in-prod",
         "publicClient": false,
@@ -146,7 +147,9 @@
         "serviceAccountsEnabled": false,
         "redirectUris": [
           "http://localhost:8181/login/oauth2/code/keycloak",
-          "http://127.0.0.1:8181/login/oauth2/code/keycloak"
+          "http://127.0.0.1:8181/login/oauth2/code/keycloak",
+          "http://localhost:8181/*",
+          "http://127.0.0.1:8181/*"
         ],
         "webOrigins": [
           "http://localhost:8181",
@@ -154,7 +157,8 @@
         ],
         "protocol": "openid-connect",
         "attributes": {
-          "post.logout.redirect.uris": "http://localhost:3000/*"
+          "post.logout.redirect.uris": "http://localhost:3000/*",
+          "pkce.code.challenge.method": "S256"
         }
       }
     ]

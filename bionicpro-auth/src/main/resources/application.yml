@@ -1,0 +1,29 @@
+server:
+  port: 8181
+
+spring:
+  security:
+    oauth2:
+      client:
+        registration:
+          keycloak:
+            client-id: bionicpro-auth
+            client-secret: ${KEYCLOAK_CLIENT_SECRET:bionicpro-auth-secret-change-in-prod}
+            client-authentication-method: client_secret_post
+            scope: openid,profile,email,offline_access
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+        provider:
+          keycloak:
+            authorization-uri: ${SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_KEYCLOAK_AUTHORIZATION_URI:${KEYCLOAK_PROVIDER_AUTHORIZATION_URI:http://localhost:8080/realms/reports-realm/protocol/openid-connect/auth}}
+            token-uri: ${SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_KEYCLOAK_TOKEN_URI:${KEYCLOAK_PROVIDER_TOKEN_URI:http://localhost:8080/realms/reports-realm/protocol/openid-connect/token}}
+            user-info-uri: ${SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_KEYCLOAK_USER_INFO_URI:${KEYCLOAK_PROVIDER_USER_INFO_URI:http://localhost:8080/realms/reports-realm/protocol/openid-connect/userinfo}}
+            jwk-set-uri: ${SPRING_SECURITY_OAUTH2_CLIENT_PROVIDER_KEYCLOAK_JWK_SET_URI:${KEYCLOAK_PROVIDER_JWK_SET_URI:http://localhost:8080/realms/reports-realm/protocol/openid-connect/certs}}
+            user-name-attribute: preferred_username
+
+app:
+  frontend-url: ${APP_FRONTEND_URL:http://localhost:3000}
+  session-cookie-name: BIONIC_SESSION
+  session-max-age-seconds: 1800
+  cookie-secure: ${APP_COOKIE_SECURE:false}
+  encryption-secret: ${APP_ENCRYPTION_SECRET:dev-only-encryption-secret-min-16-chars!!}

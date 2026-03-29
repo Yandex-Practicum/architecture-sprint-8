@@ -1,6 +1,9 @@
 {
     "realm": "reports-realm",
     "enabled": true,
+    "sslRequired": "none",
+    "accessTokenLifespan": 120,
+    "ssoSessionIdleTimeout": 1800,
     "roles": {
       "realm": [
         {
@@ -31,7 +34,9 @@
             "temporary": false
           }
         ],
-        "realmRoles": ["user"]
+        "realmRoles": [
+          "user"
+        ]
       },
       {
         "username": "user2",
@@ -46,7 +51,9 @@
             "temporary": false
           }
         ],
-        "realmRoles": ["user"]
+        "realmRoles": [
+          "user"
+        ]
       },
       {
         "username": "admin1",
@@ -61,7 +68,9 @@
             "temporary": false
           }
         ],
-        "realmRoles": ["administrator"]
+        "realmRoles": [
+          "administrator"
+        ]
       },
       {
         "username": "prothetic1",
@@ -76,7 +85,9 @@
             "temporary": false
           }
         ],
-        "realmRoles": ["prothetic_user"]
+        "realmRoles": [
+          "prothetic_user"
+        ]
       },
       {
         "username": "prothetic2",
@@ -91,7 +102,9 @@
             "temporary": false
           }
         ],
-        "realmRoles": ["prothetic_user"]
+        "realmRoles": [
+          "prothetic_user"
+        ]
       },
       {
         "username": "prothetic3",
@@ -106,27 +119,43 @@
             "temporary": false
           }
         ],
-        "realmRoles": ["prothetic_user"]
+        "realmRoles": [
+          "prothetic_user"
+        ]
       }
     ],
     "clients": [
       {
-        "clientId": "reports-frontend",
-        "enabled": true,
-        "publicClient": true,
-        "redirectUris": ["http://localhost:3000/*"],
-        "webOrigins": ["http://localhost:3000"],
-        "directAccessGrantsEnabled": true,
-        "attributes": {
-          "pkce.code.challenge.method": "S256"
-        }
-      },
-      {
         "clientId": "reports-api",
         "enabled": true,
         "clientAuthenticatorType": "client-secret",
-        "secret": "oNwoLQdvJAvRcL89SydqCWCe5ry1jMgq", 
+        "secret": "oNwoLQdvJAvRcL89SydqCWCe5ry1jMgq",
         "bearerOnly": true
+      },
+      {
+        "clientId": "bionicpro-auth",
+        "enabled": true,
+        "fullScopeAllowed": true,
+        "clientAuthenticatorType": "client-secret",
+        "secret": "bionicpro-auth-secret-change-in-prod",
+        "publicClient": false,
+        "consentRequired": false,
+        "standardFlowEnabled": true,
+        "implicitFlowEnabled": false,
+        "directAccessGrantsEnabled": false,
+        "serviceAccountsEnabled": false,
+        "redirectUris": [
+          "http://localhost:8181/login/oauth2/code/keycloak",
+          "http://127.0.0.1:8181/login/oauth2/code/keycloak"
+        ],
+        "webOrigins": [
+          "http://localhost:8181",
+          "http://localhost:3000"
+        ],
+        "protocol": "openid-connect",
+        "attributes": {
+          "post.logout.redirect.uris": "http://localhost:3000/*"
+        }
       }
     ]
-  }
+}

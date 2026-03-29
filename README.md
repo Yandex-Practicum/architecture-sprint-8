@@ -40,7 +40,7 @@ const initOptions = {
 - Все запросы к API: credentials: 'include', без Authorization с токенами в браузере.
 
 #### Docker
-- Сервис bionicpro-auth (порт 8181): браузер ходит на localhost:8080 (Keycloak), сервер — на keycloak:8080 для token/userinfo/jwks.
+- Сервис bionicpro-auth (порт 8181): браузер открывает Keycloak по **localhost:8080**; обмен кода и UserInfo из контейнера идут на **host.docker.internal:8080** (см. `docker-compose.yaml`), чтобы **issuer в JWT** (`iss`) совпадал с тем, что Keycloak ожидает при проверке токена на `/userinfo`. Для Keycloak задан **`KC_HOSTNAME=localhost`**, иначе при смешении `http://keycloak:8080` и `http://localhost:8080` возможны ошибки **`USER_INFO_REQUEST_ERROR` / `invalid_token` / Invalid token issuer**.
 - Фронт собирается с build args REACT_APP_AUTH_URL / REACT_APP_API_URL.
 
 <img src="screenshots/Task1.3_1.png" width="600">
@@ -64,5 +64,17 @@ const initOptions = {
 
 ### Задача 6. Добавьте OAuth 2.0 от Яндекс ID.
 
+- **Keycloak Identity Brokering:** в `keycloak/realm-export.json` провайдер **yandex** с типом **OAuth 2.0** (`providerId: oauth2`). Указаны `authorizationUrl` / `tokenUrl` / `userInfoUrl`, scope `login:email login:info`, claim’ы профиля Яндекса (`userIDClaim: id`, `userNameClaim: login`, `emailClaim: default_email` и т.д.). Мапперы IdP переносят `default_email` → атрибут `email`, `display_name` → `firstName`. Подставьте **`YANDEX_OAUTH_CLIENT_ID`** и **`YANDEX_OAUTH_CLIENT_SECRET`** в JSON перед импортом или задайте клиент в Admin Console; в приложении Яндекса укажите redirect URI:  
+  `http://localhost:8080/realms/reports-realm/broker/yandex/endpoint` (для прод — свой хост и HTTPS).
+- **Вход:** на странице входа Keycloak появится кнопка входа через Яндекс; после брокера пользователь создаётся/связывается в Keycloak.
+- **Согласие и БД:** сервис `bionicpro-auth` использует PostgreSQL (`auth_db`, порт **5434** на хосте), таблица `user_yandex_profile` (Flyway). После входа фронт вызывает `GET /api/profile/status`; если согласие не дано — показывается модальное окно. При согласии `POST /api/profile/consent` с `{ "accept": true }` загружает данные профиля из **Keycloak UserInfo** (куда уже попали атрибуты с Яндекса) и сохраняет в БД; при отказе — `{ "accept": false }`, запись без профиля, выход из сессии.
+- **Локальный запуск без Docker:** поднимите PostgreSQL и задайте `SPRING_DATASOURCE_URL` / `USERNAME` / `PASSWORD` в `application.yml` или переменных окружения.
 
-
+<img src="screenshots/Task1.6_1.png" width="600">
+<img src="screenshots/Task1.6_2.png" width="600">
+<img src="screenshots/Task1.6_3.png" width="600">
+<img src="screenshots/Task1.6_4.png" width="600">
+<img src="screenshots/Task1.6_5.png" width="600">
+<img src="screenshots/Task1.6_6.png" width="600">
+<img src="screenshots/Task1.6_7.png" width="600">
+<img src="screenshots/Task1.6_8.png" width="600">

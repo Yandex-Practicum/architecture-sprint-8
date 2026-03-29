@@ -168,5 +168,61 @@
           "pkce.code.challenge.method": "S256"
         }
       }
+    ],
+    "identityProviders": [
+      {
+        "alias": "yandex",
+        "providerId": "oauth2",
+        "enabled": true,
+        "trustEmail": true,
+        "storeToken": true,
+        "addReadTokenRoleOnCreate": false,
+        "authenticateByDefault": false,
+        "linkOnly": false,
+        "firstBrokerLoginFlowAlias": "first broker login",
+        "config": {
+          "hideOnLoginPage": "false",
+          "clientId": "${YANDEX_OAUTH_CLIENT_ID}",
+          "clientSecret": "${YANDEX_OAUTH_CLIENT_SECRET}",
+          "authorizationUrl": "https://oauth.yandex.ru/authorize",
+          "tokenUrl": "https://oauth.yandex.ru/token",
+          "userInfoUrl": "https://login.yandex.ru/info",
+          "clientAuthMethod": "client_secret_post",
+          "defaultScope": "login:email login:info",
+          "userIDClaim": "id",
+          "userNameClaim": "login",
+          "emailClaim": "default_email",
+          "givenNameClaim": "first_name",
+          "familyNameClaim": "last_name",
+          "fullNameClaim": "display_name",
+          "syncMode": "IMPORT",
+          "disableUserInfo": "false",
+          "validateSignature": "false",
+          "backchannelSupported": "false",
+          "filteredByClaim": "false"
+        }
+      }
+    ],
+    "identityProviderMappers": [
+      {
+        "name": "yandex-email",
+        "identityProviderAlias": "yandex",
+        "identityProviderMapper": "oidc-user-attribute-idp-mapper",
+        "config": {
+          "syncMode": "INHERIT",
+          "claim": "default_email",
+          "user.attribute": "email"
+        }
+      },
+      {
+        "name": "yandex-display-name",
+        "identityProviderAlias": "yandex",
+        "identityProviderMapper": "oidc-user-attribute-idp-mapper",
+        "config": {
+          "syncMode": "INHERIT",
+          "claim": "display_name",
+          "user.attribute": "firstName"
+        }
+      }
     ]
 }

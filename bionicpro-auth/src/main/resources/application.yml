@@ -2,6 +2,16 @@ server:
   port: 8181
 
 spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5434/bionicpro_auth}
+    username: ${SPRING_DATASOURCE_USERNAME:auth}
+    password: ${SPRING_DATASOURCE_PASSWORD:auth}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
   security:
     oauth2:
       client:

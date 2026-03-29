@@ -23,3 +23,14 @@
 ![code_verified.png](code_verified.png)
 
 ![code_challenge.png](code_challenge.png)
+
+## Задача 3. Безопасное хранение токенов и сессии
+
+Было:
+- реализовано backend-сервис (bionicpro-auth);
+- добавлен Redis для хранения сессий;
+- перенастроен Keycloak;
+- переписана логика работы фронта на работу с сессиями;
+
+Итоговый результат представлен на диаграмме:
+[diagram.puml](diagram.puml)

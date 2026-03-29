@@ -1,5 +1,9 @@
 version: '3.8'
 
+networks:
+  bionicpro:
+    driver: bridge
+
 services:
   keycloak_db:
     image: postgres:14
@@ -11,6 +15,9 @@ services:
       - ./postgres-keycloak-data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+    networks:
+      - bionicpro
+
   keycloak:
     image: quay.io/keycloak/keycloak:21.1
     environment:
@@ -20,7 +27,7 @@ services:
       KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
       KC_DB_USERNAME: keycloak_user
       KC_DB_PASSWORD: keycloak_password
-    command: 
+    command:
       - start-dev
       - --import-realm
     volumes:
@@ -29,6 +36,38 @@ services:
       - "8080:8080"
     depends_on:
       - keycloak_db
+    networks:
+      - bionicpro
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - ./redis-data:/data
+    networks:
+      - bionicpro
+
+  bionicpro-auth:
+    build:
+      context: ./bionicpro-auth
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      KEYCLOAK_URL: http://localhost:8080
+      KEYCLOAK_INTERNAL_URL: http://keycloak:8080
+      KEYCLOAK_REALM: reports-realm
+      KEYCLOAK_CLIENT_ID: reports-frontend
+      REDIS_URL: redis://redis:6379/0
+      FRONTEND_URL: http://localhost:3000
+      PUBLIC_BASE_URL: http://localhost:8000
+      COOKIE_SECURE: "false"
+    depends_on:
+      - redis
+      - keycloak
+    networks:
+      - bionicpro
+
   frontend:
     build:
       context: ./frontend
@@ -37,6 +76,5 @@ services:
       - "3000:3000"
     environment:
       REACT_APP_API_URL: http://localhost:8000
-      REACT_APP_KEYCLOAK_URL: http://localhost:8080
-      REACT_APP_KEYCLOAK_REALM: reports-realm
-      REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+    networks:
+      - bionicpro

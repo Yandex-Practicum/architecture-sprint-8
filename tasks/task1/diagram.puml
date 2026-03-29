@@ -1,0 +1,63 @@
+@startuml bionicpro-auth-sequences
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+title Задача 3: безопасное хранение токенов и сессии
+
+actor "Пользователь" as User
+participant "Браузер" as Browser
+participant "Frontend\n(React SPA)" as FE
+participant "bionicpro-auth\n(FastAPI)" as Auth
+database "Redis" as Redis
+participant "Keycloak" as KC
+
+== 1. Вход: OAuth 2.0 Authorization Code + PKCE ==
+
+User -> Browser: открыть приложение
+Browser -> FE: загрузка SPA
+FE -> Browser: экран «Login»
+
+User -> Browser: нажать Login
+Browser -> Auth: **GET /auth/login**
+activate Auth
+Auth -> Auth: state, code_verifier,\ncode_challenge (S256)
+Auth -> Redis: **SET** pkce:{state} → code_verifier\n(TTL)
+Auth -> Browser: **302** Location: Keycloak /auth\n(authorize: client_id, redirect_uri,\nstate, code_challenge, …)
+deactivate Auth
+
+Browser -> KC: **GET** …/openid-connect/auth\n(редирект с фронта бэкенда)
+User -> KC: логин / согласие (при необходимости)
+KC -> Browser: **302** …/auth/callback?code=&state=
+
+Browser -> Auth: **GET /auth/callback?** code, state
+activate Auth
+Auth -> Redis: **GET + DEL** pkce:{state}\n(одноразовый verifier)
+Auth -> KC: **POST** …/openid-connect/token\n(grant_type=authorization_code,\ncode, code_verifier, redirect_uri)
+KC --> Auth: access_token, refresh_token,\nexpires_in
+Auth -> Redis: **SET** session:{session_id}\n→ JSON(access_token, refresh_token,\naccess_expires_at)\nTTL = session_ttl
+Auth -> Browser: **302** Location: frontend_url\n**Set-Cookie:** bionicpro_session=…\n(HttpOnly, Secure*, SameSite=Lax)
+deactivate Auth
+Browser -> FE: загрузка SPA с cookie
+
+== 2. Защищённый ресурс: проверка сессии,\nrefresh access_token, ротация session id ==
+
+Browser -> FE: действие (напр. загрузка /reports)
+FE -> Auth: **GET /reports**\nCookie: bionicpro_session
+activate Auth
+Auth -> Redis: **GET** session:{session_id}
+
+alt access_token ещё валиден\n(до истечения − skew)
+  note right of Auth: только чтение сессии
+else пора обновить access_token
+  Auth -> KC: **POST** …/token\n(grant_type=refresh_token)
+  KC --> Auth: access_token [, refresh_token],\nexpires_in
+  note right of Auth: новые токены в payload сессии
+end
+
+Auth -> Redis: **ротация:** SET session:{new_id},\nDEL session:{old_id}\n(привязка токенов к новому id)
+Auth -> Browser: **200** JSON\n**Set-Cookie:** bionicpro_session=new_id\n(защита от session fixation)
+Auth --> FE: тело ответа
+deactivate Auth
+
+
+@enduml

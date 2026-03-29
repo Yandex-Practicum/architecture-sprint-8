@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   keycloak_db:
     image: postgres:14
@@ -11,6 +9,12 @@ services:
       - ./postgres-keycloak-data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak_user -d keycloak_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   keycloak:
     image: quay.io/keycloak/keycloak:21.1
     environment:
@@ -20,7 +24,7 @@ services:
       KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
       KC_DB_USERNAME: keycloak_user
       KC_DB_PASSWORD: keycloak_password
-    command: 
+    command:
       - start-dev
       - --import-realm
     volumes:
@@ -28,7 +32,117 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      - keycloak_db
+      keycloak_db:
+        condition: service_healthy
+
+  crm_db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: crm_db
+      POSTGRES_USER: crm_user
+      POSTGRES_PASSWORD: crm_password
+    ports:
+      - "5434:5432"
+    volumes:
+      - ./crm/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crm_user -d crm_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  telemetry_db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: telemetry_db
+      POSTGRES_USER: telemetry_user
+      POSTGRES_PASSWORD: telemetry_password
+    ports:
+      - "5435:5432"
+    volumes:
+      - ./telemetry/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U telemetry_user -d telemetry_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: reports_user
+      CLICKHOUSE_PASSWORD: reports_password
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - ./clickhouse/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --query 'SELECT 1'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  airflow:
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    command: standalone
+    ports:
+      - "8081:8080"
+    environment:
+      AIRFLOW_HOME: /opt/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
+      _AIRFLOW_WWW_USER_USERNAME: admin
+      _AIRFLOW_WWW_USER_PASSWORD: admin
+      CRM_DB_HOST: crm_db
+      CRM_DB_PORT: 5432
+      CRM_DB_NAME: crm_db
+      CRM_DB_USER: crm_user
+      CRM_DB_PASSWORD: crm_password
+      TELEMETRY_DB_HOST: telemetry_db
+      TELEMETRY_DB_PORT: 5432
+      TELEMETRY_DB_NAME: telemetry_db
+      TELEMETRY_DB_USER: telemetry_user
+      TELEMETRY_DB_PASSWORD: telemetry_password
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: 8123
+      CLICKHOUSE_DATABASE: default
+      CLICKHOUSE_USERNAME: reports_user
+      CLICKHOUSE_PASSWORD: reports_password
+    depends_on:
+      crm_db:
+        condition: service_healthy
+      telemetry_db:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: 8123
+      CLICKHOUSE_DATABASE: default
+      CLICKHOUSE_USERNAME: reports_user
+      CLICKHOUSE_PASSWORD: reports_password
+      REPORTS_TABLE: reports_user_summary
+      KEYCLOAK_JWKS_URL: http://host.docker.internal:8080/realms/reports-realm/protocol/openid-connect/certs
+      KEYCLOAK_EXPECTED_ISSUER: http://localhost:8080/realms/reports-realm
+      ALLOWED_ORIGINS: http://localhost:3000
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+
   frontend:
     build:
       context: ./frontend
@@ -40,3 +154,6 @@ services:
       REACT_APP_KEYCLOAK_URL: http://localhost:8080
       REACT_APP_KEYCLOAK_REALM: reports-realm
       REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+    depends_on:
+      backend:
+        condition: service_started

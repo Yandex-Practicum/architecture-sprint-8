@@ -11,3 +11,15 @@
 - **Яндекс ID** - внешняя удостоверяющая служба.
 
 ![scheme.png](scheme.png)
+
+## Задача 2. Замена Code Grant на PKCE
+
+Процесс:
+- Была добавлена настройка на frontend;
+- Был настроен keycloak через UI; 
+- Нужные настройки были экспортированы и добавлены в realm-export.json.
+
+Результаты проверки:
+![code_verified.png](code_verified.png)
+
+![code_challenge.png](code_challenge.png)

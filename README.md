@@ -43,9 +43,10 @@ const initOptions = {
 - Сервис bionicpro-auth (порт 8181): браузер ходит на localhost:8080 (Keycloak), сервер — на keycloak:8080 для token/userinfo/jwks.
 - Фронт собирается с build args REACT_APP_AUTH_URL / REACT_APP_API_URL.
 
-### Задача 4. Добавьте LDAP для возможности получения данных о пользователях представительства BionicPRO в другой стране.
+### Задача 4. Добавьте LDAP для возможности получения данных о пользователях.
 
-TODO
+- **OpenLDAP:** `ldap/Dockerfile` (osixia/openldap, `LDAP_DOMAIN=example.com`), данные — `ldap/config.ldif`
+- Учётки из LDAP (например `jane@example.com` / `password`) доступны для входа через Keycloak
 
 ### Задача 5. Настройте MFA.
 

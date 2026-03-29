@@ -28,7 +28,8 @@ uid: jane.smith
 mail: jane@example.com
 userPassword: password
 
-dn: uid=alex,ou=People,dc=example,dc=com
+dn: uid=alex.johnson,ou=People,dc=example,dc=com
+objectClass: top
 objectClass: inetOrgPerson
 cn: Alex
 sn: Johnson
@@ -36,7 +37,7 @@ uid: alex.johnson
 mail: alex@example.com
 userPassword: password
 
-# Роли
+# Группы (роли) — cn совпадают с realm-ролями Keycloak для role-ldap-mapper
 dn: cn=user,ou=Groups,dc=example,dc=com
 objectClass: groupOfNames
 cn: user

@@ -1,6 +1,20 @@
 version: '3.8'
 
 services:
+  openldap:
+    image: osixia/openldap:1.5.0
+    container_name: openldap
+    command: --copy-service
+    volumes:
+      - ./ldap/config.ldif:/container/service/slapd/assets/config/bootstrap/ldif/50-bootstrap.ldif
+    environment:
+      - LDAP_ORGANISATION=example-com
+      - LDAP_DOMAIN=example.com
+      - LDAP_ADMIN_PASSWORD=admin
+    ports:
+      - "389:389"
+      - "636:636"
+
   keycloak_db:
     image: postgres:14
     environment:
@@ -11,6 +25,7 @@ services:
       - postgres-keycloak-data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+
   keycloak:
     image: quay.io/keycloak/keycloak:21.1
     environment:
@@ -37,7 +52,11 @@ services:
       retries: 3
       start_period: 30s # Gives Keycloak time to start up before the first check
     depends_on:
-      - keycloak_db
+      keycloak_db:
+        condition: service_started
+      openldap:
+        condition: service_started
+
   bionicpro-auth:
     build:
       context: ./bionicpro-auth
@@ -59,6 +78,7 @@ services:
     depends_on:
       keycloak:
         condition: service_healthy
+
   frontend:
     build:
       context: ./frontend

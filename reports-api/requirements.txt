@@ -1,0 +1,5 @@
+clickhouse-connect==0.8.18
+fastapi==0.116.1
+httpx==0.28.1
+minio==7.2.18
+uvicorn==0.35.0

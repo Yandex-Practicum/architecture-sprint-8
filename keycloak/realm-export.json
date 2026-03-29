@@ -2,6 +2,13 @@
     "realm": "reports-realm",
     "enabled": true,
     "sslRequired": "none",
+    "otpPolicyType": "totp",
+    "otpPolicyAlgorithm": "HmacSHA1",
+    "otpPolicyInitialCounter": 0,
+    "otpPolicyDigits": 6,
+    "otpPolicyLookAheadWindow": 1,
+    "otpPolicyPeriod": 30,
+    "otpPolicyCodeReusable": false,
     "accessTokenLifespan": 120,
     "ssoSessionIdleTimeout": 1800,
     "roles": {

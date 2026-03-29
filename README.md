@@ -43,14 +43,24 @@ const initOptions = {
 - Сервис bionicpro-auth (порт 8181): браузер ходит на localhost:8080 (Keycloak), сервер — на keycloak:8080 для token/userinfo/jwks.
 - Фронт собирается с build args REACT_APP_AUTH_URL / REACT_APP_API_URL.
 
+<img src="screenshots/Task1.3_1.png" width="600">
+<img src="screenshots/Task1.3_2.png" width="600">
+<img src="screenshots/Task1.3_3.png" width="600">
+
 ### Задача 4. Добавьте LDAP для возможности получения данных о пользователях.
 
 - **OpenLDAP:** `ldap/Dockerfile` (osixia/openldap, `LDAP_DOMAIN=example.com`), данные — `ldap/config.ldif`
 - Учётки из LDAP (например `jane@example.com` / `password`) доступны для входа через Keycloak
 
+<img src="screenshots/Task1.4_2.png" width="600">
+<img src="screenshots/Task1.4_3.png" width="600">
+
 ### Задача 5. Настройте MFA.
 
-TODO
+<img src="screenshots/Task1.5_2.png" width="600">
+<img src="screenshots/Task1.5_3.png" width="600">
+<img src="screenshots/Task1.5_4.png" width="600">
+<img src="screenshots/Task1.5_5.png" width="600">
 
 ### Задача 6. Добавьте OAuth 2.0 от Яндекс ID.
 

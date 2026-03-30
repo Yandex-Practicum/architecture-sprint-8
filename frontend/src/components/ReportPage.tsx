@@ -30,6 +30,29 @@ interface UserInfo {
   email: string;
   name: string;
   roles: string[];
+  user_id?: number;
+}
+
+interface ReportRow {
+  user_id: number;
+  report_date: string;
+  session_count: number;
+  avg_wear_time_min: number;
+  total_gestures: number;
+  avg_myosignal_quality: number;
+  order_status: string | null;
+  prosthesis_model: string | null;
+  last_contact_date: string | null;
+}
+
+interface GenerateReportResponse {
+  user_id: number;
+  requested_range: { from: string; to: string };
+  actual_range: { from: string | null; to: string | null };
+  available_range: { from: string | null; to: string | null };
+  data_complete: boolean;
+  count: number;
+  reports: ReportRow[];
 }
 
 interface UserProfile {
@@ -55,6 +78,14 @@ const ReportPage: React.FC = () => {
   const [showConsentDialog, setShowConsentDialog] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
+  const [reports, setReports] = useState<ReportRow[]>([]);
+  const [reportsLoaded, setReportsLoaded] = useState(false);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [availableFrom, setAvailableFrom] = useState<string | null>(null);
+  const [availableTo, setAvailableTo] = useState<string | null>(null);
+  const [dataComplete, setDataComplete] = useState(true);
+  const [actualRange, setActualRange] = useState<{ from: string | null; to: string | null } | null>(null);
 
   const checkSession = useCallback(async () => {
     try {
@@ -179,6 +210,14 @@ const ReportPage: React.FC = () => {
     setConsentGiven(false);
     setProfile(null);
     setShowConsentDialog(false);
+    setReports([]);
+    setReportsLoaded(false);
+    setDateFrom('');
+    setDateTo('');
+    setAvailableFrom(null);
+    setAvailableTo(null);
+    setDataComplete(true);
+    setActualRange(null);
   };
 
   const handleConsent = async (consent: boolean) => {
@@ -215,13 +254,59 @@ const ReportPage: React.FC = () => {
     }
   };
 
-  const downloadReport = async () => {
+  const fetchAvailableRange = useCallback(async () => {
+    if (!user?.user_id) return;
+    try {
+      const params = new URLSearchParams({ user_id: String(user.user_id) });
+      const resp = await fetch(`${AUTH_URL}/auth/proxy/reports/date-range?${params}`, {
+        credentials: 'include',
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        setAvailableFrom(data.available_from);
+        setAvailableTo(data.available_to);
+        if (data.available_from && data.available_to) {
+          setDateFrom(data.available_from);
+          setDateTo(data.available_to);
+        }
+      }
+    } catch {
+      // non-critical
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (authenticated && user?.user_id) {
+      fetchAvailableRange();
+    }
+  }, [authenticated, user, fetchAvailableRange]);
+
+  const generateReport = async () => {
+    if (!user?.user_id) {
+      setError('User ID not available. Please re-login.');
+      return;
+    }
+    if (!dateFrom || !dateTo) {
+      setError('Please select date range.');
+      return;
+    }
     try {
       setReportLoading(true);
       setError(null);
+      setReports([]);
+      setReportsLoaded(false);
+      setDataComplete(true);
+      setActualRange(null);
 
-      const response = await fetch(`${AUTH_URL}/auth/proxy/reports`, {
+      const response = await fetch(`${AUTH_URL}/auth/proxy/reports/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
+        body: JSON.stringify({
+          user_id: user.user_id,
+          date_from: dateFrom,
+          date_to: dateTo,
+        }),
       });
 
       if (response.status === 401) {
@@ -231,9 +316,22 @@ const ReportPage: React.FC = () => {
         return;
       }
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch report');
+      if (response.status === 403) {
+        setError('Access denied: you can only view your own reports');
+        return;
       }
+
+      if (!response.ok) {
+        throw new Error('Failed to generate report');
+      }
+
+      const data: GenerateReportResponse = await response.json();
+      setReports(data.reports);
+      setReportsLoaded(true);
+      setDataComplete(data.data_complete);
+      setActualRange(data.actual_range);
+      if (data.available_range.from) setAvailableFrom(data.available_range.from);
+      if (data.available_range.to) setAvailableTo(data.available_range.to);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -351,19 +449,97 @@ const ReportPage: React.FC = () => {
           </div>
         )}
 
-        <button
-          onClick={downloadReport}
-          disabled={reportLoading}
-          className={`px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 ${
-            reportLoading ? 'opacity-50 cursor-not-allowed' : ''
-          }`}
-        >
-          {reportLoading ? 'Generating Report...' : 'Download Report'}
-        </button>
+        <div className="mb-4">
+          <h3 className="font-semibold mb-2">Generate Report</h3>
+          {availableFrom && availableTo && (
+            <p className="text-xs text-gray-500 mb-2">
+              Data available: {availableFrom} — {availableTo}
+            </p>
+          )}
+          <div className="flex items-end gap-3">
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">From</label>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="border rounded px-2 py-1 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">To</label>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="border rounded px-2 py-1 text-sm"
+              />
+            </div>
+            <button
+              onClick={generateReport}
+              disabled={reportLoading}
+              className={`px-4 py-1.5 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 ${
+                reportLoading ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+            >
+              {reportLoading ? 'Generating...' : 'Generate Report'}
+            </button>
+          </div>
+        </div>
 
         {error && (
-          <div className="mt-4 p-4 bg-red-100 text-red-700 rounded">
+          <div className="mt-4 p-4 bg-red-100 text-red-700 rounded text-sm">
             {error}
+          </div>
+        )}
+
+        {reportsLoaded && !dataComplete && (
+          <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded text-sm">
+            Data is available only through <strong>{availableTo}</strong>.
+            {actualRange?.from && actualRange?.to
+              ? ` Report generated for ${actualRange.from} — ${actualRange.to}.`
+              : ' No data for the requested period.'
+            }
+            {' '}The ETL pipeline processes data daily.
+          </div>
+        )}
+
+        {reportsLoaded && (
+          <div className="mt-4">
+            {reports.length === 0 ? (
+              <p className="text-gray-500">No reports found for the selected period.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm border border-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-3 py-2 border-b text-left">Date</th>
+                      <th className="px-3 py-2 border-b text-left">Sessions</th>
+                      <th className="px-3 py-2 border-b text-left">Avg Wear (min)</th>
+                      <th className="px-3 py-2 border-b text-left">Gestures</th>
+                      <th className="px-3 py-2 border-b text-left">Signal Quality</th>
+                      <th className="px-3 py-2 border-b text-left">Order Status</th>
+                      <th className="px-3 py-2 border-b text-left">Prosthesis</th>
+                      <th className="px-3 py-2 border-b text-left">Last Contact</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reports.map((row, idx) => (
+                      <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                        <td className="px-3 py-2 border-b">{row.report_date}</td>
+                        <td className="px-3 py-2 border-b">{row.session_count}</td>
+                        <td className="px-3 py-2 border-b">{row.avg_wear_time_min.toFixed(1)}</td>
+                        <td className="px-3 py-2 border-b">{row.total_gestures}</td>
+                        <td className="px-3 py-2 border-b">{(row.avg_myosignal_quality * 100).toFixed(0)}%</td>
+                        <td className="px-3 py-2 border-b">{row.order_status || '—'}</td>
+                        <td className="px-3 py-2 border-b">{row.prosthesis_model || '—'}</td>
+                        <td className="px-3 py-2 border-b">{row.last_contact_date || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -70,3 +70,27 @@ VALUES
     (2, 'in_progress', 'BionicArm Lite V2', '2025-01-10', true),
     (3, 'delivered',   'BionicHand Pro V3', '2024-09-20', false),
     (3, 'warranty',    'BionicHand Pro V3', '2025-02-01', true);
+
+-- ===================== OLAP DB (витрина отчётности) ========================
+
+\connect postgres;
+
+CREATE DATABASE olap_data;
+
+\connect olap_data;
+
+CREATE TABLE IF NOT EXISTS fact_user_report (
+    id                    SERIAL PRIMARY KEY,
+    user_id               BIGINT           NOT NULL,
+    report_date           DATE             NOT NULL,
+    session_count         INT              NOT NULL DEFAULT 0,
+    avg_wear_time_min     DOUBLE PRECISION NOT NULL DEFAULT 0,
+    total_gestures        INT              NOT NULL DEFAULT 0,
+    avg_myosignal_quality DOUBLE PRECISION NOT NULL DEFAULT 0,
+    order_status          VARCHAR(50),
+    prosthesis_model      VARCHAR(100),
+    last_contact_date     DATE,
+    loaded_at             TIMESTAMP        NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_fact_user_report_user_date ON fact_user_report (user_id, report_date DESC);

@@ -15,10 +15,6 @@ x-airflow-common: &airflow-common
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
     AIRFLOW__WEBSERVER__SECRET_KEY: 'bionic-pro-secret-change-me'
     _PIP_ADDITIONAL_REQUIREMENTS: ''
-    # Подключения к источникам данных и OLAP
-    AIRFLOW__CONNECTIONS__SENSOR_DB: postgresql://airflow:airflow@postgres:5432/sensor_data
-    AIRFLOW__CONNECTIONS__CRM_DB: postgresql://airflow:airflow@postgres:5432/crm_data
-    AIRFLOW__CONNECTIONS__OLAP_DB: clickhouse://default:@clickhouse:8123/default
   volumes:
     - ./dag-airflow/dags:/opt/airflow/dags
     - ./dag-airflow/sql:/opt/airflow/dags/sql
@@ -62,6 +58,11 @@ services:
       - ./postgres-keycloak-data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "keycloak_user", "-d", "keycloak_db"]
+      interval: 5s
+      retries: 5
+      start_period: 5s
     networks:
       - bionicpro
 
@@ -106,8 +107,16 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      - keycloak_db
-      - openldap
+      keycloak_db:
+        condition: service_healthy
+      openldap:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && echo done"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
     networks:
       - bionicpro
 
@@ -147,14 +156,14 @@ services:
     ports:
       - "8001:8001"
     environment:
-      CLICKHOUSE_HOST: clickhouse
-      CLICKHOUSE_PORT: "9000"
-      CLICKHOUSE_DB: default
+      DATABASE_URL: postgresql://airflow:airflow@postgres:5432/olap_data
       KEYCLOAK_URL: http://keycloak:8080
       KEYCLOAK_REALM: reports-realm
     depends_on:
-      - clickhouse
-      - keycloak
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
     networks:
       - bionicpro
 
@@ -203,24 +212,6 @@ services:
       - bionicpro
 
   # ---------------------------------------------------------------
-  # OLAP БД — ClickHouse
-  # ---------------------------------------------------------------
-  clickhouse:
-    image: clickhouse/clickhouse-server:24.3
-    ports:
-      - "8123:8123"
-      - "9000:9000"
-    volumes:
-      - clickhouse_data:/var/lib/clickhouse
-      - ./dag-airflow/sql/create_fact_user_report.sql:/docker-entrypoint-initdb.d/create_fact_user_report.sql
-    environment:
-      CLICKHOUSE_DB: default
-      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
-    restart: always
-    networks:
-      - bionicpro
-
-  # ---------------------------------------------------------------
   # Airflow Init (миграция БД + admin-пользователь)
   # ---------------------------------------------------------------
   airflow-init:
@@ -228,17 +219,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: >
-      bash -c "
-        airflow db init &&
-        airflow users create
-          --username admin
-          --firstname admin
-          --lastname admin
-          --role Admin
-          --email admin@bionicpro.local
-          --password admin
-      "
+    command: ["bash", "-c", "airflow db init && airflow users create --username admin --firstname admin --lastname admin --role Admin --email admin@bionicpro.local --password admin || true && airflow connections add sensor_db --conn-type postgres --conn-host postgres --conn-port 5432 --conn-login airflow --conn-password airflow --conn-schema sensor_data || true && airflow connections add crm_db --conn-type postgres --conn-host postgres --conn-port 5432 --conn-login airflow --conn-password airflow --conn-schema crm_data || true && airflow connections add olap_db --conn-type postgres --conn-host postgres --conn-port 5432 --conn-login airflow --conn-password airflow --conn-schema olap_data || true"]
     networks:
       - bionicpro
 
@@ -323,7 +304,6 @@ services:
 
 volumes:
   postgres_data:
-  clickhouse_data:
 
 networks:
   bionicpro:

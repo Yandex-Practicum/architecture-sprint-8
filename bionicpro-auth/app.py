@@ -324,6 +324,7 @@ def login():
                 profile = _get_user_profile(keycloak_user_id)
                 if profile:
                     consent_given = profile["consent_given"]
+                    user_data["user_id"] = profile["id"]
             except Exception:
                 pass
 
@@ -396,44 +397,154 @@ def session_info():
 
     # Check if user has given consent
     consent_given = False
+    user_data = {
+        "username": user_info.get("preferred_username"),
+        "email": user_info.get("email"),
+        "name": user_info.get("name"),
+        "roles": user_info.get("realm_access", {}).get("roles", []),
+    }
     if keycloak_user_id:
         try:
             profile = _get_user_profile(keycloak_user_id)
             if profile:
                 consent_given = profile["consent_given"]
+                user_data["user_id"] = profile["id"]
         except Exception:
             pass
 
     response = make_response(jsonify({
         "authenticated": True,
-        "user": {
-            "username": user_info.get("preferred_username"),
-            "email": user_info.get("email"),
-            "name": user_info.get("name"),
-            "roles": user_info.get("realm_access", {}).get("roles", []),
-        },
+        "user": user_data,
         "consent_given": consent_given,
     }))
     _set_session_cookie(response, request.session_id)
     return response
 
 
+def _get_verified_profile(session_data, requested_user_id):
+    """Проверяет identity и ownership. Возвращает (profile, error_response)."""
+    keycloak_user_id = _get_keycloak_user_id(session_data["access_token"])
+    if not keycloak_user_id:
+        return None, make_response(jsonify({"error": "Failed to get user identity"}), 500)
+
+    profile = _get_user_profile(keycloak_user_id)
+    if not profile:
+        return None, make_response(jsonify({"error": "User profile not found"}), 404)
+
+    if requested_user_id is not None and requested_user_id != profile["id"]:
+        return None, make_response(jsonify({"error": "Access denied: you can only view your own reports"}), 403)
+
+    return profile, None
+
+
+def _upstream_headers(session_data, profile):
+    return {
+        "Authorization": f"Bearer {session_data['access_token']}",
+        "X-User-Id": str(profile["id"]),
+    }
+
+
 @app.route("/auth/proxy/reports", methods=["GET"])
 @require_session
 def proxy_reports():
-    """Proxy request to reports API with the server-side access token."""
+    """Proxy GET /reports — получение отчётов пользователя."""
     session_data = request.session_data
+
+    requested_user_id = request.args.get("user_id", type=int)
+    if requested_user_id is None:
+        response = make_response(jsonify({"error": "Query parameter 'user_id' is required"}), 400)
+        _set_session_cookie(response, request.session_id)
+        return response
+
+    profile, err = _get_verified_profile(session_data, requested_user_id)
+    if err:
+        _set_session_cookie(err, request.session_id)
+        return err
+
     api_url = os.environ.get("REPORTS_API_URL", "http://localhost:8001")
     try:
         resp = requests.get(
             f"{api_url}/reports",
-            headers={"Authorization": f"Bearer {session_data['access_token']}"},
+            headers=_upstream_headers(session_data, profile),
             params=request.args,
             timeout=30,
         )
         response = make_response(resp.content, resp.status_code)
         response.headers["Content-Type"] = resp.headers.get("Content-Type", "application/json")
-    except requests.RequestException as e:
+    except requests.RequestException:
+        response = make_response(jsonify({"error": "Upstream service unavailable"}), 502)
+
+    _set_session_cookie(response, request.session_id)
+    return response
+
+
+@app.route("/auth/proxy/reports/date-range", methods=["GET"])
+@require_session
+def proxy_reports_date_range():
+    """Proxy GET /reports/date-range — доступный диапазон дат."""
+    session_data = request.session_data
+
+    requested_user_id = request.args.get("user_id", type=int)
+    if requested_user_id is None:
+        response = make_response(jsonify({"error": "Query parameter 'user_id' is required"}), 400)
+        _set_session_cookie(response, request.session_id)
+        return response
+
+    profile, err = _get_verified_profile(session_data, requested_user_id)
+    if err:
+        _set_session_cookie(err, request.session_id)
+        return err
+
+    api_url = os.environ.get("REPORTS_API_URL", "http://localhost:8001")
+    try:
+        resp = requests.get(
+            f"{api_url}/reports/date-range",
+            headers=_upstream_headers(session_data, profile),
+            params=request.args,
+            timeout=30,
+        )
+        response = make_response(resp.content, resp.status_code)
+        response.headers["Content-Type"] = resp.headers.get("Content-Type", "application/json")
+    except requests.RequestException:
+        response = make_response(jsonify({"error": "Upstream service unavailable"}), 502)
+
+    _set_session_cookie(response, request.session_id)
+    return response
+
+
+@app.route("/auth/proxy/reports/generate", methods=["POST"])
+@require_session
+def proxy_reports_generate():
+    """Proxy POST /reports/generate — генерация отчёта за период."""
+    session_data = request.session_data
+
+    body = request.get_json(silent=True) or {}
+    requested_user_id = body.get("user_id")
+    if requested_user_id is None:
+        response = make_response(jsonify({"error": "Field 'user_id' is required"}), 400)
+        _set_session_cookie(response, request.session_id)
+        return response
+    requested_user_id = int(requested_user_id)
+
+    profile, err = _get_verified_profile(session_data, requested_user_id)
+    if err:
+        _set_session_cookie(err, request.session_id)
+        return err
+
+    api_url = os.environ.get("REPORTS_API_URL", "http://localhost:8001")
+    try:
+        resp = requests.post(
+            f"{api_url}/reports/generate",
+            headers={
+                **_upstream_headers(session_data, profile),
+                "Content-Type": "application/json",
+            },
+            json=body,
+            timeout=30,
+        )
+        response = make_response(resp.content, resp.status_code)
+        response.headers["Content-Type"] = resp.headers.get("Content-Type", "application/json")
+    except requests.RequestException:
         response = make_response(jsonify({"error": "Upstream service unavailable"}), 502)
 
     _set_session_cookie(response, request.session_id)

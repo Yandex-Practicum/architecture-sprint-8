@@ -16,13 +16,6 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 
-# ---------------------------------------------------------------------------
-# Подключения (задаются через env AIRFLOW__CONNECTIONS__ в docker-compose)
-#   - sensor_db   : PostgreSQL, БД датчиков (sensor_data)
-#   - crm_db      : PostgreSQL, БД CRM (crm_data)
-#   - olap_db     : ClickHouse (OLAP)
-# ---------------------------------------------------------------------------
-
 SENSOR_DB_CONN = "sensor_db"
 CRM_DB_CONN = "crm_db"
 OLAP_DB_CONN = "olap_db"
@@ -124,9 +117,9 @@ def transform_data(**context):
     user_agg = {}
     for row in sensor_rows:
         uid = row[0]
-        duration_min = row[4] or 0
-        gestures = row[5] or 0
-        quality = row[6] or 0
+        duration_min = float(row[4] or 0)
+        gestures = int(row[5] or 0)
+        quality = float(row[6] or 0)
 
         if uid not in user_agg:
             user_agg[uid] = {
@@ -198,8 +191,8 @@ def load_to_olap(**context):
 
     # Удаляем старые данные за этот день (идемпотентность)
     cursor.execute(
-        "ALTER TABLE fact_user_report DELETE WHERE report_date = %(dt)s",
-        {"dt": report_date},
+        "DELETE FROM fact_user_report WHERE report_date = %s",
+        (report_date,),
     )
 
     # Batch-вставка

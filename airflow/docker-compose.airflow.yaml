@@ -1,0 +1,76 @@
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    environment:
+      - CLICKHOUSE_DB=bionicpro
+      - CLICKHOUSE_USER=airflow
+      - CLICKHOUSE_PASSWORD=airflow
+    ports: ["9000:9000", "8123:8123"]
+    volumes:
+      - ch_data:/var/lib/clickhouse
+
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+  airflow-webserver:
+    image: apache/airflow:2.9.3
+    depends_on:
+      - postgres
+    env_file:
+      - .env
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__WEBSERVER__RBAC=True
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+      - CLICKHOUSE_HOST=clickhouse
+      - CLICKHOUSE_PORT=9000
+      - CLICKHOUSE_USER=airflow
+      - CLICKHOUSE_PASSWORD=airflow
+      - CLICKHOUSE_DB=bionicpro
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./requirements.txt:/opt/airflow/requirements.txt
+    command: >
+      bash -lc "
+        pip install -r /opt/airflow/requirements.txt &&
+        airflow db migrate &&
+        airflow users create -u admin -p admin -f Admin -l User -r Admin -e admin@example.com || true &&
+        airflow webserver
+      "
+    ports:
+      - "8081:8080"
+
+  airflow-scheduler:
+    image: apache/airflow:2.9.3
+    depends_on:
+      - airflow-webserver
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+      - CLICKHOUSE_HOST=clickhouse
+      - CLICKHOUSE_PORT=9000
+      - CLICKHOUSE_USER=airflow
+      - CLICKHOUSE_PASSWORD=airflow
+      - CLICKHOUSE_DB=bionicpro
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./requirements.txt:/opt/airflow/requirements.txt
+    command: >
+      bash -lc "
+        pip install -r /opt/airflow/requirements.txt &&
+        airflow scheduler
+      "
+
+volumes:
+  ch_data:
+  pg_data:

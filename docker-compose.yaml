@@ -1,6 +1,39 @@
 version: '3.8'
 
+x-airflow-common: &airflow-common
+  build:
+    context: ./dag-airflow
+    dockerfile: Dockerfile
+  environment: &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CORE__FERNET_KEY: ''
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
+    AIRFLOW__WEBSERVER__SECRET_KEY: 'bionic-pro-secret-change-me'
+    _PIP_ADDITIONAL_REQUIREMENTS: ''
+    # Подключения к источникам данных и OLAP
+    AIRFLOW__CONNECTIONS__SENSOR_DB: postgresql://airflow:airflow@postgres:5432/sensor_data
+    AIRFLOW__CONNECTIONS__CRM_DB: postgresql://airflow:airflow@postgres:5432/crm_data
+    AIRFLOW__CONNECTIONS__OLAP_DB: clickhouse://default:@clickhouse:8123/default
+  volumes:
+    - ./dag-airflow/dags:/opt/airflow/dags
+    - ./dag-airflow/sql:/opt/airflow/dags/sql
+    - ./data:/opt/airflow/sample_files
+  user: "${AIRFLOW_UID:-50000}:0"
+  depends_on: &airflow-common-depends-on
+    postgres:
+      condition: service_healthy
+  networks:
+    - bionicpro
+
 services:
+  # ---------------------------------------------------------------
+  # OpenLDAP
+  # ---------------------------------------------------------------
   openldap:
     image: osixia/openldap:1.5.0
     environment:
@@ -13,7 +46,12 @@ services:
     ports:
       - "389:389"
       - "636:636"
+    networks:
+      - bionicpro
 
+  # ---------------------------------------------------------------
+  # Keycloak DB
+  # ---------------------------------------------------------------
   keycloak_db:
     image: postgres:14
     environment:
@@ -24,6 +62,12 @@ services:
       - ./postgres-keycloak-data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+    networks:
+      - bionicpro
+
+  # ---------------------------------------------------------------
+  # App DB (BionicPRO backend)
+  # ---------------------------------------------------------------
   app_db:
     image: postgres:14
     environment:
@@ -32,9 +76,15 @@ services:
       POSTGRES_PASSWORD: bionicpro_password
     volumes:
       - ./postgres-app-data:/var/lib/postgresql/data
-      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./bionicpro-auth/init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
       - "5434:5432"
+    networks:
+      - bionicpro
+
+  # ---------------------------------------------------------------
+  # Keycloak
+  # ---------------------------------------------------------------
   keycloak:
     image: quay.io/keycloak/keycloak:21.1
     environment:
@@ -58,6 +108,12 @@ services:
     depends_on:
       - keycloak_db
       - openldap
+    networks:
+      - bionicpro
+
+  # ---------------------------------------------------------------
+  # BionicPRO Auth BFF
+  # ---------------------------------------------------------------
   bionicpro-auth:
     build:
       context: ./bionicpro-auth
@@ -73,9 +129,38 @@ services:
       SECURE_COOKIE: "false"
       DATABASE_URL: postgresql://bionicpro_user:bionicpro_password@app_db:5432/bionicpro_db
       YANDEX_PROFILE_URL: https://login.yandex.ru/info
+      REPORTS_API_URL: http://reports-api:8001
     depends_on:
       - keycloak
       - app_db
+      - reports-api
+    networks:
+      - bionicpro
+
+  # ---------------------------------------------------------------
+  # Reports API — GET /reports из OLAP (ClickHouse)
+  # ---------------------------------------------------------------
+  reports-api:
+    build:
+      context: ./reports-api
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: "9000"
+      CLICKHOUSE_DB: default
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: reports-realm
+    depends_on:
+      - clickhouse
+      - keycloak
+    networks:
+      - bionicpro
+
+  # ---------------------------------------------------------------
+  # Frontend
+  # ---------------------------------------------------------------
   frontend:
     build:
       context: ./frontend
@@ -87,3 +172,158 @@ services:
       REACT_APP_KEYCLOAK_URL: http://localhost:8080
       REACT_APP_KEYCLOAK_REALM: reports-realm
       REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+    networks:
+      - bionicpro
+
+  # ---------------------------------------------------------------
+  # PostgreSQL (Airflow metadata + sensor_data + crm_data)
+  # ---------------------------------------------------------------
+  postgres:
+    image: postgres:16.0
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./dag-airflow/sql/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    ports:
+      - "5435:5432"
+    logging:
+      options:
+        max-size: 10m
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    restart: always
+    networks:
+      - bionicpro
+
+  # ---------------------------------------------------------------
+  # OLAP БД — ClickHouse
+  # ---------------------------------------------------------------
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./dag-airflow/sql/create_fact_user_report.sql:/docker-entrypoint-initdb.d/create_fact_user_report.sql
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    restart: always
+    networks:
+      - bionicpro
+
+  # ---------------------------------------------------------------
+  # Airflow Init (миграция БД + admin-пользователь)
+  # ---------------------------------------------------------------
+  airflow-init:
+    <<: *airflow-common
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >
+      bash -c "
+        airflow db init &&
+        airflow users create
+          --username admin
+          --firstname admin
+          --lastname admin
+          --role Admin
+          --email admin@bionicpro.local
+          --password admin
+      "
+    networks:
+      - bionicpro
+
+  # ---------------------------------------------------------------
+  # Airflow Webserver — http://localhost:8081
+  # ---------------------------------------------------------------
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver --port 8081
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8081/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - bionicpro
+
+  # ---------------------------------------------------------------
+  # Airflow Scheduler
+  # ---------------------------------------------------------------
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    depends_on:
+      postgres:
+        condition: service_healthy
+      airflow-webserver:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob --hostname \"$${HOSTNAME}\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: always
+    networks:
+      - bionicpro
+
+  # ---------------------------------------------------------------
+  # Airflow Triggerer
+  # ---------------------------------------------------------------
+  airflow-triggerer:
+    <<: *airflow-common
+    command: bash -c "airflow triggerer"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "airflow jobs check --job-type TriggererJob --hostname \"$${HOSTNAME}\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    networks:
+      - bionicpro
+
+  # ---------------------------------------------------------------
+  # Airflow CLI (debug)
+  # ---------------------------------------------------------------
+  airflow-cli:
+    <<: *airflow-common
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles:
+      - debug
+    command:
+      - bash
+      - -c
+      - airflow
+    networks:
+      - bionicpro
+
+volumes:
+  postgres_data:
+  clickhouse_data:
+
+networks:
+  bionicpro:

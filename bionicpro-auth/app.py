@@ -428,6 +428,7 @@ def proxy_reports():
         resp = requests.get(
             f"{api_url}/reports",
             headers={"Authorization": f"Bearer {session_data['access_token']}"},
+            params=request.args,
             timeout=30,
         )
         response = make_response(resp.content, resp.status_code)

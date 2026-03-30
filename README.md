@@ -4,7 +4,8 @@
 
 ### Задача 1. Предложите архитектурное решение и доработайте диаграмму C4 для управления учётными данными пользователя. 
 
-TODO
+[BionicPRO_C4_model.drawio.xml](BionicPRO_C4_model.drawio.xml)
+![BionicPRO_C4_model.drawio.png](BionicPRO_C4_model.drawio.png)
 
 ### Задача 2. Улучшите безопасность существующего приложения, заменив Code Grant на PKCE.
 

@@ -16,6 +16,7 @@ const ReportPage: React.FC = () => {
   const [profileStatus, setProfileStatus] = useState<ProfileStatus | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [consentLoading, setConsentLoading] = useState(false);
+  const [reportPayload, setReportPayload] = useState<Record<string, unknown> | null>(null);
 
   const checkSession = useCallback(async () => {
     try {
@@ -108,6 +109,7 @@ const ReportPage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
+      setReportPayload(null);
 
       const response = await fetch(`${API_URL}/api/reports`, {
         credentials: 'include',
@@ -120,11 +122,13 @@ const ReportPage: React.FC = () => {
       }
 
       if (!response.ok) {
-        setError(`Ошибка: ${response.status}`);
+        const t = await response.text();
+        setError(t || `Ошибка: ${response.status}`);
         return;
       }
 
-      await response.json();
+      const data = (await response.json()) as Record<string, unknown>;
+      setReportPayload(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -248,6 +252,27 @@ const ReportPage: React.FC = () => {
         {error && (
           <div className="mt-4 p-4 bg-red-100 text-red-700 rounded">
             {error}
+          </div>
+        )}
+
+        {reportPayload && (
+          <div className="mt-6">
+            <h2 className="text-lg font-semibold mb-2">Отчёт по протезу (OLAP)</h2>
+            {typeof reportPayload.coverageHint === 'string' && (
+              <p className="text-sm text-gray-700 mb-2 border-l-4 border-blue-200 pl-3 py-1 bg-blue-50/50 rounded-r">
+                {reportPayload.coverageHint}
+              </p>
+            )}
+            <p className="text-sm text-gray-600 mb-2">
+              Данные из витрины; при отсутствии строк для вашего пользователя в ETL — укажите свой "sub": {' '}
+              <code className="bg-gray-100 px-1 rounded break-all">
+                {reportPayload.userSubject != null ? String(reportPayload.userSubject) : '—'}
+              </code>{' '}
+              в CSV или выполните DAG в Airflow после входа.
+            </p>
+            <pre className="text-xs bg-gray-50 border rounded p-3 overflow-auto max-h-96 whitespace-pre-wrap">
+              {JSON.stringify(reportPayload, null, 2)}
+            </pre>
           </div>
         )}
       </div>

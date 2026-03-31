@@ -1,0 +1,4 @@
+customer_id,email,keycloak_subject,prosthesis_model,region
+crm-001,prothetic1,00000000-0000-0000-0000-000000000001,BionicPRO-X,Moscow
+crm-002,prothetic2,00000000-0000-0000-0000-000000000002,BionicPRO-Lite,SPb
+crm-003,user2,00000000-0000-0000-0000-000000000003,BionicPRO-X,Kazan

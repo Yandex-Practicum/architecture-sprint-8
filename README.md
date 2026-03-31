@@ -79,3 +79,43 @@ const initOptions = {
 <img src="screenshots/Task1.6_6.png" width="600">
 <img src="screenshots/Task1.6_7.png" width="600">
 <img src="screenshots/Task1.6_8.png" width="600">
+
+## Задание 2. Разработка сервиса отчётов
+
+### Задача 1. Архитектура
+
+[BionicPRO_C4_model_OLAP.drawio.xml](BionicPRO_C4_model_OLAP.drawio.xml)
+![BionicPRO_C4_model_OLAP.drawio.png](BionicPRO_C4_model_OLAP.drawio.png)
+
+### Задача 2. ETL и Airflow
+
+- **OLAP-база:** PostgreSQL `olap_db` (порт на хосте **5435**), схема и таблицы — [`dwh/sql/init-olap.sql`](dwh/sql/init-olap.sql): staging `reporting.stg_crm`, `reporting.stg_telemetry`, витрина **`reporting.mart_user_prosthesis_daily`** (агрегаты по пользователю и дню, индекс по `user_subject`).
+- **Источники-заглушки:** CSV [`dwh/data/crm_customers.csv`](dwh/data/crm_customers.csv) и [`dwh/data/telemetry_events.csv`](dwh/data/telemetry_events.csv).
+- **DAG** [`dwh/dags/prosthesis_reporting_mart.py`](dwh/dags/prosthesis_reporting_mart.py): загрузка CSV в staging → пересборка витрины; расписание **`0 6 * * *`** (ежедневно в 06:00 UTC).
+- **Образ Airflow** с зависимостью `psycopg2-binary`: [`dwh/airflow/Dockerfile`](dwh/airflow/Dockerfile). В `docker-compose.yaml` сервисы **`airflow-webserver`** (UI на **http://localhost:8085**) и **`airflow-scheduler`**, общий volume **`airflow-home`** для метаданных Airflow. Вход в UI: **`airflow` / `airflow`** (задаётся через `_AIRFLOW_WWW_USER_*`; режим **`airflow standalone`** в образе создаёт **случайный** пароль, поэтому не используется).
+- После первого запуска контейнеров в UI Airflow нужно **включить DAG** и при необходимости выполнить **Trigger DAG**, чтобы витрина заполнилась.
+
+### Задача 3. Бэкенд API
+
+- Отдельный сервис **`bionicpro-reports`** (Python, FastAPI): [`bionicpro-reports/`](bionicpro-reports/), порт **8082**, эндпоинт **`GET /reports`** — чтение готовой витрины без тяжёлых вычислений в runtime.
+- **`bionicpro-auth`** проксирует **`GET /api/reports`** в сервис отчётов с передачей **Bearer access token** ([`ReportsController`](bionicpro-auth/src/main/java/com/bionicpro/auth/api/ReportsController.java)); базовый URL задаётся **`REPORTS_SERVICE_BASE_URL`** (в Docker — `http://bionicpro-reports:8082`).
+
+### Задача 4. Ограничение доступа
+
+- Сервис отчётов извлекает пользователя **только из JWT** (claim `sub`) и выбирает строки витрины **`WHERE user_subject = sub`**; запросить чужой отчёт параметром из клиента нельзя.
+
+### Задача 5. UI
+
+- На странице отчётов ([`frontend/src/components/ReportPage.tsx`](frontend/src/components/ReportPage.tsx)) кнопка запроса отчёта вызывает **`/api/reports`** с cookie-сессией; ответ отображается в виде JSON.
+
+### Docker и переменные
+
+- В корневом [`docker-compose.yaml`](docker-compose.yaml) добавлены сервисы **`olap_db`**, **`bionicpro-reports`**, **`airflow-webserver`**, **`airflow-scheduler`**, volumes **`olap-data`**, **`airflow-home`**; у **`bionicpro-auth`** задана переменная **`REPORTS_SERVICE_BASE_URL`**.
+
+### Примечание по демо-данным
+
+- В CSV указаны синтетические `keycloak_subject`. Чтобы в отчёте появились строки для **реального** пользователя, подставьте свой **`sub`**, перезапустите DAG (или обновите данные в витрине) и снова запросите отчёт.
+
+<img src="screenshots/Task2_1.png" width="600">
+<img src="screenshots/Task2_2.png" width="600">
+<img src="screenshots/Task2_3.png" width="600">

@@ -10,6 +10,10 @@ public class AppProperties {
     private int sessionMaxAgeSeconds = 1800;
     private boolean cookieSecure = true;
     private String encryptionSecret = "";
+    /**
+     * Базовый URL сервиса отчётов (bionicpro-reports), без завершающего слэша.
+     */
+    private String reportsServiceBaseUrl = "http://localhost:8082";
 
     public String getFrontendUrl() {
         return frontendUrl;
@@ -49,5 +53,13 @@ public class AppProperties {
 
     public void setEncryptionSecret(String encryptionSecret) {
         this.encryptionSecret = encryptionSecret;
+    }
+
+    public String getReportsServiceBaseUrl() {
+        return reportsServiceBaseUrl;
+    }
+
+    public void setReportsServiceBaseUrl(String reportsServiceBaseUrl) {
+        this.reportsServiceBaseUrl = reportsServiceBaseUrl;
     }
 }

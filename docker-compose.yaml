@@ -26,6 +26,24 @@ services:
     ports:
       - "5434:5432"
 
+  # OLAP-витрина для сервиса отчётов (задание 2)
+  olap_db:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: olap
+      POSTGRES_USER: olap
+      POSTGRES_PASSWORD: olap
+    volumes:
+      - ./dwh/sql/init-olap.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - olap-data:/var/lib/postgresql/data
+    ports:
+      - "5435:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U olap -d olap"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   keycloak_db:
     image: postgres:14
     environment:
@@ -96,11 +114,78 @@ services:
       KEYCLOAK_CLIENT_SECRET: bionicpro-auth-secret-change-in-prod
       APP_FRONTEND_URL: http://localhost:3000
       APP_COOKIE_SECURE: "false"
+      REPORTS_SERVICE_BASE_URL: http://bionicpro-reports:8082
     depends_on:
       auth_db:
         condition: service_started
       keycloak:
         condition: service_healthy
+      bionicpro-reports:
+        condition: service_started
+
+  bionicpro-reports:
+    build:
+      context: ./bionicpro-reports
+      dockerfile: Dockerfile
+    ports:
+      - "8082:8082"
+    environment:
+      OLAP_DSN: postgresql://olap:olap@olap_db:5432/olap
+      KEYCLOAK_ISSUER: http://localhost:8080/realms/reports-realm
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/reports-realm/protocol/openid-connect/certs
+    depends_on:
+      olap_db:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+
+  # standalone даёт случайный пароль админа — не подходит для airflow/airflow.
+  # webserver: миграция БД + создание пользователя через переменные _AIRFLOW_WWW_USER_* (см. docker-stack entrypoint).
+  airflow-webserver:
+    build:
+      context: ./dwh/airflow
+      dockerfile: Dockerfile
+    ports:
+      - "8085:8080"
+    environment:
+      _AIRFLOW_DB_MIGRATE: "true"
+      _AIRFLOW_WWW_USER_CREATE: "true"
+      _AIRFLOW_WWW_USER_USERNAME: airflow
+      _AIRFLOW_WWW_USER_PASSWORD: airflow
+      _AIRFLOW_WWW_USER_EMAIL: airflow@example.com
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+      REPORTING_OLAP_DSN: postgresql://olap:olap@olap_db:5432/olap
+      AIRFLOW_DATA_DIR: /opt/airflow/data
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
+    volumes:
+      - ./dwh/dags:/opt/airflow/dags
+      - ./dwh/data:/opt/airflow/data
+      - airflow-home:/opt/airflow
+    depends_on:
+      olap_db:
+        condition: service_healthy
+    command: webserver
+
+  airflow-scheduler:
+    build:
+      context: ./dwh/airflow
+      dockerfile: Dockerfile
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+      REPORTING_OLAP_DSN: postgresql://olap:olap@olap_db:5432/olap
+      AIRFLOW_DATA_DIR: /opt/airflow/data
+    volumes:
+      - ./dwh/dags:/opt/airflow/dags
+      - ./dwh/data:/opt/airflow/data
+      - airflow-home:/opt/airflow
+    depends_on:
+      olap_db:
+        condition: service_healthy
+      airflow-webserver:
+        condition: service_started
+    command: scheduler
 
   frontend:
     build:
@@ -115,3 +200,5 @@ services:
 volumes:
   postgres-auth-data:
   postgres-keycloak-data:
+  olap-data:
+  airflow-home:

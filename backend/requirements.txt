@@ -1,0 +1,6 @@
+fastapi==0.104.1
+uvicorn==0.24.0
+PyJWT[crypto]==2.8.0
+cryptography==41.0.7
+requests==2.31.0
+clickhouse-driver==0.2.6

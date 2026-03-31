@@ -40,3 +40,59 @@ services:
       REACT_APP_KEYCLOAK_URL: http://localhost:8080
       REACT_APP_KEYCLOAK_REALM: reports-realm
       REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+
+  # =============================================
+  # Reports API
+  # =============================================
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: reports-realm
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: 9000
+    depends_on:
+      - keycloak
+      - clickhouse
+
+  # =============================================
+  # ETL & Reporting инфраструктура
+  # =============================================
+
+  data_db:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: bionicpro
+      POSTGRES_USER: bionicpro
+      POSTGRES_PASSWORD: bionicpro
+    volumes:
+      - ./init-scripts/postgres-init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5434:5432"
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.8
+    ports:
+      - "8124:8123"
+      - "9002:9000"
+    volumes:
+      - ./init-scripts/clickhouse-init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  airflow:
+    image: apache/airflow:2.7.3
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      _PIP_ADDITIONAL_REQUIREMENTS: "clickhouse-driver psycopg2-binary"
+    volumes:
+      - ./dags:/opt/airflow/dags
+    ports:
+      - "8082:8080"
+    command: standalone
+    depends_on:
+      - data_db
+      - clickhouse

@@ -78,3 +78,18 @@ services:
       REACT_APP_API_URL: http://localhost:8000
     networks:
       - bionicpro
+
+  ldap:
+    image: osixia/openldap:1.5.0
+    command: ["--copy-service"]
+    volumes:
+      - ./ldap/config.ldif:/container/service/slapd/assets/config/bootstrap/ldif/50-bootstrap.ldif
+    environment:
+      - LDAP_ORGANISATION=bionicpro
+      - LDAP_DOMAIN=example.com
+      - LDAP_ADMIN_PASSWORD=admin
+    ports:
+      - "389:389"
+      - "636:636"
+    networks:
+      - bionicpro

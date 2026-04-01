@@ -46,6 +46,7 @@
         ]
       },
       {
+        "id": "00000000-0000-0000-0000-000000000003",
         "username": "user2",
         "enabled": true,
         "email": "user2@example.com",
@@ -80,6 +81,7 @@
         ]
       },
       {
+        "id": "00000000-0000-0000-0000-000000000001",
         "username": "prothetic1",
         "enabled": true,
         "email": "prothetic1@example.com",
@@ -97,6 +99,7 @@
         ]
       },
       {
+        "id": "00000000-0000-0000-0000-000000000002",
         "username": "prothetic2",
         "enabled": true,
         "email": "prothetic2@example.com",

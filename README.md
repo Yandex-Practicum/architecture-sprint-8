@@ -80,6 +80,7 @@ const initOptions = {
 <img src="screenshots/Task1.6_7.png" width="600">
 <img src="screenshots/Task1.6_8.png" width="600">
 
+
 ## Задание 2. Разработка сервиса отчётов
 
 ### Задача 1. Архитектура
@@ -120,9 +121,25 @@ const initOptions = {
 <img src="screenshots/Task2_2.png" width="600">
 <img src="screenshots/Task2_3.png" width="600">
 
+
 # Задание 3. Снижение нагрузки на базу данных
 
 - **Кэш отчётов в S3 (MinIO)** и ссылки на **эмуляцию CDN** (Nginx с `proxy_cache` перед MinIO).
 - Ссылки **`reportUrl`** ведут на **`http://localhost:8181/reports-cdn/...`** — прокси в **`bionicpro-auth`** ([`CdnProxyController`](bionicpro-auth/src/main/java/com/bionicpro/auth/api/CdnProxyController.java)) на **`minio:9000/reports`** (S3 path-style), чтобы не зависеть от DNS имени Nginx и не ходить на **8090** из браузера напрямую.
 - В `docker-compose.yaml`: сервисы **`minio`**, **`minio-init`**, **`minio-cdn`** (прямой доступ с хоста **http://localhost:8090**), **`APP_CDN_PROXY_TARGET=http://minio:9000/reports`**, **`S3_*`**, **`CDN_PUBLIC_BASE`** у **`bionicpro-reports`**.
 - **`GET /reports`**: при попадании в S3 ответ содержит **`cacheStatus: hit`**, **`reportUrl`** — JSON забирается с CDN; при промахе — запрос к OLAP, запись в S3, **`cacheStatus: miss`** и полное тело отчёта в ответе. Фронт подгружает тело по **`reportUrl`** при `hit` ([`ReportPage.tsx`](frontend/src/components/ReportPage.tsx)).
+
+<img src="screenshots/Task3_1.png" width="600">
+<img src="screenshots/Task3_2.png" width="600">
+<img src="screenshots/Task3_3.png" width="600">
+
+
+# Задание 4. Повышение оперативности CRM (CDC → Kafka → ClickHouse)
+
+- **OLTP CRM** (`crm_db`, порт **5436**): таблицы `customers`, `telemetry_events`; тяжёлая витрина **не** строится в CRM.
+- **Debezium** (`debezium`, REST **8083**) → **Kafka**; регистрация коннектора: **`debezium/connector-crm.json`**, job **`debezium-register`**.
+- **ClickHouse** (**8123** / **9123**): **`Kafka` + MaterializedView** → **`reporting.mart_user_prosthesis_daily`** (см. [`clickhouse/docker-entrypoint-initdb.d/01_reporting.sql`](clickhouse/docker-entrypoint-initdb.d/01_reporting.sql)).
+- **`bionicpro-reports`**: витрина только из **ClickHouse** ([`ch_reporting.py`](bionicpro-reports/ch_reporting.py)); Airflow DAG пишет в CRM через **`REPORTING_CRM_DSN`** ([`dwh/dags/prosthesis_reporting_mart.py`](dwh/dags/prosthesis_reporting_mart.py)).
+
+<img src="screenshots/Task4_1.png" width="600">
+<img src="screenshots/Task4_2.png" width="600">

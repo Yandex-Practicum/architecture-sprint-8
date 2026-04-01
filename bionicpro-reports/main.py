@@ -1,6 +1,6 @@
 """
-Сервис отчётов: чтение витрины OLAP только для пользователя из JWT (sub).
-Кэш готовых JSON в S3 + отдача публичной ссылки на CDN; при промахе — один запрос к OLAP, запись в S3.
+Сервис отчётов: витрина в ClickHouse (CDC → Kafka → KafkaEngine + MV), чтение по JWT (sub).
+Кэш JSON в S3 + ссылка на CDN при промахе.
 """
 from __future__ import annotations
 
@@ -9,11 +9,11 @@ from datetime import date, datetime, timezone
 from typing import Any
 
 import jwt
-import psycopg2
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from jwt import PyJWKClient
 
+import ch_reporting
 from report_s3 import head_exists, mart_snapshot_id, object_key_for_report, public_url, put_report_json, s3_enabled
 
 app = FastAPI(title="BionicPRO Reports API", version="1.0.0")
@@ -26,7 +26,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-OLAP_DSN = os.environ.get("OLAP_DSN", "postgresql://olap:olap@localhost:5435/olap")
 KEYCLOAK_ISSUER = os.environ.get(
     "KEYCLOAK_ISSUER", "http://localhost:8080/realms/reports-realm"
 )
@@ -75,20 +74,6 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-def _mart_footprint(cur) -> tuple[date | None, datetime | None]:
-    """Границы витрины после последнего прогона ETL (Airflow): только этот период доступен API."""
-    cur.execute(
-        """
-        SELECT MAX(stat_date), MAX(updated_at)
-        FROM reporting.mart_user_prosthesis_daily
-        """
-    )
-    row = cur.fetchone()
-    if not row:
-        return None, None
-    return row[0], row[1]
-
-
 def _build_payload(
     subject: str,
     mart_max_date: date | None,
@@ -123,22 +108,20 @@ def _build_payload(
 
     if len(series) == 0:
         hint = (
-            "В витрине нет строк для вашего пользователя: либо ETL ещё не подставил ваш sub в источники, "
-            "либо за выбранные дни данных не было. "
+            "В витрине ClickHouse нет строк для вашего пользователя: проверьте данные в CRM OLTP, "
+            "репликацию Debezium→Kafka и наполнение витрины. "
             + (
-                f"В OLAP сейчас загружены дни не позднее {mart_max_iso} (последнее обновление витрины: {mart_refresh_iso}). "
+                f"Сейчас в витрине есть дни не позднее {mart_max_iso} (обновление: {mart_refresh_iso}). "
                 if mart_max_iso
-                else "Витрина пуста — дождитесь успешного прогона DAG. "
+                else "Витрина пуста — дождитесь загрузки CRM (Airflow) и прохождения CDC. "
             )
-            + "Данные за будущие дни появятся только после следующих загрузок Airflow."
         )
     else:
         hint = (
-            "Отчёт строится только по данным, уже попавшим в витрину после ETL; "
-            f"сейчас в OLAP доступны дни не позднее {mart_max_iso}. "
-            "Запросить «свежее», чем обработал DAG, нельзя — таких строк в mart ещё нет."
+            "Отчёт из витрины ClickHouse (данные приходят из CRM через CDC, без тяжёлых выгрузок в OLTP); "
+            f"доступны дни не позднее {mart_max_iso}."
             if mart_max_iso
-            else "Отчёт строится только по данным в витрине."
+            else "Отчёт строится по данным витрины."
         )
 
     return {
@@ -148,6 +131,7 @@ def _build_payload(
         "olap": {
             "martMaxStatDate": mart_max_iso,
             "martLastRefreshAt": mart_refresh_iso,
+            "store": "clickhouse",
         },
         "userSeriesRange": {
             "minStatDate": user_min.isoformat() if user_min else None,
@@ -167,40 +151,20 @@ def _build_payload(
 @app.get("/reports")
 def get_my_report(subject: str = Depends(current_subject)) -> dict[str, Any]:
     """
-    Сначала лёгкий запрос к OLAP (снимок витрины) и проверка S3.
-    При попадании в кэш — без выборки строк пользователя; тело отчёта по ссылке CDN.
-    При промахе — полная выборка, запись в S3, ссылка на CDN + поле тела в ответе.
+    Лёгкий запрос к ClickHouse (снимок витрины), затем S3 HEAD при включённом кэше.
     """
-    conn = psycopg2.connect(OLAP_DSN)
-    try:
-        with conn.cursor() as cur:
-            mart_max_date, mart_last_refresh = _mart_footprint(cur)
-        snapshot = mart_snapshot_id(mart_max_date, mart_last_refresh)
-        key = object_key_for_report(subject, mart_max_date, mart_last_refresh)
+    mart_max_date, mart_last_refresh = ch_reporting.mart_footprint()
+    snapshot = mart_snapshot_id(mart_max_date, mart_last_refresh)
+    key = object_key_for_report(subject, mart_max_date, mart_last_refresh)
 
-        # Соединение с OLAP не держим на время S3 HEAD — только лёгкий снимок витрины уже получен.
-        if s3_enabled() and head_exists(key):
-            return {
-                "cacheStatus": "hit",
-                "reportUrl": public_url(key),
-                "martSnapshotId": snapshot,
-            }
+    if s3_enabled() and head_exists(key):
+        return {
+            "cacheStatus": "hit",
+            "reportUrl": public_url(key),
+            "martSnapshotId": snapshot,
+        }
 
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT stat_date, active_hours, steps, prosthesis_model, crm_region
-                FROM reporting.mart_user_prosthesis_daily
-                WHERE user_subject = %s
-                ORDER BY stat_date DESC
-                LIMIT 366
-                """,
-                (subject,),
-            )
-            rows = cur.fetchall()
-    finally:
-        conn.close()
-
+    rows = ch_reporting.mart_rows_for_subject(subject)
     body = _build_payload(subject, mart_max_date, mart_last_refresh, rows)
 
     if s3_enabled():

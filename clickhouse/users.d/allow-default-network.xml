@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<!-- Разрешить пользователю default подключения не только с localhost (clickhouse-init, bionicpro-reports по сети Docker). -->
+<clickhouse>
+  <users>
+    <default>
+      <networks>
+        <ip>::/0</ip>
+      </networks>
+      <password></password>
+    </default>
+  </users>
+</clickhouse>

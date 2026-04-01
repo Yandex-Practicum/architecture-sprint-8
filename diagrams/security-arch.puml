@@ -1,0 +1,35 @@
+@startuml BionicPROContainer
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title BionicPRO - Container Diagram (Security Architecture)
+
+Person(person, "Person", "Пользователь")
+
+System_Boundary(bionicpro, "Bionicpro") {
+    Container(frontend, "Frontend", "React / Nginx", "")
+    Container(bionicproAuth, "bionicpro-auth", "Go", "BFF / Сессии / Запрос и хранение токенов авторизации")
+    Container(sso, "SSO", "Keycloak", "Роли / токены / OTP")
+    Container(ldap, "OpenLDAP", "OpenLDAP", "Данные о пользователях представительства BionicPRO в другой стране")
+    Container(api, "Api Backend", "SpringBoot", "Бизнес логика протеза")
+}
+
+System_Ext(yandexid, "Yandex ID", "OAuth 2.0")
+System_Ext(IdP_EU, "Внешний IdP (ЕС)", "OAuth2/OIDC")
+System_Ext(IdP_USA, "Внешний IdP (США)", "OAuth2/OIDC")
+System_Ext(IdP_RU, "Внешний IdP (Россия)", "OAuth2/OIDC")
+
+Rel(person, frontend, "Use", "HTTPS")
+Rel(frontend, bionicproAuth, "API + cookie", "HTTPS/Rest")
+Rel(bionicproAuth, sso, "PKCE", "HTTPS")
+Rel(sso, ldap, "LDAP User federation")
+Rel(bionicproAuth, api, "Use", "HTTPS")
+
+Rel(yandexid, sso, "")
+
+Rel(ldap, IdP_EU, "OIDC Auth", "443")
+Rel(ldap, IdP_USA, "OIDC Auth", "443")
+Rel(ldap, IdP_RU, "OIDC Auth", "443")
+
+
+
+@enduml

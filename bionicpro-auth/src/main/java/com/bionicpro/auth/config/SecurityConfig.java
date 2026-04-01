@@ -29,6 +29,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/oauth2/**", "/login/**", "/error").permitAll()
                         .requestMatchers("/api/**").permitAll()
+                        .requestMatchers("/reports-cdn/**").permitAll()
                         .anyRequest().denyAll())
                 .oauth2Login(oauth -> oauth
                         .authorizationEndpoint(a -> a.authorizationRequestResolver(oauth2AuthorizationRequestResolver))

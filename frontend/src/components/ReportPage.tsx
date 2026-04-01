@@ -127,8 +127,18 @@ const ReportPage: React.FC = () => {
         return;
       }
 
-      const data = (await response.json()) as Record<string, unknown>;
-      setReportPayload(data);
+      const envelope = (await response.json()) as Record<string, unknown>;
+      if (envelope.cacheStatus === 'hit' && typeof envelope.reportUrl === 'string') {
+        const r2 = await fetch(envelope.reportUrl);
+        if (!r2.ok) {
+          setError(`Не удалось загрузить отчёт с CDN (${r2.status})`);
+          return;
+        }
+        const report = (await r2.json()) as Record<string, unknown>;
+        setReportPayload({ ...envelope, ...report });
+      } else {
+        setReportPayload(envelope);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -258,6 +268,25 @@ const ReportPage: React.FC = () => {
         {reportPayload && (
           <div className="mt-6">
             <h2 className="text-lg font-semibold mb-2">Отчёт по протезу (OLAP)</h2>
+            {reportPayload.cacheStatus != null && (
+              <p className="text-xs text-gray-500 mb-2">
+                Кэш: {String(reportPayload.cacheStatus)}
+                {typeof reportPayload.reportUrl === 'string' && (
+                  <>
+                    {' '}
+                    ·{' '}
+                    <a
+                      href={reportPayload.reportUrl}
+                      className="text-blue-600 underline break-all"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      ссылка CDN
+                    </a>
+                  </>
+                )}
+              </p>
+            )}
             {typeof reportPayload.coverageHint === 'string' && (
               <p className="text-sm text-gray-700 mb-2 border-l-4 border-blue-200 pl-3 py-1 bg-blue-50/50 rounded-r">
                 {reportPayload.coverageHint}

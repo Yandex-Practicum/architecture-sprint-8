@@ -36,6 +36,7 @@ spring:
 app:
   frontend-url: ${APP_FRONTEND_URL:http://localhost:3000}
   reports-service-base-url: ${REPORTS_SERVICE_BASE_URL:http://localhost:8082}
+  cdn-proxy-target-url: ${APP_CDN_PROXY_TARGET:http://localhost:9000/reports}
   session-cookie-name: BIONIC_SESSION
   session-max-age-seconds: 1800
   cookie-secure: ${APP_COOKIE_SECURE:false}

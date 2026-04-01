@@ -119,3 +119,10 @@ const initOptions = {
 <img src="screenshots/Task2_1.png" width="600">
 <img src="screenshots/Task2_2.png" width="600">
 <img src="screenshots/Task2_3.png" width="600">
+
+# Задание 3. Снижение нагрузки на базу данных
+
+- **Кэш отчётов в S3 (MinIO)** и ссылки на **эмуляцию CDN** (Nginx с `proxy_cache` перед MinIO).
+- Ссылки **`reportUrl`** ведут на **`http://localhost:8181/reports-cdn/...`** — прокси в **`bionicpro-auth`** ([`CdnProxyController`](bionicpro-auth/src/main/java/com/bionicpro/auth/api/CdnProxyController.java)) на **`minio:9000/reports`** (S3 path-style), чтобы не зависеть от DNS имени Nginx и не ходить на **8090** из браузера напрямую.
+- В `docker-compose.yaml`: сервисы **`minio`**, **`minio-init`**, **`minio-cdn`** (прямой доступ с хоста **http://localhost:8090**), **`APP_CDN_PROXY_TARGET=http://minio:9000/reports`**, **`S3_*`**, **`CDN_PUBLIC_BASE`** у **`bionicpro-reports`**.
+- **`GET /reports`**: при попадании в S3 ответ содержит **`cacheStatus: hit`**, **`reportUrl`** — JSON забирается с CDN; при промахе — запрос к OLAP, запись в S3, **`cacheStatus: miss`** и полное тело отчёта в ответе. Фронт подгружает тело по **`reportUrl`** при `hit` ([`ReportPage.tsx`](frontend/src/components/ReportPage.tsx)).

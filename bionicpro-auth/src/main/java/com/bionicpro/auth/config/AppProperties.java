@@ -14,6 +14,10 @@ public class AppProperties {
      * Базовый URL сервиса отчётов (bionicpro-reports), без завершающего слэша.
      */
     private String reportsServiceBaseUrl = "http://localhost:8082";
+    /**
+     * S3 path-style к MinIO (bucket в пути): в Docker — {@code http://minio:9000/reports}.
+     */
+    private String cdnProxyTargetUrl = "http://localhost:9000/reports";
 
     public String getFrontendUrl() {
         return frontendUrl;
@@ -61,5 +65,13 @@ public class AppProperties {
 
     public void setReportsServiceBaseUrl(String reportsServiceBaseUrl) {
         this.reportsServiceBaseUrl = reportsServiceBaseUrl;
+    }
+
+    public String getCdnProxyTargetUrl() {
+        return cdnProxyTargetUrl;
+    }
+
+    public void setCdnProxyTargetUrl(String cdnProxyTargetUrl) {
+        this.cdnProxyTargetUrl = cdnProxyTargetUrl;
     }
 }

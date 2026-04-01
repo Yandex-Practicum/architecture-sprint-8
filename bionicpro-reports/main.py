@@ -1,5 +1,6 @@
 """
 Сервис отчётов: чтение витрины OLAP только для пользователя из JWT (sub).
+Кэш готовых JSON в S3 + отдача публичной ссылки на CDN; при промахе — один запрос к OLAP, запись в S3.
 """
 from __future__ import annotations
 
@@ -12,6 +13,8 @@ import psycopg2
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from jwt import PyJWKClient
+
+from report_s3 import head_exists, mart_snapshot_id, object_key_for_report, public_url, put_report_json, s3_enabled
 
 app = FastAPI(title="BionicPRO Reports API", version="1.0.0")
 
@@ -86,30 +89,12 @@ def _mart_footprint(cur) -> tuple[date | None, datetime | None]:
     return row[0], row[1]
 
 
-@app.get("/reports")
-def get_my_report(subject: str = Depends(current_subject)) -> dict[str, Any]:
-    """
-    Отчёт только по текущему пользователю (sub из access token).
-    Данные читаются из витрины без online-агрегации; за пределами загруженного в OLAP периода строк нет.
-    """
-    conn = psycopg2.connect(OLAP_DSN)
-    try:
-        with conn.cursor() as cur:
-            mart_max_date, mart_last_refresh = _mart_footprint(cur)
-            cur.execute(
-                """
-                SELECT stat_date, active_hours, steps, prosthesis_model, crm_region
-                FROM reporting.mart_user_prosthesis_daily
-                WHERE user_subject = %s
-                ORDER BY stat_date DESC
-                LIMIT 366
-                """,
-                (subject,),
-            )
-            rows = cur.fetchall()
-    finally:
-        conn.close()
-
+def _build_payload(
+    subject: str,
+    mart_max_date: date | None,
+    mart_last_refresh: datetime | None,
+    rows: list[tuple],
+) -> dict[str, Any]:
     series = [
         {
             "statDate": r[0].isoformat() if r[0] else None,
@@ -177,3 +162,58 @@ def get_my_report(subject: str = Depends(current_subject)) -> dict[str, Any]:
         },
         "series": series,
     }
+
+
+@app.get("/reports")
+def get_my_report(subject: str = Depends(current_subject)) -> dict[str, Any]:
+    """
+    Сначала лёгкий запрос к OLAP (снимок витрины) и проверка S3.
+    При попадании в кэш — без выборки строк пользователя; тело отчёта по ссылке CDN.
+    При промахе — полная выборка, запись в S3, ссылка на CDN + поле тела в ответе.
+    """
+    conn = psycopg2.connect(OLAP_DSN)
+    try:
+        with conn.cursor() as cur:
+            mart_max_date, mart_last_refresh = _mart_footprint(cur)
+        snapshot = mart_snapshot_id(mart_max_date, mart_last_refresh)
+        key = object_key_for_report(subject, mart_max_date, mart_last_refresh)
+
+        # Соединение с OLAP не держим на время S3 HEAD — только лёгкий снимок витрины уже получен.
+        if s3_enabled() and head_exists(key):
+            return {
+                "cacheStatus": "hit",
+                "reportUrl": public_url(key),
+                "martSnapshotId": snapshot,
+            }
+
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT stat_date, active_hours, steps, prosthesis_model, crm_region
+                FROM reporting.mart_user_prosthesis_daily
+                WHERE user_subject = %s
+                ORDER BY stat_date DESC
+                LIMIT 366
+                """,
+                (subject,),
+            )
+            rows = cur.fetchall()
+    finally:
+        conn.close()
+
+    body = _build_payload(subject, mart_max_date, mart_last_refresh, rows)
+
+    if s3_enabled():
+        try:
+            put_report_json(key, body)
+        except Exception as e:
+            raise HTTPException(
+                status_code=503,
+                detail=f"Не удалось записать отчёт в S3: {e!s}",
+            ) from e
+
+    out: dict[str, Any] = dict(body)
+    out["cacheStatus"] = "miss" if s3_enabled() else "bypass"
+    out["reportUrl"] = public_url(key) if s3_enabled() else None
+    out["martSnapshotId"] = snapshot
+    return out

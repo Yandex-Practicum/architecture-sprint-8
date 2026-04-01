@@ -40,3 +40,21 @@ services:
       REACT_APP_KEYCLOAK_URL: http://localhost:8080
       REACT_APP_KEYCLOAK_REALM: reports-realm
       REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+
+  bionicpro-auth:
+    build:
+      context: ./bionicpro-auth
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      KEYCLOAK_URL: http://localhost:8080
+      KEYCLOAK_TOKEN_URL: http://keycloak:8080
+      KEYCLOAK_REALM: reports-realm
+      KEYCLOAK_CLIENTID: reports-frontend
+      KEYCLOAK_SECRET: 
+      KEYCLOAK_REDIRECTURI: http://localhost:8001/auth/callback
+      FRONTEND_URL: http://localhost:3000
+      REPORTAPI_URL: http://report-api:8080
+    depends_on:
+      - keycloak

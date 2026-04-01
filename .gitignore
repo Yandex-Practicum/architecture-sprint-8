@@ -1,2 +1,6 @@
 /postgres-keycloak-data
 2024__yandex-architecture-sso.code-workspace
+.vscode
+/frontend/build
+/frontend/node_modules
+/frontend/package-lock.json

@@ -155,7 +155,7 @@ def _get_available_range(user_id: int):
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
             "SELECT MIN(report_date) AS min_date, MAX(report_date) AS max_date "
-            "FROM fact_user_report WHERE user_id = %(user_id)s",
+            "FROM mv_user_report WHERE user_id = %(user_id)s",
             {"user_id": user_id},
         )
         row = cur.fetchone()
@@ -167,7 +167,7 @@ def _get_available_range(user_id: int):
 
 @app.route("/reports", methods=["GET"])
 def get_reports():
-    """Возвращает отчёт из S3-кеша или витрины fact_user_report.
+    """Возвращает отчёт из S3-кеша или витрины mv_user_report.
 
     Стратегия: S3 → OLAP (с записью результата в S3).
 
@@ -210,7 +210,7 @@ def get_reports():
         SELECT user_id, report_date, session_count, avg_wear_time_min,
                total_gestures, avg_myosignal_quality, order_status,
                prosthesis_model, last_contact_date
-        FROM fact_user_report
+        FROM mv_user_report
         WHERE user_id = %(user_id)s
     """
     params = {"user_id": user_id}
@@ -361,7 +361,7 @@ def generate_report():
         SELECT user_id, report_date, session_count, avg_wear_time_min,
                total_gestures, avg_myosignal_quality, order_status,
                prosthesis_model, last_contact_date
-        FROM fact_user_report
+        FROM mv_user_report
         WHERE user_id = %(user_id)s
           AND report_date >= %(date_from)s
           AND report_date <= %(date_to)s

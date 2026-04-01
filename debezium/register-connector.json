@@ -1,0 +1,21 @@
+{
+  "name": "crm-connector",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "database.hostname": "postgres",
+    "database.port": "5432",
+    "database.user": "airflow",
+    "database.password": "airflow",
+    "database.dbname": "crm_data",
+    "topic.prefix": "cdc",
+    "table.include.list": "public.clients,public.orders",
+    "plugin.name": "pgoutput",
+    "publication.autocreate.mode": "filtered",
+    "slot.name": "crm_cdc_slot",
+    "snapshot.mode": "initial",
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter.schemas.enable": false,
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter.schemas.enable": false
+  }
+}

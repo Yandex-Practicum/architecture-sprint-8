@@ -71,6 +71,10 @@ VALUES
     (3, 'delivered',   'BionicHand Pro V3', '2024-09-20', false),
     (3, 'warranty',    'BionicHand Pro V3', '2025-02-01', true);
 
+-- Настройка публикации для CDC (Debezium)
+ALTER TABLE clients REPLICA IDENTITY FULL;
+ALTER TABLE orders REPLICA IDENTITY FULL;
+
 -- ===================== OLAP DB (витрина отчётности) ========================
 
 \connect postgres;
@@ -94,3 +98,46 @@ CREATE TABLE IF NOT EXISTS fact_user_report (
 );
 
 CREATE INDEX idx_fact_user_report_user_date ON fact_user_report (user_id, report_date DESC);
+
+-- ===================== CDC-реплики таблиц CRM ================================
+-- Таблицы заполняются CDC Consumer из топиков Kafka (Debezium)
+
+CREATE TABLE IF NOT EXISTS cdc_clients (
+    user_id           BIGINT PRIMARY KEY,
+    full_name         VARCHAR(200) NOT NULL,
+    email             VARCHAR(200),
+    phone             VARCHAR(50),
+    last_contact_date DATE
+);
+
+CREATE TABLE IF NOT EXISTS cdc_orders (
+    order_id          INT PRIMARY KEY,
+    client_id         BIGINT       NOT NULL,
+    order_status      VARCHAR(50)  NOT NULL,
+    prosthesis_model  VARCHAR(100) NOT NULL,
+    order_date        DATE         NOT NULL,
+    is_latest         BOOLEAN      NOT NULL DEFAULT false
+);
+
+CREATE INDEX idx_cdc_orders_client ON cdc_orders (client_id, is_latest);
+
+-- ===================== Materialized View (витрина отчётности) =================
+-- Объединяет агрегированную телеметрию из ETL с актуальными CRM-данными из CDC
+
+CREATE MATERIALIZED VIEW mv_user_report AS
+SELECT
+    f.user_id,
+    f.report_date,
+    f.session_count,
+    f.avg_wear_time_min,
+    f.total_gestures,
+    f.avg_myosignal_quality,
+    COALESCE(o.order_status, f.order_status) AS order_status,
+    COALESCE(o.prosthesis_model, f.prosthesis_model) AS prosthesis_model,
+    COALESCE(c.last_contact_date, f.last_contact_date) AS last_contact_date,
+    f.loaded_at
+FROM fact_user_report f
+LEFT JOIN cdc_clients c ON c.user_id = f.user_id
+LEFT JOIN cdc_orders o ON o.client_id = f.user_id AND o.is_latest = true;
+
+CREATE UNIQUE INDEX idx_mv_user_report ON mv_user_report (user_id, report_date);

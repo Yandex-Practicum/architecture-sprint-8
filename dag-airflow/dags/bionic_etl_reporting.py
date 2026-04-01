@@ -218,10 +218,15 @@ def load_to_olap(**context):
     """
     cursor.executemany(insert_sql, report_rows)
     conn.commit()
+
+    # Обновляем Materialized View витрины после загрузки новых данных
+    cursor = conn.cursor()
+    cursor.execute("REFRESH MATERIALIZED VIEW CONCURRENTLY mv_user_report")
+    conn.commit()
     cursor.close()
     conn.close()
 
-    print(f"[load_to_olap] Загружено {len(report_rows)} строк за {report_date}")
+    print(f"[load_to_olap] Загружено {len(report_rows)} строк за {report_date}, MV обновлён")
 
 
 # ========================== EXPORT TO S3 ==================================

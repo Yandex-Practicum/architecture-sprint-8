@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 x-airflow-common: &airflow-common
   build:
@@ -8,13 +8,13 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
     AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
-    AIRFLOW__CORE__FERNET_KEY: ''
-    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
-    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
-    AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
-    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
-    AIRFLOW__WEBSERVER__SECRET_KEY: 'bionic-pro-secret-change-me'
-    _PIP_ADDITIONAL_REQUIREMENTS: ''
+    AIRFLOW__CORE__FERNET_KEY: ""
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session"
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
+    AIRFLOW__WEBSERVER__SECRET_KEY: "bionic-pro-secret-change-me"
+    _PIP_ADDITIONAL_REQUIREMENTS: ""
     S3_ENDPOINT: http://minio:9000
     S3_ACCESS_KEY: minioadmin
     S3_SECRET_KEY: minioadmin
@@ -202,6 +202,7 @@ services:
   # ---------------------------------------------------------------
   postgres:
     image: postgres:16.0
+    command: postgres -c wal_level=logical -c max_replication_slots=4 -c max_wal_senders=4
     environment:
       POSTGRES_USER: airflow
       POSTGRES_PASSWORD: airflow
@@ -232,7 +233,12 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: ["bash", "-c", "airflow db init && airflow users create --username admin --firstname admin --lastname admin --role Admin --email admin@bionicpro.local --password admin || true && airflow connections add sensor_db --conn-type postgres --conn-host postgres --conn-port 5432 --conn-login airflow --conn-password airflow --conn-schema sensor_data || true && airflow connections add crm_db --conn-type postgres --conn-host postgres --conn-port 5432 --conn-login airflow --conn-password airflow --conn-schema crm_data || true && airflow connections add olap_db --conn-type postgres --conn-host postgres --conn-port 5432 --conn-login airflow --conn-password airflow --conn-schema olap_data || true"]
+    command:
+      [
+        "bash",
+        "-c",
+        "airflow db init && airflow users create --username admin --firstname admin --lastname admin --role Admin --email admin@bionicpro.local --password admin || true && airflow connections add sensor_db --conn-type postgres --conn-host postgres --conn-port 5432 --conn-login airflow --conn-password airflow --conn-schema sensor_data || true && airflow connections add crm_db --conn-type postgres --conn-host postgres --conn-port 5432 --conn-login airflow --conn-password airflow --conn-schema crm_data || true && airflow connections add olap_db --conn-type postgres --conn-host postgres --conn-port 5432 --conn-login airflow --conn-password airflow --conn-schema olap_data || true",
+      ]
     networks:
       - bionicpro
 
@@ -269,7 +275,11 @@ services:
       airflow-webserver:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob --hostname \"$${HOSTNAME}\""]
+      test:
+        [
+          "CMD-SHELL",
+          'airflow jobs check --job-type SchedulerJob --hostname "$${HOSTNAME}"',
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -289,7 +299,11 @@ services:
       airflow-init:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD-SHELL", "airflow jobs check --job-type TriggererJob --hostname \"$${HOSTNAME}\""]
+      test:
+        [
+          "CMD-SHELL",
+          'airflow jobs check --job-type TriggererJob --hostname "$${HOSTNAME}"',
+        ]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -353,6 +367,115 @@ services:
       mc anonymous set download local/reports;
       exit 0;
       "
+    networks:
+      - bionicpro
+
+  # ---------------------------------------------------------------
+  # Zookeeper (для Kafka)
+  # ---------------------------------------------------------------
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - bionicpro
+
+  # ---------------------------------------------------------------
+  # Kafka Broker
+  # ---------------------------------------------------------------
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on:
+      - zookeeper
+    ports:
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "kafka-broker-api-versions --bootstrap-server localhost:9092",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - bionicpro
+
+  # ---------------------------------------------------------------
+  # Debezium Connect (CDC)
+  # ---------------------------------------------------------------
+  debezium-connect:
+    image: debezium/connect:2.5
+    ports:
+      - "8083:8083"
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: debezium-connect
+      CONFIG_STORAGE_TOPIC: debezium_configs
+      OFFSET_STORAGE_TOPIC: debezium_offsets
+      STATUS_STORAGE_TOPIC: debezium_statuses
+      CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      STATUS_STORAGE_REPLICATION_FACTOR: 1
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8083/connectors || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      - bionicpro
+
+  # ---------------------------------------------------------------
+  # Debezium Init — регистрация CDC-коннектора для CRM
+  # ---------------------------------------------------------------
+  debezium-init:
+    image: curlimages/curl:latest
+    depends_on:
+      debezium-connect:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c", "echo 'Registering Debezium CRM connector...' && curl -s -w '\\n%{http_code}' -X POST -H 'Content-Type: application/json' -d @/config/register-connector.json http://debezium-connect:8083/connectors && echo ' done'"]
+    volumes:
+      - ./debezium/register-connector.json:/config/register-connector.json:ro
+    networks:
+      - bionicpro
+
+  # ---------------------------------------------------------------
+  # CDC Consumer — приём событий из Kafka в OLAP
+  # ---------------------------------------------------------------
+  cdc-consumer:
+    build:
+      context: ./cdc-consumer
+      dockerfile: Dockerfile
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      DATABASE_URL: postgresql://airflow:airflow@postgres:5432/olap_data
+      CDC_BATCH_SIZE: "50"
+      CDC_REFRESH_INTERVAL: "5"
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      debezium-init:
+        condition: service_completed_successfully
+    restart: always
     networks:
       - bionicpro
 

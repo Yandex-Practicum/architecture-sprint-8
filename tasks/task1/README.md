@@ -49,3 +49,17 @@
 Настроил через microsoft authenticator
 
 ![mfa.png](mfa.png)
+
+## Задача 6. Yandex ID
+
+В целом реализовал, но столкнулся с несоответствием протоколов. Как выяснилось в группе решение есть - 
+переезд на playaru/keycloak-russian, что потребовало бы проходить весь флоу настройки заново. Так как это косяк
+самой задачи (1 из 19 в данном спринте), то я оставил попытки продвигаться дальше.
+
+![yandex.png](yandex.png)
+
+![yandex2.png](yandex2.png)
+
+Экспорт realm:
+
+[realm-exported.json](realm-exported.json)

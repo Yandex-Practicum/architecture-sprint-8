@@ -43,3 +43,9 @@
 
 Токен (расшифровка):
 ![token.png](token.png)
+
+## Задача 5. Настройка MFA
+
+Настроил через microsoft authenticator
+
+![mfa.png](mfa.png)

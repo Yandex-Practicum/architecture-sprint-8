@@ -1,0 +1,39 @@
+@startuml BionicPROReportContainer
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title BionicPRO - Container Diagram (Report Architecture)
+
+Person(person, "Person", "Пользователь")
+
+System_Boundary(bionicpro, "Bionicpro") {
+    Container(frontend, "Frontend", "React / Nginx", "")
+    Container(bionicproAuth, "bionicpro-auth", "Go", "BFF / Запрос на формирование отчета")
+    Container(api, "Report API", "Go", "Формирование отчетов")
+    Container(s3, "MinIO S3", "MinIO", "Object Storage")
+    Container(cdn, "CDN", "Nginx", "proxy cache, static files")
+
+    Boundary(cdc, "CDC") {
+        Container(debezium, "Debezium + Kafka", "kafka", "Захват изменений CRM DB")
+        Container(airflow, "Apache Airflow", "Apache Airflow", "ETL Scheduler")
+    }
+
+    ContainerDb(clickhouse, "Clickhouse", "Clickhouse", "Витрина user report summary")
+    ContainerDb(crm_db, "CRM DB", "PostgreSQL", "CRM")
+}
+
+
+Rel(person, frontend, "Use", "HTTPS")
+Rel(frontend, bionicproAuth, "API + cookie", "HTTPS/Rest")
+Rel(bionicproAuth, api, "Use", "HTTPS")
+Rel(api, s3, "check / create cache", "")
+Rel(s3, cdn, "", "")
+
+Rel(api, clickhouse, "", "")
+Rel(crm_db, debezium, "WAL / CDC", "")
+Rel(debezium, clickhouse, "MaterializedView", "")
+Rel(crm_db, airflow, "extract", "")
+Rel(airflow, clickhouse, "insert витрина", "")
+
+
+
+@enduml

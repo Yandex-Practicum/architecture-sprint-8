@@ -1,5 +1,5 @@
 import os
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 from typing import Any, List, Tuple
 
 import boto3
@@ -11,7 +11,6 @@ from airflow.providers.postgres.hooks.postgres import PostgresHook
 from clickhouse_driver import Client
 
 CONN_API = "read_from_api_db"
-CONN_CRM = "read_from_crm_db"
 CONN_CLICKHOUSE = "clickhouse_bionicpro"
 
 SQL_TELEMETRY_AGG = """
@@ -25,14 +24,28 @@ GROUP BY user_id, (measured_at AT TIME ZONE 'UTC')::date
 ORDER BY user_id, period_date
 """
 
-SQL_TELEMETRY_WATERMARK = """
-SELECT (MAX(measured_at) AT TIME ZONE 'UTC')::date
-FROM telemetry
-"""
-
-SQL_CRM = """
-SELECT user_id, plan_code
-FROM customer_plan
+SQL_REPORTS_MART_REBUILD = """
+INSERT INTO bionicpro.reports_mart
+    (user_id, period_date, avg_temperature, avg_pulse, plan_code, data_watermark_date)
+SELECT
+    t.user_id AS user_id,
+    t.period_date AS period_date,
+    t.avg_temperature AS avg_temperature,
+    t.avg_pulse AS avg_pulse,
+    coalesce(c.plan_code, '') AS plan_code,
+    coalesce(
+        (SELECT max(period_date) FROM bionicpro.telemetry_daily_agg),
+        toDate('1970-01-01')
+    ) AS data_watermark_date
+FROM bionicpro.telemetry_daily_agg AS t
+LEFT JOIN
+(
+    SELECT
+        user_id,
+        argMax(plan_code, updated_at) AS plan_code
+    FROM bionicpro.crm_customer_plan
+    GROUP BY user_id
+) AS c ON t.user_id = c.user_id
 """
 
 
@@ -54,12 +67,6 @@ def _extract_telemetry(**context: Any) -> str:
     return df.to_json(date_format="iso")
 
 
-def _extract_crm(**context: Any) -> str:
-    hook = PostgresHook(postgres_conn_id=CONN_CRM)
-    df = hook.get_pandas_df(SQL_CRM)
-    return df.to_json(date_format="iso")
-
-
 def _clickhouse_client() -> Client:
     c = BaseHook.get_connection(CONN_CLICKHOUSE)
     extra = c.extra_dejson or {}
@@ -74,62 +81,35 @@ def _clickhouse_client() -> Client:
     )
 
 
-def _build_rows(
-    telemetry_json: str, crm_json: str, watermark_date_str: str
-) -> List[Tuple[Any, ...]]:
-    tel = pd.read_json(telemetry_json)
-    crm = pd.read_json(crm_json)
-    if tel.empty:
-        return []
-
-    merged = tel.merge(crm, on="user_id", how="left")
-    merged["plan_code"] = merged["plan_code"].fillna("").astype(str)
-    wm = pd.to_datetime(watermark_date_str).date()
-    merged["data_watermark_date"] = wm
+def _load_telemetry_refresh_mart(ti: Any, **context: Any) -> None:
+    telemetry_json = ti.xcom_pull(task_ids="extract_telemetry")
+    tel = pd.read_json(telemetry_json) if telemetry_json else pd.DataFrame()
 
     rows: List[Tuple[Any, ...]] = []
-    for _, r in merged.iterrows():
-        rows.append(
-            (
-                str(r["user_id"]),
-                _parse_period_date(r["period_date"]),
-                None if pd.isna(r["avg_temperature"]) else float(r["avg_temperature"]),
-                None if pd.isna(r["avg_pulse"]) else float(r["avg_pulse"]),
-                str(r["plan_code"]),
-                r["data_watermark_date"],
+    if not tel.empty:
+        for _, r in tel.iterrows():
+            rows.append(
+                (
+                    str(r["user_id"]),
+                    _parse_period_date(r["period_date"]),
+                    None if pd.isna(r["avg_temperature"]) else float(r["avg_temperature"]),
+                    None if pd.isna(r["avg_pulse"]) else float(r["avg_pulse"]),
+                )
             )
-        )
-    return rows
 
-
-def _load_mart(ti: Any, **context: Any) -> None:
-    telemetry_json = ti.xcom_pull(task_ids="extract_telemetry")
-    crm_json = ti.xcom_pull(task_ids="extract_crm")
-
-    hook = PostgresHook(postgres_conn_id=CONN_API)
-    wm_row = hook.get_first(SQL_TELEMETRY_WATERMARK)
-    if wm_row and wm_row[0] is not None:
-        watermark_date = wm_row[0]
-        watermark_date_str = (
-            watermark_date.isoformat()
-            if hasattr(watermark_date, "isoformat")
-            else str(watermark_date)
-        )
-    else:
-        watermark_date_str = datetime.now(timezone.utc).date().isoformat()
-
-    rows = _build_rows(telemetry_json, crm_json, watermark_date_str)
     client = _clickhouse_client()
-    client.execute("TRUNCATE TABLE IF EXISTS bionicpro.reports_mart")
+    client.execute("TRUNCATE TABLE IF EXISTS bionicpro.telemetry_daily_agg")
     if rows:
         client.execute(
             """
-            INSERT INTO bionicpro.reports_mart
-                (user_id, period_date, avg_temperature, avg_pulse, plan_code, data_watermark_date)
+            INSERT INTO bionicpro.telemetry_daily_agg
+                (user_id, period_date, avg_temperature, avg_pulse)
             VALUES
             """,
             rows,
         )
+    client.execute("TRUNCATE TABLE IF EXISTS bionicpro.reports_mart")
+    client.execute(SQL_REPORTS_MART_REBUILD)
 
 
 def _purge_reports_s3(**context: Any) -> None:
@@ -177,27 +157,23 @@ default_args = {
 with DAG(
     dag_id="reports_mart_daily",
     default_args=default_args,
-    description="ETL телеметрии и CRM в витрину ClickHouse",
+    description="Телеметрия api_db → ClickHouse; CRM через Kafka/CDC; витрина TRUNCATE+INSERT",
     schedule_interval="@daily",
     start_date=datetime(2026, 3, 1),
     catchup=False,
-    tags=["clickhouse", "reports", "etl"],
+    tags=["clickhouse", "reports", "etl", "kafka", "cdc"],
 ) as dag:
     extract_telemetry = PythonOperator(
         task_id="extract_telemetry",
         python_callable=_extract_telemetry,
     )
-    extract_crm = PythonOperator(
-        task_id="extract_crm",
-        python_callable=_extract_crm,
-    )
-    load_mart = PythonOperator(
-        task_id="load_mart",
-        python_callable=_load_mart,
+    load_telemetry_refresh_mart = PythonOperator(
+        task_id="load_telemetry_refresh_mart",
+        python_callable=_load_telemetry_refresh_mart,
     )
     purge_reports_s3 = PythonOperator(
         task_id="purge_reports_s3",
         python_callable=_purge_reports_s3,
     )
 
-    [extract_telemetry, extract_crm] >> load_mart >> purge_reports_s3
+    extract_telemetry >> load_telemetry_refresh_mart >> purge_reports_s3

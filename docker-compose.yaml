@@ -1,6 +1,58 @@
-version: '3.8'
+version: "3.8"
+
+x-airflow-common: &airflow-common
+  build:
+    context: ./dag-airflow
+    dockerfile: Dockerfile
+  environment: &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CORE__FERNET_KEY: ""
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session"
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
+    AIRFLOW__WEBSERVER__SECRET_KEY: "bionic-pro-secret-change-me"
+    _PIP_ADDITIONAL_REQUIREMENTS: ""
+    S3_ENDPOINT: http://minio:9000
+    S3_ACCESS_KEY: minioadmin
+    S3_SECRET_KEY: minioadmin
+    S3_BUCKET: reports
+    REPORTS_API_URL: http://reports-api:8001
+  volumes:
+    - ./dag-airflow/dags:/opt/airflow/dags
+    - ./dag-airflow/sql:/opt/airflow/dags/sql
+    - ./data:/opt/airflow/sample_files
+  user: "${AIRFLOW_UID:-50000}:0"
+  depends_on: &airflow-common-depends-on
+    postgres:
+      condition: service_healthy
+  networks:
+    - bionicpro
 
 services:
+  # ---------------------------------------------------------------
+  # OpenLDAP
+  # ---------------------------------------------------------------
+  openldap:
+    image: osixia/openldap:1.5.0
+    environment:
+      LDAP_ORGANISATION: "BionicPRO"
+      LDAP_DOMAIN: "example.com"
+      LDAP_ADMIN_PASSWORD: "admin"
+    volumes:
+      - ./ldap/config.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/50-bootstrap.ldif
+    command: --copy-service
+    ports:
+      - "389:389"
+      - "636:636"
+    networks:
+      - bionicpro
+
+  # ---------------------------------------------------------------
+  # Keycloak DB
+  # ---------------------------------------------------------------
   keycloak_db:
     image: postgres:14
     environment:
@@ -11,6 +63,34 @@ services:
       - ./postgres-keycloak-data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "keycloak_user", "-d", "keycloak_db"]
+      interval: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - bionicpro
+
+  # ---------------------------------------------------------------
+  # App DB (BionicPRO backend)
+  # ---------------------------------------------------------------
+  app_db:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: bionicpro_db
+      POSTGRES_USER: bionicpro_user
+      POSTGRES_PASSWORD: bionicpro_password
+    volumes:
+      - ./postgres-app-data:/var/lib/postgresql/data
+      - ./bionicpro-auth/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5434:5432"
+    networks:
+      - bionicpro
+
+  # ---------------------------------------------------------------
+  # Keycloak
+  # ---------------------------------------------------------------
   keycloak:
     image: quay.io/keycloak/keycloak:21.1
     environment:
@@ -20,7 +100,11 @@ services:
       KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
       KC_DB_USERNAME: keycloak_user
       KC_DB_PASSWORD: keycloak_password
-    command: 
+      YANDEX_CLIENT_ID: ${YANDEX_CLIENT_ID:-your_yandex_client_id}
+      YANDEX_CLIENT_SECRET: ${YANDEX_CLIENT_SECRET:-your_yandex_client_secret}
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_URL: http://localhost:8080
+    command:
       - start-dev
       - --import-realm
     volumes:
@@ -28,7 +112,77 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      - keycloak_db
+      keycloak_db:
+        condition: service_healthy
+      openldap:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && echo done"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      - bionicpro
+
+  # ---------------------------------------------------------------
+  # BionicPRO Auth BFF
+  # ---------------------------------------------------------------
+  bionicpro-auth:
+    build:
+      context: ./bionicpro-auth
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      KEYCLOAK_URL: http://host.docker.internal:8080
+      KEYCLOAK_REALM: reports-realm
+      KEYCLOAK_CLIENT_ID: reports-frontend
+      FRONTEND_ORIGIN: http://localhost:3000
+      SESSION_TTL: "600"
+      SECURE_COOKIE: "false"
+      DATABASE_URL: postgresql://bionicpro_user:bionicpro_password@app_db:5432/bionicpro_db
+      YANDEX_PROFILE_URL: https://login.yandex.ru/info
+      REPORTS_API_URL: http://reports-api:8001
+    depends_on:
+      - keycloak
+      - app_db
+      - reports-api
+    networks:
+      - bionicpro
+
+  # ---------------------------------------------------------------
+  # Reports API — GET /reports из OLAP (ClickHouse)
+  # ---------------------------------------------------------------
+  reports-api:
+    build:
+      context: ./reports-api
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      DATABASE_URL: postgresql://airflow:airflow@postgres:5432/olap_data
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: reports-realm
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_BUCKET: reports
+    volumes:
+      - nginx_cache:/var/cache/nginx
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+      minio:
+        condition: service_healthy
+    networks:
+      - bionicpro
+
+  # ---------------------------------------------------------------
+  # Frontend
+  # ---------------------------------------------------------------
   frontend:
     build:
       context: ./frontend
@@ -36,7 +190,315 @@ services:
     ports:
       - "3000:3000"
     environment:
-      REACT_APP_API_URL: http://localhost:8000
+      REACT_APP_AUTH_URL: http://localhost:8000
       REACT_APP_KEYCLOAK_URL: http://localhost:8080
       REACT_APP_KEYCLOAK_REALM: reports-realm
       REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+    networks:
+      - bionicpro
+
+  # ---------------------------------------------------------------
+  # PostgreSQL (Airflow metadata + sensor_data + crm_data)
+  # ---------------------------------------------------------------
+  postgres:
+    image: postgres:16.0
+    command: postgres -c wal_level=logical -c max_replication_slots=4 -c max_wal_senders=4
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./dag-airflow/sql/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    ports:
+      - "5435:5432"
+    logging:
+      options:
+        max-size: 10m
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    restart: always
+    networks:
+      - bionicpro
+
+  # ---------------------------------------------------------------
+  # Airflow Init (миграция БД + admin-пользователь)
+  # ---------------------------------------------------------------
+  airflow-init:
+    <<: *airflow-common
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command:
+      [
+        "bash",
+        "-c",
+        "airflow db init && airflow users create --username admin --firstname admin --lastname admin --role Admin --email admin@bionicpro.local --password admin || true && airflow connections add sensor_db --conn-type postgres --conn-host postgres --conn-port 5432 --conn-login airflow --conn-password airflow --conn-schema sensor_data || true && airflow connections add crm_db --conn-type postgres --conn-host postgres --conn-port 5432 --conn-login airflow --conn-password airflow --conn-schema crm_data || true && airflow connections add olap_db --conn-type postgres --conn-host postgres --conn-port 5432 --conn-login airflow --conn-password airflow --conn-schema olap_data || true",
+      ]
+    networks:
+      - bionicpro
+
+  # ---------------------------------------------------------------
+  # Airflow Webserver — http://localhost:8081
+  # ---------------------------------------------------------------
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver --port 8081
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8081/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - bionicpro
+
+  # ---------------------------------------------------------------
+  # Airflow Scheduler
+  # ---------------------------------------------------------------
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    depends_on:
+      postgres:
+        condition: service_healthy
+      airflow-webserver:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'airflow jobs check --job-type SchedulerJob --hostname "$${HOSTNAME}"',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: always
+    networks:
+      - bionicpro
+
+  # ---------------------------------------------------------------
+  # Airflow Triggerer
+  # ---------------------------------------------------------------
+  airflow-triggerer:
+    <<: *airflow-common
+    command: bash -c "airflow triggerer"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'airflow jobs check --job-type TriggererJob --hostname "$${HOSTNAME}"',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    networks:
+      - bionicpro
+
+  # ---------------------------------------------------------------
+  # Airflow CLI (debug)
+  # ---------------------------------------------------------------
+  airflow-cli:
+    <<: *airflow-common
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles:
+      - debug
+    command:
+      - bash
+      - -c
+      - airflow
+    networks:
+      - bionicpro
+
+  # ---------------------------------------------------------------
+  # MinIO (S3-совместимое объектное хранилище для отчётов)
+  # ---------------------------------------------------------------
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - bionicpro
+
+  # ---------------------------------------------------------------
+  # MinIO Init — создание бакета reports
+  # ---------------------------------------------------------------
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 minioadmin minioadmin;
+      mc mb local/reports --ignore-existing;
+      mc anonymous set download local/reports;
+      exit 0;
+      "
+    networks:
+      - bionicpro
+
+  # ---------------------------------------------------------------
+  # Zookeeper (для Kafka)
+  # ---------------------------------------------------------------
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - bionicpro
+
+  # ---------------------------------------------------------------
+  # Kafka Broker
+  # ---------------------------------------------------------------
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on:
+      - zookeeper
+    ports:
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "kafka-broker-api-versions --bootstrap-server localhost:9092",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - bionicpro
+
+  # ---------------------------------------------------------------
+  # Debezium Connect (CDC)
+  # ---------------------------------------------------------------
+  debezium-connect:
+    image: debezium/connect:2.5
+    ports:
+      - "8083:8083"
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: debezium-connect
+      CONFIG_STORAGE_TOPIC: debezium_configs
+      OFFSET_STORAGE_TOPIC: debezium_offsets
+      STATUS_STORAGE_TOPIC: debezium_statuses
+      CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      STATUS_STORAGE_REPLICATION_FACTOR: 1
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8083/connectors || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      - bionicpro
+
+  # ---------------------------------------------------------------
+  # Debezium Init — регистрация CDC-коннектора для CRM
+  # ---------------------------------------------------------------
+  debezium-init:
+    image: curlimages/curl:latest
+    depends_on:
+      debezium-connect:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c", "echo 'Registering Debezium CRM connector...' && curl -s -w '\\n%{http_code}' -X POST -H 'Content-Type: application/json' -d @/config/register-connector.json http://debezium-connect:8083/connectors && echo ' done'"]
+    volumes:
+      - ./debezium/register-connector.json:/config/register-connector.json:ro
+    networks:
+      - bionicpro
+
+  # ---------------------------------------------------------------
+  # CDC Consumer — приём событий из Kafka в OLAP
+  # ---------------------------------------------------------------
+  cdc-consumer:
+    build:
+      context: ./cdc-consumer
+      dockerfile: Dockerfile
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      DATABASE_URL: postgresql://airflow:airflow@postgres:5432/olap_data
+      CDC_BATCH_SIZE: "50"
+      CDC_REFRESH_INTERVAL: "5"
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      debezium-init:
+        condition: service_completed_successfully
+    restart: always
+    networks:
+      - bionicpro
+
+  # ---------------------------------------------------------------
+  # Nginx Reverse Proxy (кеширование отчётов)
+  # ---------------------------------------------------------------
+  nginx-proxy:
+    image: nginx:alpine
+    volumes:
+      - ./nginx-proxy/nginx.conf:/etc/nginx/nginx.conf:ro
+      - nginx_cache:/var/cache/nginx
+    ports:
+      - "8082:80"
+    depends_on:
+      - reports-api
+      - minio-init
+    networks:
+      - bionicpro
+
+volumes:
+  postgres_data:
+  minio_data:
+  nginx_cache:
+
+networks:
+  bionicpro:

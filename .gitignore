@@ -1,2 +1,9 @@
 /postgres-keycloak-data
+/postgres-api-db-data
+/postgres-crm-db-data
+/clickhouse-data
+/redis-data
 2024__yandex-architecture-sso.code-workspace
+.idea
+task.md
+__pycache__

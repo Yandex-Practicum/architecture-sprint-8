@@ -1,6 +1,8 @@
+import os
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, List, Tuple
 
+import boto3
 import pandas as pd
 from airflow import DAG
 from airflow.hooks.base import BaseHook
@@ -130,6 +132,39 @@ def _load_mart(ti: Any, **context: Any) -> None:
         )
 
 
+def _purge_reports_s3(**context: Any) -> None:
+    endpoint = os.environ.get("REPORTS_S3_ENDPOINT_URL", "http://minio:9000")
+    bucket = os.environ.get("REPORTS_S3_BUCKET", "bionicpro-reports")
+    prefix = os.environ.get("REPORTS_S3_PREFIX", "reports/")
+    access = os.environ.get("REPORTS_S3_ACCESS_KEY", "minioadmin")
+    secret = os.environ.get("REPORTS_S3_SECRET_KEY", "minioadmin123")
+    region = os.environ.get("REPORTS_S3_REGION", "us-east-1")
+
+    s3 = boto3.client(
+        "s3",
+        endpoint_url=endpoint,
+        aws_access_key_id=access,
+        aws_secret_access_key=secret,
+        region_name=region,
+    )
+
+    paginator = s3.get_paginator("list_objects_v2")
+    keys: List[str] = []
+    for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
+        for obj in page.get("Contents", []) or []:
+            keys.append(obj["Key"])
+
+    if not keys:
+        return
+
+    for i in range(0, len(keys), 1000):
+        batch = keys[i : i + 1000]
+        s3.delete_objects(
+            Bucket=bucket,
+            Delete={"Objects": [{"Key": k} for k in batch]},
+        )
+
+
 default_args = {
     "owner": "bionicpro",
     "depends_on_past": False,
@@ -160,5 +195,9 @@ with DAG(
         task_id="load_mart",
         python_callable=_load_mart,
     )
+    purge_reports_s3 = PythonOperator(
+        task_id="purge_reports_s3",
+        python_callable=_purge_reports_s3,
+    )
 
-    [extract_telemetry, extract_crm] >> load_mart
+    [extract_telemetry, extract_crm] >> load_mart >> purge_reports_s3

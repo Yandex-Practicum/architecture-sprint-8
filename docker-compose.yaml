@@ -20,6 +20,12 @@ x-airflow-common: &airflow-common
     AIRFLOW__WEBSERVER__SECRET_KEY: 'your_airflow_webserver_sec_key'
     _PIP_ADDITIONAL_REQUIREMENTS: ''
     AIRFLOW_INPUT_DIR: '/opt/airflow/dag-inputs'
+    REPORTS_S3_ENDPOINT_URL: http://minio:9000
+    REPORTS_S3_ACCESS_KEY: minioadmin
+    REPORTS_S3_SECRET_KEY: minioadmin123
+    REPORTS_S3_BUCKET: bionicpro-reports
+    REPORTS_S3_REGION: us-east-1
+    REPORTS_S3_PREFIX: reports/
   volumes:
     - ./airflow/dags:/opt/airflow/dags
     - ./airflow/requirements.txt:/opt/airflow/requirements.txt
@@ -116,6 +122,51 @@ services:
     networks:
       - bionicpro
 
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    ports:
+      - "9002:9000"
+      - "9003:9001"
+    volumes:
+      - minio-data:/data
+    networks:
+      - bionicpro
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        set -e
+        until mc alias set local http://minio:9000 minioadmin minioadmin123; do sleep 1; done
+        mc mb local/bionicpro-reports --ignore-existing
+        mc anonymous set download local/bionicpro-reports
+    networks:
+      - bionicpro
+    restart: "no"
+
+  reports-cdn:
+    image: nginx:alpine
+    ports:
+      - "8090:80"
+    volumes:
+      - ./nginx-reports-cdn/nginx.conf:/etc/nginx/nginx.conf:ro
+      - reports-cdn-cache:/var/cache/nginx/reports
+    depends_on:
+      minio:
+        condition: service_started
+      minio-init:
+        condition: service_completed_successfully
+    networks:
+      - bionicpro
+
   bionicpro-auth:
     build:
       context: ./bionicpro-auth
@@ -151,8 +202,19 @@ services:
       CLICKHOUSE_USER: clickhouse_user
       CLICKHOUSE_PASSWORD: clickhouse_password
       CLICKHOUSE_DATABASE: bionicpro
+      S3_ENDPOINT_URL: http://minio:9000
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin123
+      S3_BUCKET: bionicpro-reports
+      S3_REGION: us-east-1
+      CDN_PUBLIC_BASE_URL: http://localhost:8090
     depends_on:
-      - clickhouse
+      clickhouse:
+        condition: service_started
+      minio:
+        condition: service_started
+      minio-init:
+        condition: service_completed_successfully
     networks:
       - bionicpro
 
@@ -280,3 +342,7 @@ services:
       bash -c " airflow db init && airflow users create \ --username admin \ --firstname admin \ --lastname admin \ --role Admin \ --email admin@sample.ru \ --password admin"
     networks:
       - bionicpro
+
+volumes:
+  minio-data:
+  reports-cdn-cache:

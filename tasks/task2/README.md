@@ -40,3 +40,11 @@
 Схема dag-а:
 ![dag.png](dag.png)
 
+## Задача 3. Бекенд-приложение для API
+
+Проверка:
+```
+curl -sS -H "X-User-Id: john.doe" http://localhost:8001/reports
+```
+
+![curl.png](curl.png)

@@ -11,7 +11,7 @@
     "otpPolicyInitialCounter": 0,
     "otpPolicyDigits": 6,
     "otpPolicyPeriod": 30,
-    "otpPolicyLookAheadWindow": 1,
+    "otpPolicyLookAheadWindow": 3,
     "otpSupportedApplications": ["google-authenticator", "freeotp"],
     "browserFlow": "browser-with-otp",
     "roles": {

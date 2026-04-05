@@ -130,10 +130,12 @@ services:
       REDIS_URL: redis://redis:6379/0
       FRONTEND_URL: http://localhost:3000
       PUBLIC_BASE_URL: http://localhost:8000
+      REPORTS_API_BASE_URL: http://reports-api:8001
       COOKIE_SECURE: "false"
     depends_on:
       - redis
       - keycloak
+      - reports-api
     networks:
       - bionicpro
 

@@ -7,9 +7,11 @@ from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+import httpx
 from redis.asyncio import Redis, from_url
 from starlette.responses import RedirectResponse, Response
 
+from jwt_claims import make_jwks_client, preferred_username_from_access_token
 from keycloak import KeycloakClient
 from redis_store import RedisStore
 from settings import settings
@@ -42,6 +44,7 @@ async def require_session(request: Request, response: Response) -> SessionContex
     if not access_token:
         raise HTTPException(status_code=401, detail="invalid session")
 
+    token_refreshed = False
     if now >= access_expires_at - settings.access_token_refresh_skew_seconds:
         if not refresh_token:
             await store.delete_session(old_session_id)
@@ -59,13 +62,21 @@ async def require_session(request: Request, response: Response) -> SessionContex
             "refresh_token": refresh_token,
             "access_expires_at": access_expires_at,
         }
+        token_refreshed = True
 
-    new_session_id = random_urlsafe_token()
-    await store.rotate_session(old_session_id, new_session_id, payload)
+    # Rotating the session id on every request breaks parallel /reports calls
+    # (e.g. React Strict Mode): the second in-flight request still sends the old
+    # cookie while Redis already deleted that key. Rotate only when tokens change.
+    session_cookie_value = old_session_id
+    if token_refreshed:
+        session_cookie_value = random_urlsafe_token()
+        await store.rotate_session(old_session_id, session_cookie_value, payload)
+    else:
+        await store.save_session(old_session_id, payload)
 
     response.set_cookie(
         key=settings.cookie_name,
-        value=new_session_id,
+        value=session_cookie_value,
         httponly=True,
         secure=settings.cookie_secure,
         samesite="lax",
@@ -85,9 +96,12 @@ async def lifespan(app: FastAPI):
     )
     app.state.redis_store = RedisStore(redis, settings)
     app.state.keycloak = KeycloakClient(settings)
+    app.state.jwks_client = make_jwks_client(settings)
+    app.state.http_client = httpx.AsyncClient(timeout=30.0)
     try:
         yield
     finally:
+        await app.state.http_client.aclose()
         await redis.aclose()
 
 
@@ -104,16 +118,30 @@ app.add_middleware(
 
 @app.get("/reports")
 async def reports(
-    _session: Annotated[SessionContext, Depends(require_session)],
+    request: Request,
+    session: Annotated[SessionContext, Depends(require_session)],
 ):
-    return {
-        "ok": True,
-        "resource": "reports",
-        "message": (
-            "Session validated; access token stays server-side "
-            "(would be sent as Authorization to a downstream API)."
-        ),
-    }
+    user_id = preferred_username_from_access_token(
+        request.app.state.jwks_client,
+        settings,
+        session.access_token,
+    )
+    url = f"{settings.reports_api_base_url}/reports"
+    client: httpx.AsyncClient = request.app.state.http_client
+    try:
+        upstream = await client.get(url, headers={"X-User-Id": user_id})
+    except httpx.RequestError as e:
+        logger.exception("reports-api request failed: %s", e)
+        raise HTTPException(
+            status_code=502, detail="reports service unreachable"
+        ) from e
+
+    media_type = upstream.headers.get("content-type") or "application/json"
+    return Response(
+        content=upstream.content,
+        status_code=upstream.status_code,
+        media_type=media_type,
+    )
 
 
 @app.get("/auth/login")

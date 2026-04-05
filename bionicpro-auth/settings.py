@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     cookie_secure: bool = False
     frontend_url: str = "http://localhost:3000"
     public_base_url: str = "http://localhost:8000"
+    reports_api_base_url: str = "http://localhost:8001"
     pkce_key_prefix: str = "pkce:"
     session_key_prefix: str = "session:"
 

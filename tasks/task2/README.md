@@ -48,3 +48,9 @@ curl -sS -H "X-User-Id: john.doe" http://localhost:8001/reports
 ```
 
 ![curl.png](curl.png)
+
+## Задача 4 и 5. Авторизация и вывод на фронт
+
+Кнопка уже была добавлена ранее, вот пример её нажатия:
+
+![report_loading.png](report_loading.png)

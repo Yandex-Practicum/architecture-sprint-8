@@ -135,8 +135,8 @@
       "attributes": {
         "pkce.code.challenge.method": "S256"
       },
-      "redirectUris": ["http://localhost:3000/*", "http://localhost:5000/callback"],
-      "webOrigins": ["http://localhost:3000", "http://localhost:5000"],
+      "redirectUris": ["http://127.0.0.1:3000/*", "http://127.0.0.1:5000/callback"],
+      "webOrigins": ["http://127.0.0.1:3000", "http://127.0.0.1:5000"],
       "fullScopeAllowed": true
     },
     {
@@ -153,8 +153,8 @@
         "pkce.code.challenge.method": "S256",
         "access.token.lifespan": "120"
       },
-      "redirectUris": ["http://localhost:5000/callback", "http://localhost:5000/auth/callback"],
-      "webOrigins": ["http://localhost:5000"],
+      "redirectUris": ["http://127.0.0.1:5000/callback", "http://127.0.0.1:5000/auth/callback"],
+      "webOrigins": ["http://127.0.0.1:5000"],
       "fullScopeAllowed": true
     },
     {

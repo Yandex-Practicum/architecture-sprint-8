@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const AUTH_SERVICE_URL = process.env.REACT_APP_AUTH_SERVICE_URL || 'http://localhost:5000';
+const AUTH_SERVICE_URL = process.env.REACT_APP_AUTH_SERVICE_URL || 'http://127.0.0.1:5000';
 
 const ReportPage: React.FC = () => {
   const [user, setUser] = useState<any>(null);

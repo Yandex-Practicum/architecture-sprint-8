@@ -25,6 +25,9 @@ services:
       KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
       KC_DB_USERNAME: keycloak_user
       KC_DB_PASSWORD: keycloak_password
+      KC_HOSTNAME: "127.0.0.1"
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_STRICT_HTTPS: "false"
     command:
       - start-dev
       - --import-realm
@@ -52,7 +55,7 @@ services:
     volumes:
       - ldap-data:/var/lib/ldap
       - ldap-config:/etc/ldap/slapd.d
-      - ./task1/ldap/bootstrap.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/bootstrap.ldif
+      - ./ldap/bootstrap.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/bootstrap.ldif
     ports:
       - "389:389"
       - "636:636"
@@ -71,15 +74,17 @@ services:
 
   bionicpro-auth:
     build:
-      context: ./task1/bionicpro-auth
+      context: ./bionicpro-auth
       dockerfile: Dockerfile
     container_name: bionicpro-auth-service
     environment:
       KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_PUBLIC_URL: http://127.0.0.1:8080
       KEYCLOAK_REALM: reports-realm
       KEYCLOAK_CLIENT_ID: bionicpro-auth
       KEYCLOAK_CLIENT_SECRET: bionicpro-auth-secret-key-2024
-      FRONTEND_URL: http://localhost:3000
+      FRONTEND_URL: http://127.0.0.1:3000
+      AUTH_SERVICE_BASE_URL: http://127.0.0.1:5000
       SESSION_SECRET_KEY: super-secret-session-key-change-in-production
       REDIS_URL: redis://redis:6379/0
       ACCESS_TOKEN_MAX_AGE: 120
@@ -96,12 +101,15 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        REACT_APP_API_URL: http://127.0.0.1:8000
+        REACT_APP_AUTH_SERVICE_URL: http://127.0.0.1:5000
+        REACT_APP_KEYCLOAK_URL: http://127.0.0.1:8080
+        REACT_APP_KEYCLOAK_REALM: reports-realm
+        REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
     container_name: bionicpro-frontend
     ports:
       - "3000:3000"
-    environment:
-      REACT_APP_API_URL: http://127.0.0.1:8000
-      REACT_APP_AUTH_SERVICE_URL: http://127.0.0.1:5000
     depends_on:
       - bionicpro-auth
     networks:

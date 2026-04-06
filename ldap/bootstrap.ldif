@@ -1,0 +1,61 @@
+dn: dc=bionicpro,dc=com
+objectClass: top
+objectClass: dcObject
+objectClass: organization
+o: BionicPRO
+dc: bionicpro
+
+dn: ou=people,dc=bionicpro,dc=com
+objectClass: organizationalUnit
+ou: people
+
+dn: ou=groups,dc=bionicpro,dc=com
+objectClass: organizationalUnit
+ou: groups
+
+dn: cn=prothetic_users,ou=groups,dc=bionicpro,dc=com
+objectClass: groupOfNames
+cn: prothetic_users
+member: uid=ldap_user1,ou=people,dc=bionicpro,dc=com
+member: uid=ldap_user2,ou=people,dc=bionicpro,dc=com
+
+dn: cn=administrators,ou=groups,dc=bionicpro,dc=com
+objectClass: groupOfNames
+cn: administrators
+member: uid=ldap_admin,ou=people,dc=bionicpro,dc=com
+
+dn: uid=ldap_user1,ou=people,dc=bionicpro,dc=com
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+objectClass: top
+cn: LDAP User One
+sn: One
+givenName: LDAP User
+uid: ldap_user1
+mail: ldap_user1@bionicpro.com
+userPassword: ldapuser123
+
+dn: uid=ldap_user2,ou=people,dc=bionicpro,dc=com
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+objectClass: top
+cn: LDAP User Two
+sn: Two
+givenName: LDAP User
+uid: ldap_user2
+mail: ldap_user2@bionicpro.com
+userPassword: ldapuser123
+
+dn: uid=ldap_admin,ou=people,dc=bionicpro,dc=com
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+objectClass: top
+cn: LDAP Admin
+sn: Admin
+givenName: LDAP
+uid: ldap_admin
+mail: ldap_admin@bionicpro.com
+userPassword: ldapadmin123

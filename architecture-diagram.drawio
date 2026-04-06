@@ -1,0 +1,170 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="BionicPRO Security Architecture with PKCE" id="c4-security">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        
+        <!-- Title -->
+        <mxCell id="title" value="BionicPRO Security Architecture&#xa;PKCE Flow + Session Management + Federated Identity" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="284.5" y="20" width="600" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- User (Pilot/Customer) -->
+        <mxCell id="user" value="&lt;b&gt;Пользователь&lt;/b&gt;&#xa;(Пилот протеза / Покупатель)" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="80" y="150" width="60" height="100" as="geometry" />
+        </mxCell>
+
+        <!-- Browser -->
+        <mxCell id="browser" value="&lt;b&gt;Browser&lt;/b&gt;&#xa;React Frontend&#xa;(с PKCE support)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;verticalAlign=top;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="240" y="150" width="160" height="100" as="geometry" />
+        </mxCell>
+
+        <!-- bionicpro-auth Service -->
+        <mxCell id="auth-service" value="&lt;b&gt;bionicpro-auth&lt;/b&gt;&#xa;Backend Service&#xa;(Python/Flask)&#xa;&#xa;• Token management&#xa;• Session handling&#xa;• Refresh token storage&#xa;• Session rotation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;verticalAlign=top;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="480" y="130" width="180" height="140" as="geometry" />
+        </mxCell>
+
+        <!-- Keycloak -->
+        <mxCell id="keycloak" value="&lt;b&gt;Keycloak (IdP)&lt;/b&gt;&#xa;&#xa;• PKCE enabled&#xa;• MFA/OTP support&#xa;• LDAP integration&#xa;• Identity Brokering&#xa;• Token issuer (JWT)&#xa;• Access token: 2 min TTL" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=top;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="760" y="130" width="180" height="140" as="geometry" />
+        </mxCell>
+
+        <!-- External IdP - LDAP -->
+        <mxCell id="ldap" value="&lt;b&gt;LDAP / Active Directory&lt;/b&gt;&#xa;&#xa;OpenLDAP Server&#xa;&#xa;User Federation&#xa;(Представительства&#xa;в других странах)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;verticalAlign=top;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1000" y="50" width="150" height="120" as="geometry" />
+        </mxCell>
+
+        <!-- External IdP - Yandex ID -->
+        <mxCell id="yandex-id" value="&lt;b&gt;Яндекс ID&lt;/b&gt;&#xa;&#xa;External IdP&#xa;&#xa;OAuth 2.0 Provider&#xa;Identity Brokering" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;verticalAlign=top;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1000" y="210" width="150" height="120" as="geometry" />
+        </mxCell>
+
+        <!-- Resource Server API -->
+        <mxCell id="api" value="&lt;b&gt;API / Resource Server&lt;/b&gt;&#xa;&#xa;Protected Resources&#xa;• Validates access token&#xa;• Checks roles/scopes" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;verticalAlign=top;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="480" y="340" width="180" height="100" as="geometry" />
+        </mxCell>
+
+        <!-- Session Storage -->
+        <mxCell id="session-storage" value="&lt;b&gt;Session Storage&lt;/b&gt;&#xa;&#xa;Redis / In-Memory&#xa;&#xa;• Refresh tokens (encrypted)&#xa;• Access tokens&#xa;• Session metadata" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#ffe6cc;strokeColor=#d79b00;verticalAlign=top;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="520" y="500" width="140" height="120" as="geometry" />
+        </mxCell>
+
+        <!-- Database -->
+        <mxCell id="database" value="&lt;b&gt;Database&lt;/b&gt;&#xa;PostgreSQL&#xa;&#xa;User profiles&#xa;(from Yandex ID)" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#ffe6cc;strokeColor=#d79b00;verticalAlign=top;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="760" y="500" width="140" height="100" as="geometry" />
+        </mxCell>
+
+        <!-- Arrows and Flow -->
+        
+        <!-- User to Browser -->
+        <mxCell id="arrow1" value="1. Открывает приложение" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;fontSize=10;" edge="1" parent="1" source="user" target="browser">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Browser to auth-service (PKCE start) -->
+        <mxCell id="arrow2" value="2. Инициирует авторизацию&#xa;(генерирует code_verifier,&#xa;отправляет code_challenge)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;fontSize=9;" edge="1" parent="1" source="browser" target="auth-service">
+          <mxGeometry x="-0.2" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- auth-service to Keycloak (redirect) -->
+        <mxCell id="arrow3" value="3. Redirect на Keycloak&#xa;с code_challenge + state" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;fontSize=9;" edge="1" parent="1" source="auth-service" target="keycloak">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Keycloak to LDAP -->
+        <mxCell id="arrow4" value="User Federation" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=1;fontSize=9;dashed=1;" edge="1" parent="1" source="keycloak" target="ldap">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Keycloak to Yandex ID -->
+        <mxCell id="arrow5" value="Identity Brokering" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=1;fontSize=9;dashed=1;" edge="1" parent="1" source="keycloak" target="yandex-id">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Keycloak back to auth-service (authorization code) -->
+        <mxCell id="arrow6" value="4. Authorization code&#xa;+ state (callback)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;fontSize=9;" edge="1" parent="1" source="keycloak" target="auth-service">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="850" y="280" />
+              <mxPoint x="570" y="280" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- auth-service to Keycloak (token exchange with code_verifier) -->
+        <mxCell id="arrow7" value="5. Token exchange:&#xa;code + code_verifier + client_secret&#xa;→ access_token + refresh_token" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;fontSize=8;exitX=1;exitY=0.75;exitDx=0;exitDy=0;entryX=0;entryY=0.75;entryDx=0;entryDy=0;" edge="1" parent="1" source="auth-service" target="keycloak">
+          <mxGeometry x="0.1" relative="1" as="geometry">
+            <Array as="points" />
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- auth-service to session-storage -->
+        <mxCell id="arrow8" value="6. Сохраняет токены&#xa;в защищённом хранилище" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;fontSize=9;" edge="1" parent="1" source="auth-service" target="session-storage">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- auth-service to browser (session cookie) -->
+        <mxCell id="arrow9" value="7. Возвращает HTTP-only&#xa;Secure session cookie" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;fontSize=9;" edge="1" parent="1" source="auth-service" target="browser">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="480" y="240" />
+              <mxPoint x="320" y="240" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Browser to API -->
+        <mxCell id="arrow10" value="8. Запрос к защищённому ресурсу&#xa;(с session cookie)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;fontSize=9;" edge="1" parent="1" source="browser" target="api">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="320" y="390" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- API to auth-service (validate session) -->
+        <mxCell id="arrow11" value="9. Проверяет сессию,&#xa;извлекает access_token" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=1;fontSize=9;dashed=1;" edge="1" parent="1" source="api" target="auth-service">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- auth-service to session-storage (get token) -->
+        <mxCell id="arrow12" value="Получает токен из хранилища" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=1;fontSize=9;dashed=1;" edge="1" parent="1" source="auth-service" target="session-storage">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="700" y="390" />
+              <mxPoint x="700" y="560" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Yandex ID to Database -->
+        <mxCell id="arrow13" value="Сохраняет профиль&#xa;пользователя" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=1;fontSize=9;dashed=1;" edge="1" parent="1" source="yandex-id" target="database">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1075" y="380" />
+              <mxPoint x="830" y="380" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Legend -->
+        <mxCell id="legend-box" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#666666;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="650" width="420" height="150" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="legend-title" value="&lt;b&gt;Ключевые особенности решения:&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=11;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="50" y="660" width="400" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="legend-content" value="✓ PKCE защищает от перехвата authorization code&#xa;✓ Токены не передаются на фронтенд, только session cookie&#xa;✓ Access token TTL = 2 минуты, автообновление через refresh token&#xa;✓ Session rotation предотвращает session fixation атаки&#xa;✓ LDAP интеграция для пользователей из разных стран&#xa;✓ MFA/OTP обязателен для всех пользователей&#xa;✓ Identity Brokering с Яндекс ID для внешней авторизации&#xa;✓ Профили пользователей из Яндекса сохраняются в БД" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="50" y="685" width="400" height="110" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

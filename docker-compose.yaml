@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   keycloak_db:
     image: postgres:14
@@ -119,17 +117,98 @@ services:
   crm_db:
     image: postgres:14
     container_name: bionicpro-crm-db
+    command:
+      - postgres
+      - -c
+      - wal_level=logical
+      - -c
+      - max_replication_slots=10
+      - -c
+      - max_wal_senders=10
     environment:
       POSTGRES_DB: crm_db
       POSTGRES_USER: crm_user
       POSTGRES_PASSWORD: crm_password
     volumes:
       - crm-postgres-data:/var/lib/postgresql/data
-      - ./airflow/init-crm.sql:/docker-entrypoint-initdb.d/init-crm.sql
+      - ./airflow/init-crm.sql:/docker-entrypoint-initdb.d/01-init-crm.sql
+      - ./airflow/init-debezium.sql:/docker-entrypoint-initdb.d/02-init-debezium.sql
     ports:
       - "5434:5432"
     networks:
       - bionicpro-network
+
+  # Zookeeper + Kafka (потоковая шина для CDC)
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    container_name: bionicpro-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - bionicpro-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: bionicpro-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9093:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    networks:
+      - bionicpro-network
+
+  # Kafka Connect с плагином Debezium (официальные образы на quay.io; тег latest на Docker Hub отсутствует)
+  kafka-connect:
+    image: quay.io/debezium/connect:2.7.3.Final
+    container_name: bionicpro-kafka-connect
+    depends_on:
+      - kafka
+      - crm_db
+    ports:
+      - "8083:8083"
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: bionicpro-connect
+      CONFIG_STORAGE_TOPIC: bionicpro_connect_configs
+      OFFSET_STORAGE_TOPIC: bionicpro_connect_offsets
+      STATUS_STORAGE_TOPIC: bionicpro_connect_status
+      CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      STATUS_STORAGE_REPLICATION_FACTOR: 1
+    networks:
+      - bionicpro-network
+
+  # Регистрация Debezium-коннектора (CRM → Kafka)
+  debezium-register:
+    image: curlimages/curl:8.5.0
+    container_name: bionicpro-debezium-register
+    depends_on:
+      - kafka-connect
+    networks:
+      - bionicpro-network
+    volumes:
+      - ./debezium/crm-postgres-connector.json:/crm.json:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        for i in $$(seq 1 40); do
+          if curl -sf http://kafka-connect:8083/connectors >/dev/null 2>&1; then break; fi
+          sleep 3
+        done
+        sleep 8
+        curl -sf -X DELETE "http://kafka-connect:8083/connectors/crm-postgres-connector" || true
+        curl -sf -X POST -H "Content-Type: application/json" --data @/crm.json "http://kafka-connect:8083/connectors"
+        echo "Debezium connector registered"
 
   # ClickHouse - OLAP хранилище для аналитики
   clickhouse:
@@ -143,9 +222,13 @@ services:
     volumes:
       - clickhouse-data:/var/lib/clickhouse
       - ./clickhouse/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+      - ./clickhouse/init-kafka-cdc.sql:/docker-entrypoint-initdb.d/init-kafka-cdc.sql
     ports:
       - "8123:8123"
       - "9000:9000"
+    depends_on:
+      kafka:
+        condition: service_started
     networks:
       - bionicpro-network
     ulimits:
@@ -198,6 +281,8 @@ services:
       CLICKHOUSE_USER: analytics_user
       CLICKHOUSE_PASSWORD: analytics_password
       CLICKHOUSE_DB: analytics_db
+      REPORTS_WEBHOOK_URL: http://reports-api:8000/internal/invalidate-reports-cache
+      REPORTS_WEBHOOK_SECRET: bionicpro-webhook-secret-2024
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/data:/opt/airflow/data
@@ -245,6 +330,8 @@ services:
       CLICKHOUSE_USER: analytics_user
       CLICKHOUSE_PASSWORD: analytics_password
       CLICKHOUSE_DB: analytics_db
+      REPORTS_WEBHOOK_URL: http://reports-api:8000/internal/invalidate-reports-cache
+      REPORTS_WEBHOOK_SECRET: bionicpro-webhook-secret-2024
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/data:/opt/airflow/data
@@ -285,6 +372,55 @@ services:
         airflow db init &&
         airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@bionicpro.com
 
+  # MinIO — S3-совместимое хранилище для кеша отчётов
+  minio:
+    image: minio/minio:latest
+    container_name: bionicpro-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+    volumes:
+      - minio-data:/data
+    ports:
+      # 9000 на хосте занят ClickHouse; API MinIO снаружи — 9002
+      - "9002:9000"
+      - "9001:9001"
+    networks:
+      - bionicpro-network
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: bionicpro-minio-init
+    depends_on:
+      - minio
+    networks:
+      - bionicpro-network
+    entrypoint: >
+      /bin/sh -c "
+      for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do
+        mc alias set local http://minio:9000 minio minio123 && break;
+        sleep 2;
+      done;
+      mc mb -p local/bionicpro-reports || true;
+      mc anonymous set download local/bionicpro-reports;
+      exit 0;
+      "
+
+  # Nginx как reverse proxy с кешем (эмуляция CDN)
+  cdn-nginx:
+    image: nginx:1.25-alpine
+    container_name: bionicpro-cdn-nginx
+    ports:
+      - "8090:80"
+    volumes:
+      - ./cdn/nginx.conf:/etc/nginx/nginx.conf:ro
+      - cdn-cache:/var/cache/nginx/reports
+    depends_on:
+      - minio
+    networks:
+      - bionicpro-network
+
   # Reports API Service - сервис для получения отчетов
   reports-api:
     build:
@@ -300,11 +436,24 @@ services:
       KEYCLOAK_URL: http://keycloak:8080
       KEYCLOAK_REALM: reports-realm
       KEYCLOAK_PUBLIC_KEY_URL: http://keycloak:8080/realms/reports-realm
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: minio
+      S3_SECRET_KEY: minio123
+      S3_BUCKET: bionicpro-reports
+      S3_REGION: us-east-1
+      CDN_BASE_URL: http://127.0.0.1:8090
+      WEBHOOK_SECRET: bionicpro-webhook-secret-2024
     ports:
       - "8000:8000"
     depends_on:
-      - clickhouse
-      - keycloak
+      clickhouse:
+        condition: service_started
+      keycloak:
+        condition: service_started
+      minio:
+        condition: service_started
+      minio-init:
+        condition: service_completed_successfully
     networks:
       - bionicpro-network
 
@@ -317,6 +466,8 @@ volumes:
   clickhouse-data:
   airflow-postgres-data:
   airflow-logs:
+  minio-data:
+  cdn-cache:
 
 networks:
   bionicpro-network:

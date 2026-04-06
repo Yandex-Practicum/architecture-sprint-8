@@ -18,6 +18,14 @@ interface ProstheticReport {
   report_period_end: string;
 }
 
+interface ReportApiResponse {
+  reports: ProstheticReport[];
+  cdn_url: string;
+  generated_at: string;
+  cached: boolean;
+  cache_key: string;
+}
+
 const ReportPage: React.FC = () => {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -25,6 +33,7 @@ const ReportPage: React.FC = () => {
   const [reportLoading, setReportLoading] = useState(false);
   const [reports, setReports] = useState<ProstheticReport[]>([]);
   const [showReports, setShowReports] = useState(false);
+  const [reportMeta, setReportMeta] = useState<{ cached: boolean; cdn_url: string } | null>(null);
 
   useEffect(() => {
     checkSession();
@@ -63,6 +72,7 @@ const ReportPage: React.FC = () => {
       setUser(null);
       setReports([]);
       setShowReports(false);
+      setReportMeta(null);
     } catch (err) {
       setError('Logout failed');
     }
@@ -94,12 +104,23 @@ const ReportPage: React.FC = () => {
         throw new Error(errorData?.detail || 'Failed to fetch reports');
       }
 
-      const reportsData = await response.json();
-      setReports(reportsData);
+      const body = await response.json();
+      const data = body as ReportApiResponse | ProstheticReport[];
+      if (Array.isArray(data)) {
+        setReports(data);
+        setReportMeta(null);
+      } else {
+        setReports(data.reports ?? []);
+        setReportMeta({
+          cached: data.cached,
+          cdn_url: data.cdn_url,
+        });
+      }
       setShowReports(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
       setReports([]);
+      setReportMeta(null);
     } finally {
       setReportLoading(false);
     }
@@ -186,6 +207,20 @@ const ReportPage: React.FC = () => {
         {error && (
           <div className="mt-4 p-4 bg-red-100 text-red-700 rounded text-sm">
             {error}
+          </div>
+        )}
+
+        {reportMeta && (
+          <div className="mt-4 p-3 bg-slate-100 text-slate-700 rounded text-sm">
+            <p>
+              Источник:{' '}
+              {reportMeta.cached
+                ? 'кеш S3 (ClickHouse не запрашивался)'
+                : 'сгенерировано из ClickHouse и записано в S3'}
+            </p>
+            <p className="text-xs mt-1 break-all">
+              CDN: <a className="text-blue-600 underline" href={reportMeta.cdn_url} target="_blank" rel="noreferrer">{reportMeta.cdn_url}</a>
+            </p>
           </div>
         )}
 

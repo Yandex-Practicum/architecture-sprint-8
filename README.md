@@ -1,256 +1,74 @@
-# BionicPRO - Комплексная система безопасности и аналитики
+# BionicPRO — учебный стенд (архитектура и безопасность)
 
-Полнофункциональная система для BionicPRO с поддержкой OAuth 2.0, PKCE, MFA, LDAP, федеративной аутентификации и аналитической системы отчетов на базе Apache Airflow и ClickHouse.
+Монорепозиторий проектной работы: единый `docker compose` поднимает SSO, отчётный API, Airflow, ClickHouse, MinIO, CDN, Kafka и Debezium. Ниже — навигация по спринтам и кратко, что в каждом из них сделано.
 
-## Архитектура
+## Задачи (task1–task4)
 
-![Архитектурная диаграмма](architecture-diagram.drawio)
+| Спринт | Суть | Документация |
+|--------|------|----------------|
+| **Task 1** | Безопасный вход: PKCE, сессии через `bionicpro-auth`, Keycloak, MFA (TOTP), LDAP, брокер Яндекс ID | [README](task1/README.md) · [QUICKSTART](task1/QUICKSTART.md) · [отчёт](task1/TASK1_COMPLETION_REPORT.md) · [C4 drawio](task1/architecture-diagram.drawio) |
+| **Task 2** | Отчёты: ETL из CRM в ClickHouse (Airflow), витрина, Reports API (JWT, RBAC по `buyer_id`), UI | [README](task2/README.md) · [QUICKSTART](task2/QUICKSTART.md) · [отчёт](task2/TASK2_COMPLETION_REPORT.md) · [диаграмма](task2/architecture-diagram.puml) |
+| **Task 3** | Разгрузка OLAP: кеш отчётов в S3 (MinIO), раздача через Nginx (CDN), инвалидация при ETL | [README](task3/README.md) · [QUICKSTART](task3/QUICKSTART.md) · [отчёт](task3/TASK3_COMPLETION_REPORT.md) · [summary](task3/SUMMARY.md) |
+| **Task 4** | CDC: изменения CRM → Debezium → Kafka → ClickHouse (`KafkaEngine` + materialized views), рядом с пакетным ETL | [README](task4/README.md) · [QUICKSTART](task4/QUICKSTART.md) · [отчёт](task4/TASK4_COMPLETION_REPORT.md) · [summary](task4/SUMMARY.md) |
 
-### Компоненты безопасности (Task 1)
-- **bionicpro-auth** - сервис аутентификации на Python/Flask с PKCE flow
-- **frontend** - React-приложение с интеграцией через auth-сервис
-- **keycloak** - Identity Provider с поддержкой MFA/OTP
-- **openldap** - LDAP-сервер для федеративной идентификации
-- **redis** - хранилище сессий и токенов
-- **postgresql** - база данных Keycloak
-
-### Компоненты аналитики (Task 2)
-- **reports-api** - FastAPI сервис для получения отчетов с JWT авторизацией
-- **apache-airflow** - оркестрация ETL процессов (веб-сервер, планировщик)
-- **clickhouse** - колоночная OLAP база данных для аналитики
-- **crm_db** - PostgreSQL база данных CRM-системы
-- **airflow_db** - PostgreSQL база метаданных Airflow
+Тексты формулировок заданий лежат в `taskN/task.txt`. Конспекты теории — в каталоге [`Theory/`](Theory/).
 
 ## Быстрый запуск
 
-### Предварительные требования
-- Docker и Docker Compose
-- Минимум 8 GB RAM для Docker
-- Свободные порты: 3000, 5000, 6379, 8000, 8080, 8081, 8123, 9000, 389, 5433-5435
-
-### Команды запуска
+Нужны Docker и Docker Compose v2, ~8 GB RAM под Docker, свободные порты (в т.ч. 3000, 5000, 8000, 8080, 8081, 8083, 8123, 9000, 9093, 5433–5435, 6379, 389 и др. — см. compose и QUICKSTART задач).
 
 ```bash
-# 1. Клонируйте репозиторий и перейдите в директорию
-cd /Users/nspeganov/IdeaProjects/architecture-bionicpro
-
-# 2. Запустите все сервисы
-docker-compose up -d --build
-
-# 3. Дождитесь полной инициализации (~3-5 минут)
-docker-compose ps
-
-# 4. Настройте Airflow connections (опционально)
-bash airflow/setup-connections.sh
-
-# 5. Запустите ETL процесс в Airflow
-# Откройте http://127.0.0.1:8081 (admin/admin)
-# Включите и запустите DAG 'etl_crm_to_clickhouse'
-
-# 6. Проверьте доступность сервисов:
-# - Frontend: http://127.0.0.1:3000
-# - Keycloak Admin: http://127.0.0.1:8080 (admin/admin)
-# - Auth Service: http://127.0.0.1:5000/health
-# - Reports API: http://127.0.0.1:8000/health
-# - Airflow UI: http://127.0.0.1:8081 (admin/admin)
+cd /path/to/architecture-bionicpro
+docker compose up -d --build
 ```
 
-### Первый вход в систему
+Дальше по сценарию:
 
-1. Откройте http://127.0.0.1:3000
-2. Нажмите "Login with Keycloak"
-3. Введите тестового пользователя: `prothetic1` / `prothetic123`
-4. **Настройте OTP** (обязательно):
-   - Отсканируйте QR-код в Google Authenticator или FreeOTP
-   - Введите 6-значный код из приложения
-5. Вы успешно вошли в систему!
+- Airflow: http://127.0.0.1:8081 (`admin` / `admin`) — включить DAG `etl_crm_to_clickhouse`; при необходимости [airflow/setup-connections.sh](airflow/setup-connections.sh).
+- Task 4: после старта проверить Kafka Connect и при необходимости [debezium/register-connector.sh](debezium/register-connector.sh) — детали в [task4/QUICKSTART.md](task4/QUICKSTART.md).
 
-## Тестовые пользователи
+Остановка с данными: `docker compose down`; полная очистка томов: `docker compose down -v`.
 
-### Локальные пользователи:
-- `prothetic1` / `prothetic123` (роль: prothetic_user)
-- `prothetic2` / `prothetic123` (роль: prothetic_user)
-- `admin1` / `admin123` (роль: administrator)
+## Сервисы в корне репозитория
 
-### LDAP пользователи (после настройки):
-- `ldap_user1` / `ldapuser123` (группа: prothetic_users)
-- `ldap_user2` / `ldapuser123` (группа: prothetic_users)
-- `ldap_admin` / `ldapadmin123` (группа: administrators)
+| Каталог / файл | Назначение |
+|----------------|------------|
+| [docker-compose.yaml](docker-compose.yaml) | Все контейнеры |
+| [bionicpro-auth/](bionicpro-auth/) | Flask: PKCE, сессии, выдача access token для API |
+| [frontend/](frontend/) | React, вход через auth-сервис, отчёты |
+| [reports-api/](reports-api/) | FastAPI + ClickHouse (+ S3/MinIO в task 3) |
+| [airflow/](airflow/) | DAG ETL, init SQL для CRM и Debezium |
+| [clickhouse/](clickhouse/) | Init схемы OLAP и (task 4) Kafka CDC |
+| [debezium/](debezium/) | JSON коннектора и скрипт регистрации |
+| [keycloak/](keycloak/) | Realm, инструкции MFA |
+| [ldap/](ldap/) | OpenLDAP bootstrap и инструкция |
+| [cdn/](cdn/) | Nginx для CDN (task 3) |
 
-*Все пользователи должны настроить OTP при первом входе*
+## Дополнительная настройка (Keycloak / LDAP / Яндекс)
 
-## Дополнительная настройка
+- LDAP: [ldap/LDAP_SETUP_INSTRUCTIONS.md](ldap/LDAP_SETUP_INSTRUCTIONS.md)
+- MFA: [keycloak/MFA_OTP_SETUP_INSTRUCTIONS.md](keycloak/MFA_OTP_SETUP_INSTRUCTIONS.md)
+- Яндекс ID: [YANDEX_ID_SETUP.md](YANDEX_ID_SETUP.md)
+- Экспорт realm: [KEYCLOAK_EXPORT_INSTRUCTIONS.md](KEYCLOAK_EXPORT_INSTRUCTIONS.md)
 
-### 1. Настройка LDAP User Federation
-Следуйте инструкциям: [`ldap/LDAP_SETUP_INSTRUCTIONS.md`](ldap/LDAP_SETUP_INSTRUCTIONS.md)
+## Тестовые пользователи (Keycloak)
 
-### 2. Настройка многофакторной аутентификации (MFA)
-Следуйте инструкциям: [`keycloak/MFA_OTP_SETUP_INSTRUCTIONS.md`](keycloak/MFA_OTP_SETUP_INSTRUCTIONS.md)
+Локальные: `prothetic1` / `prothetic123`, `prothetic2` / `prothetic123`, `admin1` / `admin123`. После настройки LDAP — см. [task1/README.md](task1/README.md). При первом входе у пользователей с включённым TOTP нужно настроить OTP в приложении-аутентификаторе.
 
-### 3. Интеграция с Яндекс ID
-Следуйте инструкциям: [`YANDEX_ID_SETUP.md`](YANDEX_ID_SETUP.md)
+## Полезные эндпоинты
 
-### 4. Экспорт конфигурации Keycloak
-Следуйте инструкциям: [`KEYCLOAK_EXPORT_INSTRUCTIONS.md`](KEYCLOAK_EXPORT_INSTRUCTIONS.md)
+- Frontend: http://127.0.0.1:3000  
+- Auth: http://127.0.0.1:5000/health  
+- Reports API: http://127.0.0.1:8000/docs  
+- Keycloak: http://127.0.0.1:8080  
 
-## Безопасность
+Подробные списки API и портов — в README соответствующих task.
 
-### Реализованные меры:
-✅ **PKCE (Proof Key for Code Exchange)** - защита от перехвата authorization code
-✅ **Session-based Authentication** - токены не передаются на фронтенд
-✅ **Short-lived Access Tokens** - TTL 2 минуты с автообновлением
-✅ **Multi-Factor Authentication** - обязательный TOTP для всех пользователей
-✅ **Federated Identity** - поддержка LDAP и внешних IdP
-✅ **Secure Token Storage** - Redis с опциональным шифрованием
-✅ **Session Rotation** - защита от session fixation атак
-✅ **HTTP-only Secure Cookies** - безопасное хранение сессий
-
-## API Endpoints
-
-### Auth Service (bionicpro-auth:5000)
-- `GET /health` - проверка состояния сервиса
-- `GET /auth/login` - инициация PKCE авторизации
-- `GET /auth/callback` - обработка callback от Keycloak
-- `POST /auth/logout` - выход из системы
-- `GET /auth/user` - получение данных пользователя
-- `GET /auth/token` - получение access token для API
-- `POST /auth/session/rotate` - ротация сессии
-
-### Reports API (reports-api:8000)
-- `GET /` - информация о сервисе
-- `GET /health` - проверка подключения к ClickHouse
-- `GET /reports` - получение отчетов пользователя (требует JWT)
-- `GET /reports/summary` - сводная статистика (требует JWT)
-- `GET /docs` - Swagger документация API
-
-## Остановка системы
+## Отладка
 
 ```bash
-# Остановка без удаления данных
-docker-compose stop
-
-# Полная очистка (включая volumes)
-docker-compose down -v
-```
-
-## Troubleshooting
-
-### Keycloak не запускается:
-```bash
-docker-compose logs keycloak
-docker-compose logs keycloak_db
-```
-
-### Auth-сервис не подключается:
-```bash
-docker-compose logs bionicpro-auth
-docker-compose exec bionicpro-auth ping keycloak
-```
-
-### LDAP проблемы:
-```bash
-docker-compose logs openldap
-# Проверьте настройки User Federation в Keycloak Admin Console
-```
-
-### Проблемы с OTP:
-- Проверьте синхронизацию времени на устройстве
-- Убедитесь в правильности настройки Authentication Flow
-- Используйте recovery codes (если настроены)
-
-## Технические детали
-
-### Структура проекта:
-```
-.
-├── bionicpro-auth/          # Auth сервис (Python/Flask)
-├── frontend/                # React приложение
-├── keycloak/               # Конфигурация Keycloak
-├── ldap/                   # Конфигурация OpenLDAP
-├── docker-compose.yaml     # Конфигурация Docker
-├── architecture-diagram.drawio  # C4 диаграмма
-└── README.md              # Этот файл
-```
-
-### Используемые технологии:
-- **Backend**: Python 3.11, Flask, FastAPI, Redis, JWT
-- **Frontend**: React, TypeScript, Tailwind CSS
-- **Identity**: Keycloak 21.1, OpenLDAP 1.5.0
-- **Database**: PostgreSQL 14, ClickHouse 23.8
-- **ETL**: Apache Airflow 2.9.1
-- **Infrastructure**: Docker, Docker Compose
-
-## Документация по задачам
-
-### Task 1: Система безопасности
-См. подробную документацию в папке `task1/`:
-- [Отчет о выполнении](task1/TASK1_COMPLETION_REPORT.md)
-- [Быстрый старт](task1/QUICKSTART.md)
-
-Реализовано:
-- ✅ PKCE Flow для защиты авторизации
-- ✅ Session-based аутентификация
-- ✅ Многофакторная аутентификация (OTP)
-- ✅ LDAP интеграция
-- ✅ Федеративная аутентификация (Яндекс ID)
-
-### Task 2: Система отчетов
-См. подробную документацию в папке `task2/`:
-- [Отчет о выполнении](task2/TASK2_COMPLETION_REPORT.md)
-- [Быстрый старт](task2/QUICKSTART.md)
-- [Архитектурная диаграмма](task2/architecture-diagram.puml)
-
-Реализовано:
-- ✅ ETL процесс на Apache Airflow
-- ✅ OLAP хранилище на ClickHouse
-- ✅ Витрина данных для отчетов
-- ✅ Reports API с JWT авторизацией
-- ✅ UI для получения отчетов
-- ✅ RBAC - доступ только к своим данным
-
----
-
-## Архитектура проекта
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│                         User                                  │
-└────────────────────────┬─────────────────────────────────────┘
-                         │
-                         v
-┌────────────────────────────────────────────────────────────────┐
-│                      Frontend (React)                          │
-│  - Login with Keycloak                                         │
-│  - Session management                                          │
-│  - Reports UI                                                  │
-└─────────┬──────────────────────────────────────┬───────────────┘
-          │                                      │
-          │ Session                             │ Bearer token
-          │                                      │
-          v                                      v
-┌──────────────────────┐              ┌──────────────────────┐
-│   Auth Service       │              │    Reports API       │
-│   (Flask + PKCE)     │              │    (FastAPI)         │
-└──────┬───────────────┘              └──────┬───────────────┘
-       │                                      │
-       │                                      │
-       v                                      v
-┌──────────────────────┐              ┌──────────────────────┐
-│    Keycloak IdP      │              │    ClickHouse        │
-│    + LDAP            │              │    (OLAP)            │
-└──────────────────────┘              └──────▲───────────────┘
-                                             │
-                                             │ ETL
-                                             │
-                                      ┌──────┴───────────────┐
-                                      │   Apache Airflow     │
-                                      │   DAG Scheduler      │
-                                      └──────▲───────────────┘
-                                             │
-                                             │ Extract
-                                             │
-                                      ┌──────┴───────────────┐
-                                      │   CRM Database       │
-                                      │   (PostgreSQL)       │
-                                      └──────────────────────┘
+docker compose logs keycloak
+docker compose logs bionicpro-auth
+docker compose logs reports-api
+docker compose logs kafka-connect   # task 4
 ```

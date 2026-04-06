@@ -219,6 +219,27 @@ def build_reports_mart(**context):
     print("Витрина отчетов успешно обновлена")
 
 
+def invalidate_reports_s3_cache(**context):
+    """После ETL сбрасываем кеш отчётов в S3 (и косвенно CDN после истечения TTL)."""
+    url = os.getenv("REPORTS_WEBHOOK_URL")
+    secret = os.getenv("REPORTS_WEBHOOK_SECRET")
+    if not url or not secret:
+        print("REPORTS_WEBHOOK_URL / REPORTS_WEBHOOK_SECRET не заданы, пропуск webhook")
+        return
+    import requests
+
+    try:
+        resp = requests.post(
+            url,
+            headers={"X-Webhook-Secret": secret},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        print("Webhook инвалидации кеша отчётов:", resp.json())
+    except Exception as e:
+        print(f"Предупреждение: не удалось вызвать webhook инвалидации: {e}")
+
+
 # Определяем DAG
 with DAG(
     'etl_crm_to_clickhouse',
@@ -263,11 +284,17 @@ with DAG(
         python_callable=build_reports_mart,
         provide_context=True,
     )
+
+    invalidate_reports_cache = PythonOperator(
+        task_id='invalidate_reports_cache',
+        python_callable=invalidate_reports_s3_cache,
+        provide_context=True,
+    )
     
     # Определяем зависимости задач
     # Сначала извлекаем данные параллельно
     extract_clients >> load_clients
     extract_prosthetics >> load_prosthetics
     
-    # Затем после загрузки строим витрину отчетов
-    [load_clients, load_prosthetics] >> build_mart
+    # Затем после загрузки строим витрину отчетов и сбрасываем кеш отчётов в S3
+    [load_clients, load_prosthetics] >> build_mart >> invalidate_reports_cache

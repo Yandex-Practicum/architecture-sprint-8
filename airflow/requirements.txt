@@ -1,0 +1,4 @@
+psycopg2-binary==2.9.9
+clickhouse-driver==0.2.7
+pandas==2.1.4
+apache-airflow-providers-postgres==5.10.0

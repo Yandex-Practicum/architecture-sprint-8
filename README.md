@@ -1,12 +1,12 @@
-# BionicPRO Security System
+# BionicPRO - Комплексная система безопасности и аналитики
 
-Комплексная система безопасности для приложения BionicPRO с поддержкой OAuth 2.0, PKCE, MFA, LDAP и федеративной аутентификации через Яндекс ID.
+Полнофункциональная система для BionicPRO с поддержкой OAuth 2.0, PKCE, MFA, LDAP, федеративной аутентификации и аналитической системы отчетов на базе Apache Airflow и ClickHouse.
 
 ## Архитектура
 
 ![Архитектурная диаграмма](architecture-diagram.drawio)
 
-Система включает следующие компоненты:
+### Компоненты безопасности (Task 1)
 - **bionicpro-auth** - сервис аутентификации на Python/Flask с PKCE flow
 - **frontend** - React-приложение с интеграцией через auth-сервис
 - **keycloak** - Identity Provider с поддержкой MFA/OTP
@@ -14,11 +14,19 @@
 - **redis** - хранилище сессий и токенов
 - **postgresql** - база данных Keycloak
 
+### Компоненты аналитики (Task 2)
+- **reports-api** - FastAPI сервис для получения отчетов с JWT авторизацией
+- **apache-airflow** - оркестрация ETL процессов (веб-сервер, планировщик)
+- **clickhouse** - колоночная OLAP база данных для аналитики
+- **crm_db** - PostgreSQL база данных CRM-системы
+- **airflow_db** - PostgreSQL база метаданных Airflow
+
 ## Быстрый запуск
 
 ### Предварительные требования
 - Docker и Docker Compose
-- Свободные порты: 3000, 5000, 6379, 8080, 389, 5433
+- Минимум 8 GB RAM для Docker
+- Свободные порты: 3000, 5000, 6379, 8000, 8080, 8081, 8123, 9000, 389, 5433-5435
 
 ### Команды запуска
 
@@ -29,13 +37,22 @@ cd /Users/nspeganov/IdeaProjects/architecture-bionicpro
 # 2. Запустите все сервисы
 docker-compose up -d --build
 
-# 3. Дождитесь полной инициализации (~2 минуты)
+# 3. Дождитесь полной инициализации (~3-5 минут)
 docker-compose ps
 
-# 4. Проверьте доступность сервисов:
+# 4. Настройте Airflow connections (опционально)
+bash airflow/setup-connections.sh
+
+# 5. Запустите ETL процесс в Airflow
+# Откройте http://127.0.0.1:8081 (admin/admin)
+# Включите и запустите DAG 'etl_crm_to_clickhouse'
+
+# 6. Проверьте доступность сервисов:
 # - Frontend: http://127.0.0.1:3000
 # - Keycloak Admin: http://127.0.0.1:8080 (admin/admin)
 # - Auth Service: http://127.0.0.1:5000/health
+# - Reports API: http://127.0.0.1:8000/health
+# - Airflow UI: http://127.0.0.1:8081 (admin/admin)
 ```
 
 ### Первый вход в систему
@@ -99,6 +116,13 @@ docker-compose ps
 - `GET /auth/token` - получение access token для API
 - `POST /auth/session/rotate` - ротация сессии
 
+### Reports API (reports-api:8000)
+- `GET /` - информация о сервисе
+- `GET /health` - проверка подключения к ClickHouse
+- `GET /reports` - получение отчетов пользователя (требует JWT)
+- `GET /reports/summary` - сводная статистика (требует JWT)
+- `GET /docs` - Swagger документация API
+
 ## Остановка системы
 
 ```bash
@@ -149,12 +173,84 @@ docker-compose logs openldap
 ```
 
 ### Используемые технологии:
-- **Backend**: Python 3.11, Flask, Redis, JWT
+- **Backend**: Python 3.11, Flask, FastAPI, Redis, JWT
 - **Frontend**: React, TypeScript, Tailwind CSS
 - **Identity**: Keycloak 21.1, OpenLDAP 1.5.0
-- **Database**: PostgreSQL 14
+- **Database**: PostgreSQL 14, ClickHouse 23.8
+- **ETL**: Apache Airflow 2.9.1
 - **Infrastructure**: Docker, Docker Compose
+
+## Документация по задачам
+
+### Task 1: Система безопасности
+См. подробную документацию в папке `task1/`:
+- [Отчет о выполнении](task1/TASK1_COMPLETION_REPORT.md)
+- [Быстрый старт](task1/QUICKSTART.md)
+
+Реализовано:
+- ✅ PKCE Flow для защиты авторизации
+- ✅ Session-based аутентификация
+- ✅ Многофакторная аутентификация (OTP)
+- ✅ LDAP интеграция
+- ✅ Федеративная аутентификация (Яндекс ID)
+
+### Task 2: Система отчетов
+См. подробную документацию в папке `task2/`:
+- [Отчет о выполнении](task2/TASK2_COMPLETION_REPORT.md)
+- [Быстрый старт](task2/QUICKSTART.md)
+- [Архитектурная диаграмма](task2/architecture-diagram.puml)
+
+Реализовано:
+- ✅ ETL процесс на Apache Airflow
+- ✅ OLAP хранилище на ClickHouse
+- ✅ Витрина данных для отчетов
+- ✅ Reports API с JWT авторизацией
+- ✅ UI для получения отчетов
+- ✅ RBAC - доступ только к своим данным
 
 ---
 
-Для получения подробной информации о реализации см. документацию в папке `task1/` (отчет о проделанной работе).
+## Архитектура проекта
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                         User                                  │
+└────────────────────────┬─────────────────────────────────────┘
+                         │
+                         v
+┌────────────────────────────────────────────────────────────────┐
+│                      Frontend (React)                          │
+│  - Login with Keycloak                                         │
+│  - Session management                                          │
+│  - Reports UI                                                  │
+└─────────┬──────────────────────────────────────┬───────────────┘
+          │                                      │
+          │ Session                             │ Bearer token
+          │                                      │
+          v                                      v
+┌──────────────────────┐              ┌──────────────────────┐
+│   Auth Service       │              │    Reports API       │
+│   (Flask + PKCE)     │              │    (FastAPI)         │
+└──────┬───────────────┘              └──────┬───────────────┘
+       │                                      │
+       │                                      │
+       v                                      v
+┌──────────────────────┐              ┌──────────────────────┐
+│    Keycloak IdP      │              │    ClickHouse        │
+│    + LDAP            │              │    (OLAP)            │
+└──────────────────────┘              └──────▲───────────────┘
+                                             │
+                                             │ ETL
+                                             │
+                                      ┌──────┴───────────────┐
+                                      │   Apache Airflow     │
+                                      │   DAG Scheduler      │
+                                      └──────▲───────────────┘
+                                             │
+                                             │ Extract
+                                             │
+                                      ┌──────┴───────────────┐
+                                      │   CRM Database       │
+                                      │   (PostgreSQL)       │
+                                      └──────────────────────┘
+```

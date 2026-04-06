@@ -115,11 +115,208 @@ services:
     networks:
       - bionicpro-network
 
+  # CRM Database (PostgreSQL) - имитация CRM-системы
+  crm_db:
+    image: postgres:14
+    container_name: bionicpro-crm-db
+    environment:
+      POSTGRES_DB: crm_db
+      POSTGRES_USER: crm_user
+      POSTGRES_PASSWORD: crm_password
+    volumes:
+      - crm-postgres-data:/var/lib/postgresql/data
+      - ./airflow/init-crm.sql:/docker-entrypoint-initdb.d/init-crm.sql
+    ports:
+      - "5434:5432"
+    networks:
+      - bionicpro-network
+
+  # ClickHouse - OLAP хранилище для аналитики
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.8
+    container_name: bionicpro-clickhouse
+    environment:
+      CLICKHOUSE_DB: analytics_db
+      CLICKHOUSE_USER: analytics_user
+      CLICKHOUSE_PASSWORD: analytics_password
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - ./clickhouse/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    networks:
+      - bionicpro-network
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+
+  # Airflow PostgreSQL - метадата Airflow
+  airflow_db:
+    image: postgres:14
+    container_name: bionicpro-airflow-db
+    environment:
+      POSTGRES_DB: airflow_db
+      POSTGRES_USER: airflow_user
+      POSTGRES_PASSWORD: airflow_password
+    volumes:
+      - airflow-postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5435:5432"
+    networks:
+      - bionicpro-network
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow_user"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+
+  # Airflow Webserver
+  airflow-webserver:
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    container_name: bionicpro-airflow-webserver
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow_user:airflow_password@airflow_db:5432/airflow_db
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow_user:airflow_password@airflow_db:5432/airflow_db
+      AIRFLOW__CORE__FERNET_KEY: 'ZmDfcTF7_60GrrY167zsiPd67pEvs0aGOv2oasOM1Pg='
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__WEBSERVER__SECRET_KEY: 'bionicpro_airflow_secret_key_2024'
+      AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth'
+      CRM_DB_HOST: crm_db
+      CRM_DB_PORT: 5432
+      CRM_DB_NAME: crm_db
+      CRM_DB_USER: crm_user
+      CRM_DB_PASSWORD: crm_password
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: 9000
+      CLICKHOUSE_USER: analytics_user
+      CLICKHOUSE_PASSWORD: analytics_password
+      CLICKHOUSE_DB: analytics_db
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/data:/opt/airflow/data
+      - airflow-logs:/opt/airflow/logs
+    ports:
+      - "8081:8080"
+    depends_on:
+      airflow_db:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+      crm_db:
+        condition: service_started
+      clickhouse:
+        condition: service_started
+    networks:
+      - bionicpro-network
+    command: webserver
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Airflow Scheduler
+  airflow-scheduler:
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    container_name: bionicpro-airflow-scheduler
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow_user:airflow_password@airflow_db:5432/airflow_db
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow_user:airflow_password@airflow_db:5432/airflow_db
+      AIRFLOW__CORE__FERNET_KEY: 'ZmDfcTF7_60GrrY167zsiPd67pEvs0aGOv2oasOM1Pg='
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      CRM_DB_HOST: crm_db
+      CRM_DB_PORT: 5432
+      CRM_DB_NAME: crm_db
+      CRM_DB_USER: crm_user
+      CRM_DB_PASSWORD: crm_password
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: 9000
+      CLICKHOUSE_USER: analytics_user
+      CLICKHOUSE_PASSWORD: analytics_password
+      CLICKHOUSE_DB: analytics_db
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/data:/opt/airflow/data
+      - airflow-logs:/opt/airflow/logs
+    depends_on:
+      airflow_db:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+      crm_db:
+        condition: service_started
+      clickhouse:
+        condition: service_started
+    networks:
+      - bionicpro-network
+    command: scheduler
+
+  # Airflow Init - инициализация БД и создание админа
+  airflow-init:
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    container_name: bionicpro-airflow-init
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow_user:airflow_password@airflow_db:5432/airflow_db
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow_user:airflow_password@airflow_db:5432/airflow_db
+      AIRFLOW__CORE__FERNET_KEY: 'ZmDfcTF7_60GrrY167zsiPd67pEvs0aGOv2oasOM1Pg='
+    depends_on:
+      airflow_db:
+        condition: service_healthy
+    networks:
+      - bionicpro-network
+    command:
+      - bash
+      - -c
+      - |
+        airflow db init &&
+        airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@bionicpro.com
+
+  # Reports API Service - сервис для получения отчетов
+  reports-api:
+    build:
+      context: ./reports-api
+      dockerfile: Dockerfile
+    container_name: bionicpro-reports-api
+    environment:
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: 9000
+      CLICKHOUSE_USER: analytics_user
+      CLICKHOUSE_PASSWORD: analytics_password
+      CLICKHOUSE_DB: analytics_db
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: reports-realm
+      KEYCLOAK_PUBLIC_KEY_URL: http://keycloak:8080/realms/reports-realm
+    ports:
+      - "8000:8000"
+    depends_on:
+      - clickhouse
+      - keycloak
+    networks:
+      - bionicpro-network
+
 volumes:
   keycloak-postgres-data:
   ldap-data:
   ldap-config:
   redis-data:
+  crm-postgres-data:
+  clickhouse-data:
+  airflow-postgres-data:
+  airflow-logs:
 
 networks:
   bionicpro-network:

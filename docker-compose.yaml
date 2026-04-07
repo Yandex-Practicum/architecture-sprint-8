@@ -1,34 +1,89 @@
-version: '3.8'
+x-airflow-common: &airflow-common
+  build:
+    context: ./airflow-data
+    dockerfile: Dockerfile
+  environment: &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor #локальный запуск
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CORE__FERNET_KEY: ''
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
+    AIRFLOW__WEBSERVER__WEB_SERVER_PORT: 9000
+    AIRFLOW__WEBSERVER__AUTO_REFRESH_INTERVAL: 30
+    AIRFLOW__WEBSERVER__SECRET_KEY: 'your_airflow_webserver_sec_key'
+    # users db, conn_id = bionic_crm
+    AIRFLOW_CONN_BIONIC_CRM: 'postgres://bionic_crm:bionic_crm@postgres:5432/bionic_crm'
+    # prosthesis db, conn_id = bionic_prosthesis
+    AIRFLOW_CONN_BIONIC_PROSTHESIS: 'postgres://prosthesis:prosthesis@postgres:5432/prosthesis'
+    # clickhouse datamart, conn_id = bionic_datamart
+    AIRFLOW_CONN_BIONIC_DATAMART: 'generic://clickhouse:clickhouse@clickhouse-server:9000/bionic'
+
+    _PIP_ADDITIONAL_REQUIREMENTS: ''
+    AIRFLOW_INPUT_DIR: '/opt/airflow/dag-inputs'
+  volumes:
+    - ./airflow-data/dags:/opt/airflow/dags
+    - ./airflow-data/dags/sql:/opt/airflow/dags/sql
+    - ./airflow-data/requirements.txt:/opt/airflow/requirements.txt
+    - ./airflow-data/data:/opt/airflow/sample_files
+  user: "${AIRFLOW_UID:-50000}:0"
+  depends_on: &airflow-common-depends-on
+    postgres:
+      condition: service_healthy
+  networks:
+    - bionic
 
 services:
-  keycloak_db:
+  # Общая БД для нескольких сервисов
+  postgres:
     image: postgres:14
     environment:
-      POSTGRES_DB: keycloak_db
-      POSTGRES_USER: keycloak_user
-      POSTGRES_PASSWORD: keycloak_password
+      POSTGRES_PASSWORD: postgres
     volumes:
-      - ./postgres-keycloak-data:/var/lib/postgresql/data
+      - ./pg-data:/var/lib/postgresql/data
+      # seed tables in clean launch with init.sh script
+      - ./db-init/init.sh:/docker-entrypoint-initdb.d/init.sh
+    restart: always
+    healthcheck:
+      test:
+        - CMD
+        - pg_isready
+        - -U
+        - postgres
+      interval: 10s
+      retries: 5
+      start_period: 5s
     ports:
-      - "5433:5432"
+      - "5532:5432" #host:container
+    networks: 
+     - bionic
+
+
   keycloak:
     image: quay.io/keycloak/keycloak:21.1
     environment:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
-      KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
-      KC_DB_USERNAME: keycloak_user
-      KC_DB_PASSWORD: keycloak_password
+      KC_DB: postgres # JUST DB TYPE, NOT NAME
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak # SPECIFY DB NAME HERE
+      KC_DB_USERNAME: keycloak # from init.sql
+      KC_DB_PASSWORD: keycloak # from init.sql
     command: 
       - start-dev
       - --import-realm
     volumes:
-      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
+      - ./db-init/keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
     ports:
       - "8080:8080"
     depends_on:
-      - keycloak_db
+      postgres:
+        condition: service_healthy
+    networks: 
+     - bionic
+
+
   frontend:
     build:
       context: ./frontend
@@ -40,3 +95,118 @@ services:
       REACT_APP_KEYCLOAK_URL: http://localhost:8080
       REACT_APP_KEYCLOAK_REALM: reports-realm
       REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+    networks: 
+     - bionic
+
+  airflow-init:
+    <<: *airflow-common
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >
+      bash -c " airflow db init && airflow users create \ --username admin \ --firstname admin \ --lastname admin \ --role Admin \ --email admin@sample.ru \ --password admin"
+    networks:
+      - bionic
+
+
+  airflow-webserver:
+    <<: *airflow-common
+
+    ports:
+      - "9000:9000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    command: webserver
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:9000/health || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - bionic
+  
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      airflow-webserver:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:9000/health || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - bionic
+
+  airflow-triggerer:
+    <<: *airflow-common
+    depends_on:
+      postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    command: bash -c "airflow triggerer"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - airflow jobs check --job-type TriggererJob --hostname "localhost:9000"
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    networks:
+      - bionic
+
+  airflow-cli:
+    <<: *airflow-common
+    container_name: airflow-cli
+    depends_on:
+      postgres:
+        condition: service_healthy
+      airflow-webserver:
+        condition: service_healthy
+      airflow-scheduler:
+        condition: service_healthy
+    restart: "no"
+    command: >
+      bash -c "echo 'Waiting for DAGs...' && sleep 10 && airflow dags unpause bionic_dag"
+    networks:
+      - bionic
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: clickhouse-server
+    user: "101:101" # fix permission denied to log flush
+    ports:
+      - "8123:8123" # HTTP interface
+      - "9100:9000" # Native client
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse # Persistent data
+      - clickhouse_logs:/var/log/clickhouse-server # Logs
+      - ./db-init/init-click.sql:/docker-entrypoint-initdb.d/init-click.sql
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    environment:
+      - CLICKHOUSE_DB=bionic
+      - CLICKHOUSE_USER=clickhouse
+      - CLICKHOUSE_PASSWORD=clickhouse
+    networks: 
+     - bionic
+  
+
+networks:
+  bionic:
+
+volumes:
+  clickhouse_data:
+  clickhouse_logs:

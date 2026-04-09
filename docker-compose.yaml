@@ -32,7 +32,7 @@ services:
     volumes:
       - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
     ports:
-      - "8080:8080"
+      - "8088:8080"
     depends_on:
       - keycloak_db
       - openldap

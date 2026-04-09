@@ -370,7 +370,18 @@ services:
       - -c
       - |
         airflow db init &&
-        airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@bionicpro.com
+        airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@bionicpro.com &&
+        airflow connections add 'crm_postgres' \
+          --conn-type 'postgres' \
+          --conn-host 'crm_db' \
+          --conn-schema 'crm_db' \
+          --conn-login 'crm_user' \
+          --conn-password 'crm_password' \
+          --conn-port 5432 || true &&
+        airflow connections add 'clickhouse_default' \
+          --conn-type 'http' \
+          --conn-host 'clickhouse' \
+          --conn-port 8123 || true
 
   # MinIO — S3-совместимое хранилище для кеша отчётов
   minio:

@@ -119,7 +119,19 @@
         "directAccessGrantsEnabled": true,
         "attributes": {
           "pkce.code.challenge.method": "S256"
-        }
+        },
+        "protocolMappers": [
+          {
+            "name": "audience-mapper",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-audience-mapper",
+            "consentRequired": false,
+            "config": {
+              "included.client.audience": "reports-frontend",
+              "id.token.claim": "true",
+              "access.token.claim": "true"
+            }
+          }]
       },
       {
         "clientId": "reports-api",

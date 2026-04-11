@@ -59,7 +59,7 @@ psql -v ON_ERROR_STOP=1 --username "bionic_crm" --dbname "bionic_crm" <<-EOSQL
     SELECT 
         (ARRAY['Иван', 'Анна', 'Сергей', 'Мария', 'Дмитрий', 'Елена', 'Алексей', 'Ольга', 'Игорь', 'Наталья'])[i] AS first_name,
         (ARRAY['Иванов', 'Петрова', 'Сидоров', 'Кузнецова', 'Попов', 'Васильева', 'Соколов', 'Михайлова', 'Новиков', 'Фёдорова'])[i] AS last_name,
-        'user' || i || '@example.com' AS email,
+        'prothetic' || i || '@example.com' AS email,
         NOW() - (random() * interval '10 days')
     FROM generate_series(1, 10) AS i;
 EOSQL

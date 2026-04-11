@@ -91,7 +91,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      REACT_APP_API_URL: http://localhost:8000
+      REACT_APP_API_URL: http://localhost:5000
       REACT_APP_KEYCLOAK_URL: http://localhost:8080
       REACT_APP_KEYCLOAK_REALM: reports-realm
       REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
@@ -201,6 +201,33 @@ services:
       - CLICKHOUSE_USER=clickhouse
       - CLICKHOUSE_PASSWORD=clickhouse
     networks: 
+     - bionic
+
+  reports-backend:
+    image: reports-backend
+    container_name: reports-backend
+    build:
+      context: ./reports-backend
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5000
+      - CLICKHOUSE_HOST=clickhouse-server
+      - CLICKHOUSE_PORT=8123
+      - CLICKHOUSE_DB=bionic
+      - CLICKHOUSE_USER=clickhouse
+      - CLICKHOUSE_PASSWORD=clickhouse
+      - Keycloak__AuthorityURL=http://keycloak:8080/realms/reports-realm
+      - Keycloak__MetadataURL=http://keycloak:8080/realms/reports-realm/.well-known/openid-configuration
+      - Keycloak__Audience=reports-backend
+      - Keycloak__ValidIssuer=http://localhost:8080/realms/reports-realm
+      - Keycloak__ValidAudience=reports-frontend
+      - FrontendURL=http://localhost:3000
+    depends_on:
+    - clickhouse
+    networks:
      - bionic
   
 

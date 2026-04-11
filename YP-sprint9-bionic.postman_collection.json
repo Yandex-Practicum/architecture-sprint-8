@@ -1,0 +1,169 @@
+{
+  "info": {
+    "_postman_id": "78da488e-62eb-4d23-88d0-aea0d49b3659",
+    "name": "YP-sprint9-bionic",
+    "description": "# 🚀 Get started here\n\nThis template guides you through CRUD operations (GET, POST, PUT, DELETE), variables, and tests.\n\n## 🔖 **How to use this template**\n\n#### **Step 1: Send requests**\n\nRESTful APIs allow you to perform CRUD operations using the POST, GET, PUT, and DELETE HTTP methods.\n\nThis collection contains each of these [request](https://learning.postman.com/docs/sending-requests/requests/) types. Open each request and click \"Send\" to see what happens.\n\n#### **Step 2: View responses**\n\nObserve the response tab for status code (200 OK), response time, and size.\n\n#### **Step 3: Send new Body data**\n\nUpdate or add new data in \"Body\" in the POST request. Typically, Body data is also used in PUT request.\n\n```\n{\n    \"name\": \"Add your name in the body\"\n}\n\n ```\n\n#### **Step 4: Update the variable**\n\nVariables enable you to store and reuse values in Postman. We have created a [variable](https://learning.postman.com/docs/sending-requests/variables/) called `base_url` with the sample request [https://postman-api-learner.glitch.me](https://postman-api-learner.glitch.me). Replace it with your API endpoint to customize this collection.\n\n#### **Step 5: Add tests in the \"Scripts\" tab**\n\nAdding tests to your requests can help you confirm that your API is working as expected. You can write test scripts in JavaScript and view the output in the \"Test Results\" tab.\n\n<img src=\"https://content.pstmn.io/fa30ea0a-373d-4545-a668-e7b283cca343/aW1hZ2UucG5n\" width=\"2162\" height=\"1530\">\n\n## 💪 Pro tips\n\n- Use folders to group related requests and organize the collection.\n    \n- Add more [scripts](https://learning.postman.com/docs/writing-scripts/intro-to-scripts/) to verify if the API works as expected and execute workflows.\n    \n\n## 💡Related templates\n\n[API testing basics](https://go.postman.co/redirect/workspace?type=personal&collectionTemplateId=e9a37a28-055b-49cd-8c7e-97494a21eb54&sourceTemplateId=ddb19591-3097-41cf-82af-c84273e56719)  \n[API documentation](https://go.postman.co/redirect/workspace?type=personal&collectionTemplateId=e9c28f47-1253-44af-a2f3-20dce4da1f18&sourceTemplateId=ddb19591-3097-41cf-82af-c84273e56719)  \n[Authorization methods](https://go.postman.co/redirect/workspace?type=personal&collectionTemplateId=31a9a6ed-4cdf-4ced-984c-d12c9aec1c27&sourceTemplateId=ddb19591-3097-41cf-82af-c84273e56719)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "4467239"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            {
+              "key": "grant_type",
+              "value": "password",
+              "type": "text",
+              "uuid": "deb242f6-b621-4ce7-a7d2-5ca380c7bbb3"
+            },
+            {
+              "key": "client_id",
+              "value": "reports-frontend",
+              "type": "text",
+              "uuid": "2d0345a1-4283-48c7-8817-852530a938fc"
+            },
+            {
+              "key": "scope",
+              "value": "email",
+              "type": "text",
+              "uuid": "b9b6fc7f-4b31-4516-8294-47cabb9b0cc2"
+            },
+            {
+              "key": "username",
+              "value": "user1@example.com",
+              "type": "text",
+              "uuid": "a54b6947-3643-4464-9b51-c12f96839a4f"
+            },
+            {
+              "key": "password",
+              "value": "password123",
+              "type": "text",
+              "uuid": "bcb10fc6-36c3-468d-a9ae-d6a88ae4a2e0"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{keycloak_url}}/realms/reports-realm/protocol/openid-connect/token",
+          "host": [
+            "{{keycloak_url}}"
+          ],
+          "path": [
+            "realms",
+            "reports-realm",
+            "protocol",
+            "openid-connect",
+            "token"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "reports-call-for-auth user",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:5266/reports",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "5266",
+          "path": [
+            "reports"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "reports-max-date-for-auth user",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:5266/reports/get_available_date",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "5266",
+          "path": [
+            "reports",
+            "get_available_date"
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "id",
+      "value": "1"
+    },
+    {
+      "key": "base_url",
+      "value": "https://template.postman-echo.com"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "keycloak_url",
+      "value": ""
+    }
+  ]
+}

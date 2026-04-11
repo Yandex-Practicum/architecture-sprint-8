@@ -8,3 +8,6 @@
 airflow-data/dags/sql/__pycache__/
 airflow-data/dags/__pycache__/
 pg-data/
+reports-backend/.vs/
+reports-backend/bin/
+reports-backend/obj/

@@ -19,12 +19,14 @@ namespace bionicpro_auth.Controllers
     public class AuthController(
                         IAuthService authService,
                         IContextWrapper contextWrapper,
-                        IOptionsMonitor<SessionSettings> settings) : ControllerBase
+                        IOptionsMonitor<SessionSettings> settings,
+                        ILogger<AuthController> logger) : ControllerBase
     {
 
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequest login)
         {
+            logger.LogInformation("I am on login");
             try
             {
                 SessionData session = await authService.LoginAsyncAsync(login.UserName, login.Pass);
@@ -35,8 +37,11 @@ namespace bionicpro_auth.Controllers
                 {
                     user = new
                     {
-                        session.UserInfo.UserId,
-                        session.UserInfo.UserName
+                        userId = session.UserInfo.UserId,
+                        username = session.UserInfo.UserName,
+                        createdAt = session.AccessTokenCreateAt,
+                        expiry = session.AccessTokenExpiry,
+                        expireIn = session.AccessTokenCreateAt + session.AccessTokenExpiry
                     },
                     message = "Login successful"
                 });
@@ -56,11 +61,11 @@ namespace bionicpro_auth.Controllers
             {
                 return Ok(new
                 {
-                    session.UserInfo.UserId,
-                    session.UserInfo.UserName,
-                    session.AccessTokenCreateAt,
-                    session.AccessTokenExpiry,
-                    AccessTokenExpireIn = session.AccessTokenCreateAt + session.AccessTokenExpiry
+                    userId = session.UserInfo.UserId,
+                    username = session.UserInfo.UserName,
+                    createdAt = session.AccessTokenCreateAt,
+                    expiry = session.AccessTokenExpiry,
+                    expireIn = session.AccessTokenCreateAt + session.AccessTokenExpiry
                 });
             }
 

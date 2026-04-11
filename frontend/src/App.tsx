@@ -1,25 +1,51 @@
 import React from 'react';
-import { ReactKeycloakProvider } from '@react-keycloak/web';
-import Keycloak, { KeycloakConfig } from 'keycloak-js';
-import ReportPage from './components/ReportPage';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { LoginPage } from './pages/LoginPage';
+import { DashboardPage } from './pages/DashboardPage';
+import { ProfilePage } from './pages/ProfilePage';
+import { ProtectedRoute } from './components/ProtectedRoute';
+import { Navbar } from './components/Navbar';
+import './App.css';
 
-const keycloakConfig: KeycloakConfig = {
-  url: process.env.REACT_APP_KEYCLOAK_URL,
-  realm: process.env.REACT_APP_KEYCLOAK_REALM||"",
-  clientId: process.env.REACT_APP_KEYCLOAK_CLIENT_ID||""
-};
+const AppContent: React.FC = () => {
+  const { isAuthenticated } = useAuth();
 
-const keycloak = new Keycloak(keycloakConfig);
-
-const App: React.FC = () => {
   return (
-    <ReactKeycloakProvider authClient={keycloak}
-        initOptions={{onLoad: 'check-sso', pkceMethod: 'S256', silentCheckSsoRedirectUri: `${window.location.origin}/silent-check-sso.html`}}    >
-      <div className="App">
-        <ReportPage />
-      </div>
-    </ReactKeycloakProvider>
+    <>
+      {isAuthenticated && <Navbar />}
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <DashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <ProfilePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    </>
   );
 };
+
+function App() {
+  return (
+    <Router>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </Router>
+  );
+}
 
 export default App;

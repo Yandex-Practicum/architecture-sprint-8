@@ -10,7 +10,7 @@ namespace bionicpro_auth.Components.Handlers.Implementation
             var cookieOptions = new CookieOptions
             {
                 HttpOnly = true,
-                Secure = context.Request.IsHttps,
+                // Secure = context.Request.IsHttps,
                 SameSite = SameSiteMode.Strict,
                 Expires = DateTime.UtcNow.Add(settings.CurrentValue.SessionLifeTime)
             };

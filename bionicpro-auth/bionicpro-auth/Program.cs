@@ -2,6 +2,7 @@ using bionicpro_auth.Components.Handlers;
 using bionicpro_auth.Components.Handlers.Implementation;
 using bionicpro_auth.Components.Middleware;
 using Microsoft.AspNetCore.OpenApi;
+using Microsoft.Extensions.Logging;
 using NETCore.Keycloak.Client.Authentication;
 using NETCore.Keycloak.Client.HttpClients.Abstraction;
 using NETCore.Keycloak.Client.HttpClients.Implementation;
@@ -9,6 +10,9 @@ using NETCore.Keycloak.Client.Models.KcEnum;
 
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddLogging();
+builder.Services.AddLogging(builder => builder.AddConsole()); 
 
 // Add services to the container.
 
@@ -39,11 +43,23 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddControllers();
 
+builder.Services.AddCors(options =>
+    {
+        options.AddPolicy("MyPolicy", builder =>
+        {
+            builder
+                .WithOrigins("https://front.bio-pro.local:444")
+                .AllowCredentials()          
+                .AllowAnyHeader()
+                .AllowAnyMethod(); 
+        });
+    });
+
 var app = builder.Build();
 
 app.UseSwagger();
 app.UseSwaggerUI();
-
+app.UseCors("MyPolicy");
 
 app.UseAuthentication();
 

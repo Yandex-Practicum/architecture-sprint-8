@@ -112,6 +112,7 @@
     "clients": [
     {
           "clientId": "reports-frontend",
+          "secret": "oNwoLQdvJAvRcL89SydqCWCe5ry1jMgq", 
           "baseUrl": "http://localhost:3000/*",
           "surrogateAuthRequired": false,
           "enabled": true,
@@ -128,7 +129,7 @@
           "consentRequired": false,
           "standardFlowEnabled": true,
           "implicitFlowEnabled": false,
-          "directAccessGrantsEnabled": false,
+          "directAccessGrantsEnabled": true,
           "serviceAccountsEnabled": false,
           "publicClient": true,
           "frontchannelLogout": false,

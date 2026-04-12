@@ -1,17 +1,61 @@
 services:
+
+  openldap:
+    image: osixia/openldap:latest
+    container_name: openldap
+    environment:
+      - LDAP_ORGANISATION=Example
+      - LDAP_BASE_DN=example.com
+      - LDAP_DOMAIN=example.com
+      - LDAP_ADMIN_PASSWORD=admin123
+      - LDAP_CONFIG_PASSWORD=admin123
+      - LDAP_TLS=false
+      - LDAP_REMOVE_CONFIG_AFTER_SETUP=false
+      - LDAP_READONLY_USER=false
+      - LDAP_BACKEND=mdb
+      - DAP_REPLICATION=false
+    volumes:
+      - ./ldap/config-orig.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/config.ldif
+    ports:
+      - "389:389"
+      - "636:636"
+    command: [
+      "--copy-service",
+      "--loglevel", "debug"
+    ]
+    networks:
+      - bionicpro-net
+    restart: unless-stopped
+
+  phpldapadmin:
+    image: osixia/phpldapadmin:latest
+    container_name: phpldapadmin
+    environment:
+      - PHPLDAPADMIN_LDAP_HOSTS=openldap
+      - PHPLDAPADMIN_HTTPS=false
+    ports:
+      - "8090:80"
+    depends_on:
+      - openldap
+    networks:
+      - bionicpro-net
+
+
+
   keycloak_db:
     image: postgres:14
     environment:
       POSTGRES_DB: keycloak_db
       POSTGRES_USER: keycloak_user
       POSTGRES_PASSWORD: keycloak_password
-    volumes:
-      - ./postgres-keycloak-data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+    networks:
+      - bionicpro-net
+
 
   keycloak:
-    image: quay.io/keycloak/keycloak:21.1
+    image: quay.io/keycloak/keycloak:23.0
     environment:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
@@ -19,15 +63,17 @@ services:
       KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
       KC_DB_USERNAME: keycloak_user
       KC_DB_PASSWORD: keycloak_password
-    command: 
+    command:
       - start-dev
       - --import-realm
     volumes:
-      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
+      - ./keycloak/keycloak-export-ldap/:/opt/keycloak/data/import/
     ports:
       - "8080:8080"
     depends_on:
       - keycloak_db
+    networks:
+      - bionicpro-net
 
 
   frontend:
@@ -39,7 +85,8 @@ services:
     environment:
       REACT_APP_VITE_API_URL: https://api.bio-pro.local:444
       REACT_APP_VITE_API_TIMEOUT: 30000
-
+    networks:
+      - bionicpro-net
 
   bionicpro-auth:
     build:
@@ -52,7 +99,8 @@ services:
       Keycloak__auth-server-url: http://keycloak:8080
       Keycloac__credentionals__client-id: reports-frontend
       Keycloac__credentionals__secret: oNwoLQdvJAvRcL89SydqCWCe5ry1jMgq
-
+    networks:
+      - bionicpro-net
 
 
   nginx:
@@ -67,5 +115,11 @@ services:
     ports:
       - 444:444
     restart: always
+    networks:
+      - bionicpro-net
 
 
+
+networks:
+  bionicpro-net:
+    driver: bridge

@@ -520,7 +520,7 @@
       "credentialData" : "{\"hashIterations\":27500,\"algorithm\":\"pbkdf2-sha256\",\"additionalParameters\":{}}"
     } ],
     "disableableCredentialTypes" : [ ],
-    "requiredActions" : [ ],
+    "requiredActions" : ["CONFIGURE_TOTP"],
     "realmRoles" : [ "prothetic_user" ],
     "notBefore" : 0,
     "groups" : [ ]

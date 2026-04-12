@@ -84,22 +84,7 @@
       "clientRole" : false,
       "containerId" : "4724df88-5e82-4998-b78d-7ec54c8033d4",
       "attributes" : { }
-    }, {
-      "id" : "9612c9ea-9c07-4357-909a-fb8cd8cbcdd3",
-      "name" : "admin",
-      "description" : "${role_admin}",
-      "composite" : true,
-      "composites" : {
-        "realm" : [ "create-realm" ],
-        "client" : {
-          "master-realm" : [ "view-realm", "manage-users", "query-groups", "manage-events", "view-clients", "query-users", "view-events", "query-realms", "manage-identity-providers", "query-clients", "manage-realm", "impersonation", "manage-clients", "manage-authorization", "view-identity-providers", "view-users", "create-client", "view-authorization" ],
-          "reports-realm-realm" : [ "view-realm", "impersonation", "manage-clients", "query-clients", "view-identity-providers", "manage-identity-providers", "manage-authorization", "view-users", "view-events", "create-client", "manage-events", "view-authorization", "manage-realm", "manage-users", "query-users", "view-clients", "query-realms", "query-groups" ]
-        }
-      },
-      "clientRole" : false,
-      "containerId" : "4724df88-5e82-4998-b78d-7ec54c8033d4",
-      "attributes" : { }
-    } ],
+    }],
     "client" : {
       "security-admin-console" : [ ],
       "admin-cli" : [ ],
@@ -541,26 +526,6 @@
   "webAuthnPolicyPasswordlessAvoidSameAuthenticatorRegister" : false,
   "webAuthnPolicyPasswordlessAcceptableAaguids" : [ ],
   "webAuthnPolicyPasswordlessExtraOrigins" : [ ],
-  "users" : [ {
-    "id" : "601061e3-474a-42b0-baa1-7fb0249eb8b4",
-    "createdTimestamp" : 1776000244674,
-    "username" : "admin",
-    "enabled" : true,
-    "totp" : false,
-    "emailVerified" : false,
-    "credentials" : [ {
-      "id" : "5ca86e01-154d-4864-b072-c0e0c3fda3b2",
-      "type" : "password",
-      "createdDate" : 1776000244738,
-      "secretData" : "{\"value\":\"/k9oPXjzwHAnsGO9bWVrk1jm3SyuRynV2XF0ZhJFK4A=\",\"salt\":\"KUsrh2v5iIGpUMP7t6ncQQ==\",\"additionalParameters\":{}}",
-      "credentialData" : "{\"hashIterations\":27500,\"algorithm\":\"pbkdf2-sha256\",\"additionalParameters\":{}}"
-    } ],
-    "disableableCredentialTypes" : [ ],
-    "requiredActions" : [ ],
-    "realmRoles" : [ "default-roles-master", "admin" ],
-    "notBefore" : 0,
-    "groups" : [ ]
-  } ],
   "scopeMappings" : [ {
     "clientScope" : "offline_access",
     "roles" : [ "offline_access" ]

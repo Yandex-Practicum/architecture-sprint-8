@@ -19,7 +19,7 @@ class AuthService {
   private readonly API_URL = process.env.REACT_APP_VITE_API_URL;
 
 
-  async login(username: string, password: string): Promise<{ success: boolean; user?: User; error?: string }> {
+  async login(username: string, password: string, otpCode: string): Promise<{ success: boolean; user?: User; requiresOtp?:boolean, error?: string }> {
 
     try {
       const response = await fetch(`${this.API_URL}/api/auth/login`, {
@@ -29,7 +29,7 @@ class AuthService {
           'Origin': window.location.origin,
         },
         credentials: 'include', // Важно для отправки и получения cookies
-        body: JSON.stringify({ username, pass:password }),
+        body: JSON.stringify({ username, pass:password, opt:otpCode }),
       });
 
       if (response.ok) {
@@ -38,7 +38,7 @@ class AuthService {
       }
 
       const errorData = await response.json().catch(() => ({ error: 'Login failed' }));
-      return { success: false, error: errorData.error || 'Invalid credentials' };
+      return { success: false, requiresOtp: errorData.requiresOtp, error: errorData.error || 'Invalid credentials' };
     } catch (error) {
       console.error('Login error:', error);
       return { success: false, error: 'Network error. Please try again.' };

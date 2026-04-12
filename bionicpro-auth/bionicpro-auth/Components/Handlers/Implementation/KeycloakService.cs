@@ -74,7 +74,7 @@ namespace bionicpro_auth.Components.Handlers.Implementation
             }
             catch (Exception ex)
             {
-                logger.LogError(ex);
+                logger.LogError(ex, "Failed to get token");
 
                 return new AuthResult
                 {

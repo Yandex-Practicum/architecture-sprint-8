@@ -1,11 +1,13 @@
 ﻿using bionicpro_auth.Models;
+using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
 namespace bionicpro_auth.Components.Handlers.Implementation
 {
     public class KeycloakService(
                             HttpClient httpClient,
-                            IConfiguration config) : IKeyCloakService
+                            IConfiguration config,
+                            ILogger<KeycloakService> logger) : IKeyCloakService
     {
 
         private string _clientId => config["Keycloak:credentials:client-id"];
@@ -34,6 +36,9 @@ namespace bionicpro_auth.Components.Handlers.Implementation
                 var requestContent = new FormUrlEncodedContent(content);
                 var response = await httpClient.PostAsync(_tokenEndpoint, requestContent);
                 var json = await response.Content.ReadAsStringAsync();
+
+                logger.LogInformation($"AUTH OPT Response:{json}");
+
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -69,6 +74,8 @@ namespace bionicpro_auth.Components.Handlers.Implementation
             }
             catch (Exception ex)
             {
+                logger.LogError(ex);
+
                 return new AuthResult
                 {
                     IsSuccess = false,

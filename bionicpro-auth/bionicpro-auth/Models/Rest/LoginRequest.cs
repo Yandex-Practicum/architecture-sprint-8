@@ -2,7 +2,8 @@
 {
     public record LoginRequest
     {
-        public required string UserName { get; set; }
-        public required string Pass { get; set; }
+        public string UserName { get; set; }
+        public string Pass { get; set; }
+        public string? Otp { get; set; }
     }
 }

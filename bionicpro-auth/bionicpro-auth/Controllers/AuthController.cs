@@ -1,16 +1,11 @@
 ﻿using bionicpro_auth.Components.Handlers;
-using bionicpro_auth.Components.Handlers.Implementation;
 using bionicpro_auth.Components.Middleware;
 using bionicpro_auth.Models;
+using bionicpro_auth.Models.Exception;
 using bionicpro_auth.Models.Rest;
 using bionicpro_auth.Models.Settings;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
-using NETCore.Keycloak.Client.HttpClients.Abstraction;
-using NETCore.Keycloak.Client.Models;
-using NETCore.Keycloak.Client.Models.Auth;
-using NETCore.Keycloak.Client.Models.Tokens;
 
 namespace bionicpro_auth.Controllers
 {
@@ -29,7 +24,7 @@ namespace bionicpro_auth.Controllers
             logger.LogInformation("I am on login");
             try
             {
-                SessionData session = await authService.LoginAsyncAsync(login.UserName, login.Pass);
+                SessionData session = await authService.LoginAsyncAsync(login.UserName, login.Pass, login.Otp);
 
                 contextWrapper.UpdateSessionCookie(HttpContext, session.SessionId);
 
@@ -44,6 +39,14 @@ namespace bionicpro_auth.Controllers
                         expireIn = session.AccessTokenCreateAt + session.AccessTokenExpiry
                     },
                     message = "Login successful"
+                });
+            }
+            catch (OtpRequiredException)
+            {
+                return Unauthorized(new
+                {
+                    success = false,
+                    requiresOtp = true,
                 });
             }
             catch (Exception e)

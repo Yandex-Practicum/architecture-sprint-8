@@ -1,8 +1,6 @@
-﻿using bionicpro_auth.Components.Handlers;
-using bionicpro_auth.Models;
+﻿using bionicpro_auth.Models;
 using bionicpro_auth.Models.Settings;
 using Microsoft.Extensions.Options;
-using NETCore.Keycloak.Client.Models.Tokens;
 
 namespace bionicpro_auth.Components.Handlers.Implementation
 {
@@ -11,7 +9,7 @@ namespace bionicpro_auth.Components.Handlers.Implementation
                         IEncryptor encryptor,
                         IOptionsMonitor<SessionSettings> sessionSetings) : ISessionService
     {
-        public SessionData CreateSession(UserInfo userInfo, KcIdentityProviderToken token)
+        public SessionData CreateSession(UserInfo userInfo, KeycloakTokenResponse token)
         {
 
             SessionData sessionData = new()

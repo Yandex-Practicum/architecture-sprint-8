@@ -1,5 +1,5 @@
 ﻿using bionicpro_auth.Models;
-using NETCore.Keycloak.Client.Models.Tokens;
+using bionicpro_auth.Models.Exception;
 
 namespace bionicpro_auth.Components.Handlers.Implementation
 {
@@ -8,29 +8,44 @@ namespace bionicpro_auth.Components.Handlers.Implementation
                     ISessionService sessionService,
                     IEncryptor encryptor) : IAuthService
     {
-        public async Task<SessionData> LoginAsyncAsync(string login, string password)
+
+
+
+        public async Task<SessionData> LoginAsyncAsync(string login, string password, string? otp)
         {
-            KcIdentityProviderToken token = await keycloakService.LoginAsync(login, password);
+            AuthResult loginResponse = await keycloakService.LoginAsync(login, password, otp);
 
-            UserInfo userInfo = await keycloakService.GetUserInfoAsync(token.AccessToken);
+            if (!loginResponse.IsSuccess && loginResponse.RequiresOtp)
+            {
+                throw new OtpRequiredException();
+            }
+            else if (!loginResponse.IsSuccess)
+            {
+                throw new UnauthorizedAccessException();
+            }
 
-            return sessionService.CreateSession(userInfo, token);
+            UserInfo userInfo = await keycloakService.GetUserInfoAsync(loginResponse.Tokens.AccessToken);
+
+            return sessionService.CreateSession(userInfo, loginResponse.Tokens);
         }
 
         public async Task<SessionData> RefreshSessionAsync(Guid sessionId)
         {
             SessionData session = sessionService.GetSession(sessionId);
 
-            KcIdentityProviderToken token = await keycloakService.RefreshAccessTokenAsync(encryptor.Decrypt(session.EncryptedRefreshToken));
-            sessionService.RemoveSession(sessionId);
+            AuthResult loginResponse = await keycloakService.RefreshAccessTokenAsync(encryptor.Decrypt(session.EncryptedRefreshToken));
 
-            return sessionService.CreateSession(session.UserInfo, token);
+            sessionService.RemoveSession(sessionId);
+            if (!loginResponse.IsSuccess)
+            {
+                throw new UnauthorizedAccessException();
+            }
+            return sessionService.CreateSession(session.UserInfo, loginResponse.Tokens);
         }
 
         public async Task LogoutAsync(Guid sessionId)
         {
             SessionData session = sessionService.GetSession(sessionId);
-            await keycloakService.RevokeTokenAsync(encryptor.Decrypt(session.EncryptedRefreshToken));
             sessionService.RemoveSession(sessionId);
         }
     }

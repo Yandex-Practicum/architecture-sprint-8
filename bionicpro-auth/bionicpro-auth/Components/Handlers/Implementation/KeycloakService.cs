@@ -1,44 +1,80 @@
-﻿using bionicpro_auth.Components.Handlers;
-using bionicpro_auth.Models;
-using NETCore.Keycloak.Client.HttpClients.Abstraction;
-using NETCore.Keycloak.Client.Models;
-using NETCore.Keycloak.Client.Models.Auth;
-using NETCore.Keycloak.Client.Models.Tokens;
-using NETCore.Keycloak.Client.Models.Users;
+﻿using bionicpro_auth.Models;
+using System.Text.Json;
 
 namespace bionicpro_auth.Components.Handlers.Implementation
 {
     public class KeycloakService(
-                            IKeycloakClient client,
+                            HttpClient httpClient,
                             IConfiguration config) : IKeyCloakService
     {
-        private KcClientCredentials clientCreds => new()
+
+        private string _clientId => config["Keycloak:credentials:client-id"];
+        private string _secret => config["Keycloak:credentials:secret"];
+        private string _tokenEndpoint => config["Keycloak:TokenEndpoint"];
+
+        public async Task<AuthResult> LoginAsync(string userName, string password, string? otp)
         {
-            ClientId = config["Keycloak:credentials:client-id"],
-            Secret = config["Keycloak:credentials:secret"]
-        };
 
-
-
-        public async Task<KcIdentityProviderToken> LoginAsync(string userName, string password)
-        {
-            KcResponse<KcIdentityProviderToken> tokenResponse = await client.Auth.GetResourceOwnerPasswordTokenAsync(
-                config["Keycloak:realm"],
-                clientCreds,
-                new KcUserLogin()
-                {
-                    Username = userName,
-                    Password = password
-                }
-            );
-
-
-            if (tokenResponse.IsError)
+            try
             {
-                throw tokenResponse.Exception;
-            }
+                var content = new List<KeyValuePair<string, string>>
+                {
+                    new("grant_type", "password"),
+                    new("client_id", _clientId),
+                    new("client_secret", _secret),
+                    new("username", userName),
+                    new("password", password)
+                };
 
-            return tokenResponse.Response;
+                if (!string.IsNullOrEmpty(otp))
+                {
+                    content.Add(new KeyValuePair<string, string>("totp", otp));
+                }
+
+                var requestContent = new FormUrlEncodedContent(content);
+                var response = await httpClient.PostAsync(_tokenEndpoint, requestContent);
+                var json = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var tokens = JsonSerializer.Deserialize<KeycloakTokenResponse>(json);
+                    return new AuthResult()
+                    {
+                        IsSuccess = true,
+                        Tokens = tokens
+                    };
+                }
+
+                var errorResponse = JsonSerializer.Deserialize<KeycloakErrorResponse>(json);
+
+                if (errorResponse?.Error == "invalid_grant")
+                {
+                    var errorDesc = errorResponse.ErrorDescription?.ToLower() ?? "";
+
+                    if (errorDesc.Contains("otp") || errorDesc.Contains("totp") || errorDesc.Contains("code"))
+                    {
+                        return new AuthResult
+                        {
+                            IsSuccess = false,
+                            RequiresOtp = true
+                        };
+                    }
+                }
+
+                return new AuthResult
+                {
+                    IsSuccess = false,
+                    ErrorMessage = errorResponse.ErrorDescription
+                };
+            }
+            catch (Exception ex)
+            {
+                return new AuthResult
+                {
+                    IsSuccess = false,
+                    ErrorMessage = "Unhandled exception"
+                };
+            }
         }
 
         public Task<UserInfo> GetUserInfoAsync(string accessToken)
@@ -61,19 +97,47 @@ namespace bionicpro_auth.Components.Handlers.Implementation
 
         }
 
-        public async Task<KcIdentityProviderToken> RefreshAccessTokenAsync(string refreshToken)
+        public async Task<AuthResult> RefreshAccessTokenAsync(string refreshToken)
         {
-            KcResponse<KcIdentityProviderToken> tokenResponse = await client.Auth.RefreshAccessTokenAsync(config["Keycloak:realm"], clientCreds, refreshToken);
-            if (tokenResponse.IsError)
+            try
             {
-                throw new InvalidOperationException("Can`t refresh access token");
+                var content = new FormUrlEncodedContent(new[]
+                {
+                    new KeyValuePair<string, string>("grant_type", "refresh_token"),
+                    new KeyValuePair<string, string>("client_id", _clientId),
+                    new KeyValuePair<string, string>("client_secret", _secret),
+                    new KeyValuePair<string, string>("refresh_token", refreshToken)
+                });
+
+                var response = await httpClient.PostAsync(_tokenEndpoint, content);
+                var json = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var tokens = JsonSerializer.Deserialize<KeycloakTokenResponse>(json);
+                    return new AuthResult()
+                    {
+                        IsSuccess = true,
+                        Tokens = tokens
+                    };
+                }
+
+                var error = JsonSerializer.Deserialize<KeycloakErrorResponse>(json);
+                return new AuthResult()
+                {
+                    IsSuccess = false,
+                    ErrorMessage = error?.ErrorDescription ?? "Token refresh failed"
+                };
             }
-            return tokenResponse.Response;
+            catch
+            {
+                return new AuthResult()
+                {
+                    IsSuccess = false,
+                    ErrorMessage = "Internal server error"
+                };
+            }
         }
 
-        public async Task<bool> RevokeTokenAsync(string refreshToken)
-        {
-            return (await client.Auth.RevokeRefreshTokenAsync(config["Keycloak:realm"], clientCreds, refreshToken)).Response;
-        }
     }
 }

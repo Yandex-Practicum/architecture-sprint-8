@@ -114,9 +114,11 @@
         "clientId": "reports-frontend",
         "enabled": true,
         "publicClient": true,
+        "standardFlowEnabled": true,
+        "implicitFlowEnabled": false,
+        "directAccessGrantsEnabled": false,
         "redirectUris": ["http://localhost:3000/*"],
-        "webOrigins": ["http://localhost:3000"],
-        "directAccessGrantsEnabled": true
+        "webOrigins": ["http://localhost:3000"]
       },
       {
         "clientId": "reports-api",

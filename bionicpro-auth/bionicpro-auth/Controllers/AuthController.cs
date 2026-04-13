@@ -1,108 +1,145 @@
-﻿using bionicpro_auth.Components.Handlers;
-using bionicpro_auth.Components.Middleware;
+﻿// Controllers/AuthController.cs
+using bionicpro_auth.Components.Handlers;
+using bionicpro_auth.Components.Handlers.Implementation;
 using bionicpro_auth.Models;
-using bionicpro_auth.Models.Exception;
-using bionicpro_auth.Models.Rest;
 using bionicpro_auth.Models.Settings;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
+using System.Runtime;
 
-namespace bionicpro_auth.Controllers
+namespace BionicProAuth.Controllers;
+
+[ApiController]
+[Route("api/auth")]
+public class AuthController : ControllerBase
 {
-    [ApiController]
-    [Route("api/[controller]")]
-    public class AuthController(
-                        IAuthService authService,
-                        IContextWrapper contextWrapper,
-                        IOptionsMonitor<SessionSettings> settings,
-                        ILogger<AuthController> logger) : ControllerBase
+    private readonly IKeyCloakService _keycloakService;
+    private readonly ISessionService _sessionService;
+    private readonly IMemoryCache _cache;
+    private readonly IOptionsMonitor<AppSettings> _settings;
+    private readonly ILogger<AuthController> _logger;
+
+    public AuthController(
+        IKeyCloakService keycloakService,
+        IMemoryCache cache,
+        ISessionService sessionService,
+        IOptionsMonitor<AppSettings> settings,
+        ILogger<AuthController> logger)
     {
+        _settings = settings;
+        _keycloakService = keycloakService;
+        _sessionService = sessionService;
+        _cache = cache;
+        _logger = logger;
+    }
 
-        [HttpPost("login")]
-        public async Task<IActionResult> Login([FromBody] LoginRequest login)
+    /// <summary>
+    /// Начало авторизации - возвращает URL для редиректа на Keycloak
+    /// </summary>
+    [HttpGet("login-url")]
+    public IActionResult GetLoginUrl([FromQuery] string? idpHint = null)
+    {
+        var state = Guid.NewGuid().ToString();
+        var redirectUri = $"{Request.Scheme}://{Request.Host}/api/auth/callback";
+
+        // Сохраняем state для проверки
+        _cache.Set($"oauth_state_{state}", state, TimeSpan.FromMinutes(10));
+
+        var authUrl = _keycloakService.GenerateAuthorizationUrl(state, redirectUri, idpHint);
+
+        return Ok(new { url = authUrl });
+    }
+
+    /// <summary>
+    /// Callback после авторизации в Keycloak
+    /// Keycloak уже проверил пароль и OTP (если включен)
+    /// </summary>
+    [HttpGet("callback")]
+    public async Task<IActionResult> Callback([FromQuery] string code, [FromQuery] string state, [FromQuery] string? error)
+    {
+        if (!string.IsNullOrEmpty(error))
         {
-            logger.LogInformation("I am on login");
-            try
-            {
-                SessionData session = await authService.LoginAsyncAsync(login.UserName, login.Pass, login.Otp);
-
-                contextWrapper.UpdateSessionCookie(HttpContext, session.SessionId);
-
-                return Ok(new
-                {
-                    user = new
-                    {
-                        userId = session.UserInfo.UserId,
-                        username = session.UserInfo.UserName,
-                        createdAt = session.AccessTokenCreateAt,
-                        expiry = session.AccessTokenExpiry,
-                        expireIn = session.AccessTokenCreateAt + session.AccessTokenExpiry
-                    },
-                    message = "Login successful"
-                });
-            }
-            catch (OtpRequiredException)
-            {
-                return Unauthorized(new
-                {
-                    success = false,
-                    requiresOtp = true,
-                });
-            }
-            catch (Exception e)
-            {
-                return Unauthorized("Authentication failed");
-            }
+            _logger.LogError($"OAuth error: {error}");
+            return Redirect($"{GetFrontendUrl()}/login?error={error}");
         }
 
-        [SessionRotate]
-        [HttpGet("me")]
-        public async Task<IActionResult> GetCurrentUser()
+        // Проверяем state
+        if (!_cache.TryGetValue($"oauth_state_{state}", out _))
         {
-            // Информация о пользователе доступна через middleware
-            if (HttpContext.Items["Session"] is SessionData session)
-            {
-                return Ok(new
-                {
-                    userId = session.UserInfo.UserId,
-                    username = session.UserInfo.UserName,
-                    createdAt = session.AccessTokenCreateAt,
-                    expiry = session.AccessTokenExpiry,
-                    expireIn = session.AccessTokenCreateAt + session.AccessTokenExpiry
-                });
-            }
-
-            return Unauthorized(new { error = "Not authenticated" });
+            return BadRequest("Invalid state");
         }
 
-        [SessionRotate]
-        [HttpGet("validate")]
-        public IActionResult ValidateSession()
-        {
-            if (HttpContext.Items["Session"] != null)
-            {
-                return Ok(new { valid = true });
-            }
+        var redirectUri = $"{Request.Scheme}://{Request.Host}/api/auth/callback";
 
-            return Unauthorized(new { valid = false });
+        // Обмениваем code на токены
+        var tokens = await _keycloakService.ExchangeCodeForTokensAsync(code, redirectUri);
+
+        if (tokens == null)
+        {
+            return Redirect($"{GetFrontendUrl()}/login?error=token_exchange_failed");
         }
 
-        [HttpPost("logout")]
-        public async Task<IActionResult> Logout()
+        // Получаем информацию о пользователе
+        var userInfo = await _keycloakService.GetUserInfoAsync(tokens.Tokens!.AccessToken);
+
+        SessionData session = _sessionService.CreateSession(userInfo, tokens.Tokens);
+
+        // Создаем cookie
+        Response.Cookies.Append("session_id", session.SessionId.ToString(), new CookieOptions
         {
-            var cookieName = settings.CurrentValue.CookiesName;
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Strict,
+            MaxAge = TimeSpan.FromMinutes(15),
+            Path = "/"
+        });
 
-            if (Request.Cookies.TryGetValue(cookieName, out var rawSessionId) &&
-                Guid.TryParse(rawSessionId, out Guid sessionId))
-            {
+        // Редирект на фронтенд
+        return Redirect($"{GetFrontendUrl()}/auth/callback?success=true");
+    }
 
-                await authService.LogoutAsync(sessionId);
+    /// <summary>
+    /// Проверка сессии
+    /// </summary>
+    [HttpGet("session")]
+    public IActionResult GetSession()
+    {
+        var sessionId = HttpContext.Items["Session"] as Guid?;
 
-                Response.Cookies.Delete(cookieName);
-            }
-
-            return Ok(new { message = "Logout successful" });
+        if (sessionId is null)
+        {
+            return Unauthorized();
         }
 
+        SessionData session = _sessionService.GetSession(sessionId!.Value);
+
+        return Ok(new
+        {
+            authenticated = true,
+            username = session!.UserInfo.PreferredUsername,
+            email = session.UserInfo.Email
+        });
+    }
+
+    /// <summary>
+    /// Выход
+    /// </summary>
+    [HttpPost("logout")]
+    public IActionResult Logout()
+    {
+        var sessionId = Request.Cookies["session_id"];
+        if (!string.IsNullOrEmpty(sessionId))
+        {
+            _cache.Remove($"session_{sessionId}");
+            Response.Cookies.Delete("session_id");
+        }
+
+        return Ok(new { success = true });
+    }
+
+    private string GetFrontendUrl()
+    {
+        return _settings.CurrentValue.Frontend;
     }
 }

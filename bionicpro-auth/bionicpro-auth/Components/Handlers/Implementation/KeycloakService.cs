@@ -1,106 +1,102 @@
 ﻿using bionicpro_auth.Models;
-using Microsoft.Extensions.Logging;
+using bionicpro_auth.Models.Settings;
+using Microsoft.Extensions.Options;
+using System.Net.Http;
 using System.Text.Json;
 
 namespace bionicpro_auth.Components.Handlers.Implementation
 {
     public class KeycloakService(
                             HttpClient httpClient,
-                            IConfiguration config,
+                            IOptionsMonitor<KeycloakSettings> settings,
                             ILogger<KeycloakService> logger) : IKeyCloakService
     {
 
-        private string _clientId => config["Keycloak:credentials:client-id"];
-        private string _secret => config["Keycloak:credentials:secret"];
-        private string _tokenEndpoint => config["Keycloak:TokenEndpoint"];
-
-        public async Task<AuthResult> LoginAsync(string userName, string password, string? otp)
+        /// <summary>
+        /// Генерация URL для авторизации в Keycloak (с PKCE)
+        /// </summary>
+        public string GenerateAuthorizationUrl( string state, string redirectUri, string? kcIdpHint = null)
         {
+            var baseUrl = $"{settings.CurrentValue.BaseUrl.TrimEnd('/')}/realms/{settings.CurrentValue.Realm}/protocol/openid-connect/auth";
 
+            List<string> parameters =
+            [
+                $"response_type=code",
+                $"client_id={settings.CurrentValue.FrontendCredentional.ClientId}",
+                $"redirect_uri={Uri.EscapeDataString(redirectUri)}",
+                $"scope=openid profile email",
+                $"state={state}"
+            ];
+
+            if (!string.IsNullOrEmpty(kcIdpHint))
+            {
+                parameters.Add($"kc_idp_hint={kcIdpHint}");
+            }
+
+            return $"{baseUrl}?{string.Join("&", parameters)}";
+        }
+
+        /// <summary>
+        /// Обмен authorization code на токены
+        /// </summary>
+        public async Task<AuthResult?> ExchangeCodeForTokensAsync(string code, string redirectUri)
+        {
             try
             {
-                var content = new List<KeyValuePair<string, string>>
-                {
-                    new("grant_type", "password"),
-                    new("client_id", _clientId),
-                    new("client_secret", _secret),
-                    new("username", userName),
-                    new("password", password)
-                };
+                var tokenUrl = $"{settings.CurrentValue.BaseUrl.TrimEnd('/')}/realms/{settings.CurrentValue.Realm}/protocol/openid-connect/token";
 
-                if (!string.IsNullOrEmpty(otp))
-                {
-                    content.Add(new KeyValuePair<string, string>("totp", otp));
-                }
+                var content = new FormUrlEncodedContent([
+                        new KeyValuePair<string, string>("grant_type", "authorization_code"),
+                        new KeyValuePair<string, string>("client_id", settings.CurrentValue.BackendCredentional.ClientId),
+                        new KeyValuePair<string, string>("client_secret", settings.CurrentValue.BackendCredentional.Secret),
+                        new KeyValuePair<string, string>("code", code),
+                        new KeyValuePair<string, string>("redirect_uri", redirectUri)
+                ]);
 
-                var requestContent = new FormUrlEncodedContent(content);
-                var response = await httpClient.PostAsync(_tokenEndpoint, requestContent);
+                var response = await httpClient.PostAsync(tokenUrl, content);
                 var json = await response.Content.ReadAsStringAsync();
 
-                logger.LogInformation($"AUTH OPT Response:{json}");
-
-
-                if (response.IsSuccessStatusCode)
+                if (!response.IsSuccessStatusCode)
                 {
-                    var tokens = JsonSerializer.Deserialize<KeycloakTokenResponse>(json);
-                    return new AuthResult()
-                    {
-                        IsSuccess = true,
-                        Tokens = tokens
-                    };
+                    return new AuthResult() { IsSuccess = false, ErrorMessage = $"Token exchange failed: {json}" };
                 }
 
-                var errorResponse = JsonSerializer.Deserialize<KeycloakErrorResponse>(json);
-
-                if (errorResponse?.Error == "invalid_grant")
-                {
-                    var errorDesc = errorResponse.ErrorDescription?.ToLower() ?? "";
-
-                    if (errorDesc.Contains("otp") || errorDesc.Contains("totp") || errorDesc.Contains("code"))
-                    {
-                        return new AuthResult
-                        {
-                            IsSuccess = false,
-                            RequiresOtp = true
-                        };
-                    }
-                }
-
-                return new AuthResult
-                {
-                    IsSuccess = false,
-                    ErrorMessage = errorResponse.ErrorDescription
-                };
+                return new AuthResult() { IsSuccess = true, Tokens = JsonSerializer.Deserialize<KeycloakTokenResponse>(json) };
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Failed to get token");
-
-                return new AuthResult
-                {
-                    IsSuccess = false,
-                    ErrorMessage = "Unhandled exception"
-                };
+                logger.LogError(ex, "Token exchange failed");
+                return new AuthResult() { IsSuccess = false, ErrorMessage = $"Token exchange failed: {ex.Message}" };
             }
         }
 
-        public Task<UserInfo> GetUserInfoAsync(string accessToken)
+        public async Task<UserInfo> GetUserInfoAsync(string accessToken)
         {
-            // Парсим JWT токен для получения sub (user id)
-            var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
-            var jwtToken = handler.ReadJwtToken(accessToken);
-
-            if (jwtToken.Subject is null)
+            try
             {
-                throw new InvalidOperationException("User id null or empty");
+                var userInfoUrl = $"{settings.CurrentValue.BaseUrl}/realms/{settings.CurrentValue.Realm}/protocol/openid-connect/userinfo";
+
+                httpClient.DefaultRequestHeaders.Clear();
+                httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {accessToken}");
+
+                var response = await httpClient.GetAsync(userInfoUrl);
+                var json = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    return null;
+                }
+
+                return JsonSerializer.Deserialize<UserInfo>(json, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                })!;
             }
-
-            return Task.FromResult(new UserInfo()
+            catch (Exception ex)
             {
-                UserId = jwtToken.Subject,
-                Name = jwtToken.Claims.FirstOrDefault(c => c.Type == "name")?.Value,
-                UserName = jwtToken.Claims.FirstOrDefault(c => c.Type == "preferred_username")?.Value ?? "Undefined",
-            });
+                logger.LogError(ex, "Failed to get user info");
+                return null;
+            }
 
         }
 
@@ -108,15 +104,17 @@ namespace bionicpro_auth.Components.Handlers.Implementation
         {
             try
             {
+
+                var tokenEndpoint = $"{settings.CurrentValue.BaseUrl.Trim('/')}/realms/{settings.CurrentValue.Realm}/protocol/openid-connect/token";
                 var content = new FormUrlEncodedContent(new[]
                 {
                     new KeyValuePair<string, string>("grant_type", "refresh_token"),
-                    new KeyValuePair<string, string>("client_id", _clientId),
-                    new KeyValuePair<string, string>("client_secret", _secret),
+                    new KeyValuePair<string, string>("client_id", settings.CurrentValue.BackendCredentional.ClientId),
+                    new KeyValuePair<string, string>("client_secret", settings.CurrentValue.BackendCredentional.Secret),
                     new KeyValuePair<string, string>("refresh_token", refreshToken)
                 });
 
-                var response = await httpClient.PostAsync(_tokenEndpoint, content);
+                var response = await httpClient.PostAsync(tokenEndpoint, content);
                 var json = await response.Content.ReadAsStringAsync();
 
                 if (response.IsSuccessStatusCode)

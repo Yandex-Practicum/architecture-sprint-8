@@ -37,24 +37,11 @@ namespace bionicpro_auth.Components.Middleware
 
                     contextWrapper.UpdateSessionCookie(context.HttpContext, session.SessionId);
 
-                    context.HttpContext.Items["Session"] = session;
-                    context.HttpContext.Items["AccessToken"] = session.AccessToken;
-
-                    // Создаем ClaimsPrincipal для авторизации
-                    var claims = new List<Claim>
-                    {
-                        new Claim(ClaimTypes.NameIdentifier, session.UserInfo.UserId),
-                        new Claim(ClaimTypes.Name, session.UserInfo.UserName),
-                        new Claim("SessionId", session.SessionId.ToString())
-                    };
-
-                    var identity = new ClaimsIdentity(claims, "Session");
-                    context.HttpContext.User = new ClaimsPrincipal(identity);
+                    context.HttpContext.Items["Session"] = session.SessionId;
                 }
                 else
                 {
                     context.HttpContext.Response.Cookies.Delete(settings.CurrentValue.CookiesName);
-
                 }
 
                 await next();

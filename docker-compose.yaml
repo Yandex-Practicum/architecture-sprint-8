@@ -11,6 +11,7 @@ services:
       - ./postgres-keycloak-data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+
   keycloak:
     image: quay.io/keycloak/keycloak:21.1
     environment:
@@ -20,6 +21,9 @@ services:
       KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
       KC_DB_USERNAME: keycloak_user
       KC_DB_PASSWORD: keycloak_password
+      KEYCLOAK_HOSTNAME: keycloak
+      KC_HOSTNAME_STRICT: false
+      KC_HOSTNAME_STRICT_HTTPS: false
     command: 
       - start-dev
       - --import-realm
@@ -29,6 +33,105 @@ services:
       - "8080:8080"
     depends_on:
       - keycloak_db
+
+  postgres_airflow:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: airflow
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+    volumes:
+      - postgres_airflow_data:/var/lib/postgresql/data
+    ports:
+      - "5435:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 5s
+      retries: 5
+    restart: always
+
+  airflow-init:
+    image: apache/airflow:2.8.0
+    depends_on:
+      postgres_airflow:
+        condition: service_healthy
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres_airflow/airflow
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/requirements.txt:/opt/airflow/requirements.txt
+    entrypoint: /bin/bash
+    command: >
+      -c "pip install -r /opt/airflow/requirements.txt &&
+          airflow db init &&
+          airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com"
+    restart: "no"
+
+  airflow:
+    image: apache/airflow:2.8.0
+    depends_on:
+      postgres_airflow:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres_airflow/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: False
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/requirements.txt:/opt/airflow/requirements.txt
+      - ./airflow/data:/opt/airflow/data
+    ports:
+      - "8081:8080"
+    command: >
+      bash -c "pip install -r /opt/airflow/requirements.txt &&
+               airflow webserver & airflow scheduler"
+    restart: always
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    container_name: clickhouse-server
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    environment:
+      CLICKHOUSE_DB: reports_db
+      CLICKHOUSE_USER: "airflow"
+      CLICKHOUSE_PASSWORD: "airflow123"  
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"   
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./clickhouse/users.d:/etc/clickhouse-server/users.d
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    restart: always
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+
+  #backend:
+    #build:
+      #context: ./backend
+      #dockerfile: Dockerfile
+    #ports:
+      #- "8000:8000"
+    #environment:
+      #CLICKHOUSE_URL: jdbc:clickhouse://clickhouse:8123/reports_db
+      #CLICKHOUSE_USER: default
+      #CLICKHOUSE_PASSWORD: clickhouse123
+    #depends_on:
+      #clickhouse:
+        #condition: service_healthy
+      #keycloak:
+        #condition: service_started
+    #restart: always**/
+
   frontend:
     build:
       context: ./frontend
@@ -40,3 +143,10 @@ services:
       REACT_APP_KEYCLOAK_URL: http://localhost:8080
       REACT_APP_KEYCLOAK_REALM: reports-realm
       REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+    depends_on:      
+      - keycloak
+    restart: always
+
+volumes:
+  postgres_airflow_data:
+  clickhouse_data:

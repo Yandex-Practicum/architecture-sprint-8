@@ -1,2 +1,34 @@
-/postgres-keycloak-data
-2024__yandex-architecture-sso.code-workspace
+# Docker volumes / данные баз данных
+postgres-keycloak-data/
+postgres-airflow-data/
+clickhouse_data/
+logs/
+
+# Airflow
+airflow/logs/
+airflow/airflow-webserver.pid
+airflow/airflow.cfg
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+
+# Frontend
+frontend/node_modules/
+frontend/build/
+frontend/.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+*.log
+.env

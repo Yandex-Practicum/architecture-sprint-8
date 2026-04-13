@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "@react-keycloak/web": "^3.4.0",
+    "keycloak-js": "^26.2.3"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0"
+  }
+}

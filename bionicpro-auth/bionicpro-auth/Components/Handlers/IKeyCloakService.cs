@@ -4,7 +4,7 @@ namespace bionicpro_auth.Components.Handlers
 {
     public interface IKeyCloakService
     {
-        string GenerateAuthorizationUrl(string state, string redirectUri, string? kcIdpHint = null);
+        string GenerateAuthorizationUrl(string state,string codeChallange,  string redirectUri, string? kcIdpHint = null);
 
         Task<AuthResult?> ExchangeCodeForTokensAsync(string code, string redirectUri);
 

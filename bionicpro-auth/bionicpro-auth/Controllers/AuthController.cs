@@ -7,6 +7,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using System.Runtime;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace BionicProAuth.Controllers;
 
@@ -40,13 +42,15 @@ public class AuthController : ControllerBase
     [HttpGet("login-url")]
     public IActionResult GetLoginUrl([FromQuery] string? idpHint = null)
     {
+        var codeVerifier = GenerateCodeVerifier();
+        var codeChallenge = GenerateCodeChallenge(codeVerifier);
         var state = Guid.NewGuid().ToString();
         var redirectUri = $"{Request.Scheme}://{Request.Host}/api/auth/callback";
 
         // Сохраняем state для проверки
-        _cache.Set($"oauth_state_{state}", state, TimeSpan.FromMinutes(10));
+        _cache.Set($"oauth_state_{state}", codeVerifier, TimeSpan.FromMinutes(10));
 
-        var authUrl = _keycloakService.GenerateAuthorizationUrl(state, redirectUri, idpHint);
+        var authUrl = _keycloakService.GenerateAuthorizationUrl(state, codeChallenge, redirectUri, idpHint);
 
         return Ok(new { url = authUrl });
     }
@@ -141,5 +145,32 @@ public class AuthController : ControllerBase
     private string GetFrontendUrl()
     {
         return _settings.CurrentValue.Frontend;
+    }
+
+
+
+    private string GenerateCodeVerifier()
+    {
+        var randomBytes = new byte[32];
+        using (var rng = RandomNumberGenerator.Create())
+        {
+            rng.GetBytes(randomBytes);
+        }
+        return Convert.ToBase64String(randomBytes)
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
+    }
+
+    private string GenerateCodeChallenge(string codeVerifier)
+    {
+        using (var sha256 = SHA256.Create())
+        {
+            var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(codeVerifier));
+            return Convert.ToBase64String(hash)
+                .TrimEnd('=')
+                .Replace('+', '-')
+                .Replace('/', '_');
+        }
     }
 }

@@ -15,16 +15,18 @@ namespace bionicpro_auth.Components.Handlers.Implementation
         /// <summary>
         /// Генерация URL для авторизации в Keycloak (с PKCE)
         /// </summary>
-        public string GenerateAuthorizationUrl( string state, string redirectUri, string? kcIdpHint = null)
+        public string GenerateAuthorizationUrl( string state, string codeChallange, string redirectUri, string? kcIdpHint = null)
         {
             var baseUrl = $"{settings.CurrentValue.BaseUrl.TrimEnd('/')}/realms/{settings.CurrentValue.Realm}/protocol/openid-connect/auth";
 
             List<string> parameters =
             [
-                $"response_type=code",
+                "response_type=code",
                 $"client_id={settings.CurrentValue.FrontendCredentional.ClientId}",
                 $"redirect_uri={Uri.EscapeDataString(redirectUri)}",
-                $"scope=openid profile email",
+                "scope=openid profile email",
+                $"code_challenge={codeChallange}",
+                "code_challenge_method=S256",
                 $"state={state}"
             ];
 

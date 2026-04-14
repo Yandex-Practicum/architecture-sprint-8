@@ -1,11 +1,13 @@
 ﻿// Controllers/AuthController.cs
 using bionicpro_auth.Components.Handlers;
 using bionicpro_auth.Components.Handlers.Implementation;
+using bionicpro_auth.Components.Middleware;
 using bionicpro_auth.Models;
 using bionicpro_auth.Models.Settings;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
+using Microsoft.VisualBasic;
 using System.Runtime;
 using System.Security.Cryptography;
 using System.Text;
@@ -18,18 +20,24 @@ public class AuthController : ControllerBase
 {
     private readonly IKeyCloakService _keycloakService;
     private readonly ISessionService _sessionService;
+    private readonly IContextWrapper _contextWrapper;
     private readonly IMemoryCache _cache;
+    private readonly IAuthService _authService;
     private readonly IOptionsMonitor<AppSettings> _settings;
     private readonly ILogger<AuthController> _logger;
 
     public AuthController(
         IKeyCloakService keycloakService,
         IMemoryCache cache,
+        IContextWrapper contextWrapper,
         ISessionService sessionService,
+        IAuthService authService,
         IOptionsMonitor<AppSettings> settings,
         ILogger<AuthController> logger)
     {
+        _authService = authService;
         _settings = settings;
+        _contextWrapper = contextWrapper;
         _keycloakService = keycloakService;
         _sessionService = sessionService;
         _cache = cache;
@@ -45,7 +53,7 @@ public class AuthController : ControllerBase
         var codeVerifier = GenerateCodeVerifier();
         var codeChallenge = GenerateCodeChallenge(codeVerifier);
         var state = Guid.NewGuid().ToString();
-        var redirectUri = $"{Request.Scheme}://{Request.Host}/api/auth/callback";
+        var redirectUri = $"https://{Request.Host}:444/api/auth/callback";
 
         // Сохраняем state для проверки
         _cache.Set($"oauth_state_{state}", codeVerifier, TimeSpan.FromMinutes(10));
@@ -69,17 +77,17 @@ public class AuthController : ControllerBase
         }
 
         // Проверяем state
-        if (!_cache.TryGetValue($"oauth_state_{state}", out _))
+        if (!_cache.TryGetValue($"oauth_state_{state}", out string? codeVerifier))
         {
             return BadRequest("Invalid state");
         }
 
-        var redirectUri = $"{Request.Scheme}://{Request.Host}/api/auth/callback";
+        var redirectUri = $"https://{Request.Host}:444/api/auth/callback";
 
         // Обмениваем code на токены
-        var tokens = await _keycloakService.ExchangeCodeForTokensAsync(code, redirectUri);
+        var tokens = await _keycloakService.ExchangeCodeForTokensAsync(code, codeVerifier!, redirectUri);
 
-        if (tokens == null)
+        if (tokens?.IsSuccess != true)
         {
             return Redirect($"{GetFrontendUrl()}/login?error=token_exchange_failed");
         }
@@ -89,15 +97,7 @@ public class AuthController : ControllerBase
 
         SessionData session = _sessionService.CreateSession(userInfo, tokens.Tokens);
 
-        // Создаем cookie
-        Response.Cookies.Append("session_id", session.SessionId.ToString(), new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = true,
-            SameSite = SameSiteMode.Strict,
-            MaxAge = TimeSpan.FromMinutes(15),
-            Path = "/"
-        });
+        _contextWrapper.UpdateSessionCookie(HttpContext, session.SessionId);
 
         // Редирект на фронтенд
         return Redirect($"{GetFrontendUrl()}/auth/callback?success=true");
@@ -106,6 +106,7 @@ public class AuthController : ControllerBase
     /// <summary>
     /// Проверка сессии
     /// </summary>
+    [SessionRotate]
     [HttpGet("session")]
     public IActionResult GetSession()
     {
@@ -135,8 +136,8 @@ public class AuthController : ControllerBase
         var sessionId = Request.Cookies["session_id"];
         if (!string.IsNullOrEmpty(sessionId))
         {
-            _cache.Remove($"session_{sessionId}");
-            Response.Cookies.Delete("session_id");
+            _authService.LogOutAsync(Guid.Parse(sessionId));
+            _contextWrapper.RemoveSession(HttpContext);
         }
 
         return Ok(new { success = true });

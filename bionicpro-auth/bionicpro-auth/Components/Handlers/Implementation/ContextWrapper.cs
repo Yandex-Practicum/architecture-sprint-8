@@ -17,5 +17,10 @@ namespace bionicpro_auth.Components.Handlers.Implementation
 
             context.Response.Cookies.Append(settings.CurrentValue.CookiesName, sessionId.ToString(), cookieOptions);
         }
+
+        public void RemoveSession(HttpContext context)
+        {
+            context.Response.Cookies.Delete(settings.CurrentValue.CookiesName);
+        }
     }
 }

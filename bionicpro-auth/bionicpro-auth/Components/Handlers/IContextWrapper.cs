@@ -5,5 +5,7 @@
 
         void UpdateSessionCookie(HttpContext context, Guid sessionId);
 
+        void RemoveSession(HttpContext context);
+
     }
 }

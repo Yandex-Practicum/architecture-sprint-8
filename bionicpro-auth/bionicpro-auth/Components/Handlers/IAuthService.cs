@@ -7,6 +7,7 @@ namespace bionicpro_auth.Components.Handlers
 
 
         Task<SessionData> RefreshSessionAsync(Guid sessionId);
+        Task LogOutAsync(Guid sessionId);
 
     }
 }

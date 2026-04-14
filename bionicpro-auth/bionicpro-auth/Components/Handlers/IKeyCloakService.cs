@@ -6,11 +6,12 @@ namespace bionicpro_auth.Components.Handlers
     {
         string GenerateAuthorizationUrl(string state,string codeChallange,  string redirectUri, string? kcIdpHint = null);
 
-        Task<AuthResult?> ExchangeCodeForTokensAsync(string code, string redirectUri);
+        Task<AuthResult?> ExchangeCodeForTokensAsync(string code, string codeVerify, string redirectUri);
 
         Task<UserInfo> GetUserInfoAsync(string accessToken);
 
         Task<AuthResult> RefreshAccessTokenAsync(string refreshToken);
+        Task LogoutFromKeycloak(string refreshToken);
 
     }
 }

@@ -23,5 +23,14 @@ namespace bionicpro_auth.Components.Handlers.Implementation
             return sessionService.CreateSession(session.UserInfo, loginResponse.Tokens);
         }
 
+        public async Task LogOutAsync(Guid sessionId)
+        {
+            SessionData session = sessionService.GetSession(sessionId);
+
+            await keycloakService.LogoutFromKeycloak(encryptor.Decrypt(session.EncryptedRefreshToken));
+
+            sessionService.RemoveSession(sessionId);
+        }
+
     }
 }

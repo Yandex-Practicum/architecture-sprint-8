@@ -25,17 +25,12 @@ namespace bionicpro_auth.Components.Middleware
 
                     SessionData session = sessionService.GetSession(sessionId);
 
-                    if (session.AccessTokenCreateAt + session.AccessTokenExpiry > DateTime.Now)
-                    {
-                        sessionId = sessionService.RotateSession(sessionId);
-                        session = sessionService.GetSession(sessionId);
-                    }
-                    else
+                    if (session.AccessTokenCreateAt + session.AccessTokenExpiry < DateTime.Now)
                     {
                         session = await authService.RefreshSessionAsync(sessionId);
+                        contextWrapper.UpdateSessionCookie(context.HttpContext, session.SessionId);
                     }
 
-                    contextWrapper.UpdateSessionCookie(context.HttpContext, session.SessionId);
 
                     context.HttpContext.Items["Session"] = session.SessionId;
                 }

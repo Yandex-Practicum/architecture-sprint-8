@@ -15,9 +15,10 @@ namespace bionicpro_auth.Components.Handlers.Implementation
         /// <summary>
         /// Генерация URL для авторизации в Keycloak (с PKCE)
         /// </summary>
-        public string GenerateAuthorizationUrl( string state, string codeChallange, string redirectUri, string? kcIdpHint = null)
+        public string GenerateAuthorizationUrl(string state, string codeChallange, string redirectUri, string? kcIdpHint = null)
         {
-            var baseUrl = $"{settings.CurrentValue.BaseUrl.TrimEnd('/')}/realms/{settings.CurrentValue.Realm}/protocol/openid-connect/auth";
+            //var baseUrl = $"{settings.CurrentValue.BaseUrl.TrimEnd('/')}/realms/{settings.CurrentValue.Realm}/protocol/openid-connect/auth";
+            var baseUrl = $"http://localhost:8080/realms/{settings.CurrentValue.Realm}/protocol/openid-connect/auth";
 
             List<string> parameters =
             [
@@ -41,7 +42,7 @@ namespace bionicpro_auth.Components.Handlers.Implementation
         /// <summary>
         /// Обмен authorization code на токены
         /// </summary>
-        public async Task<AuthResult?> ExchangeCodeForTokensAsync(string code, string redirectUri)
+        public async Task<AuthResult?> ExchangeCodeForTokensAsync(string code, string codeVerify, string redirectUri)
         {
             try
             {
@@ -49,10 +50,10 @@ namespace bionicpro_auth.Components.Handlers.Implementation
 
                 var content = new FormUrlEncodedContent([
                         new KeyValuePair<string, string>("grant_type", "authorization_code"),
-                        new KeyValuePair<string, string>("client_id", settings.CurrentValue.BackendCredentional.ClientId),
-                        new KeyValuePair<string, string>("client_secret", settings.CurrentValue.BackendCredentional.Secret),
+                        new KeyValuePair<string, string>("client_id", settings.CurrentValue.FrontendCredentional.ClientId),
                         new KeyValuePair<string, string>("code", code),
-                        new KeyValuePair<string, string>("redirect_uri", redirectUri)
+                        new KeyValuePair<string, string>("redirect_uri", redirectUri),
+                        new KeyValuePair<string, string>("code_verifier", codeVerify)
                 ]);
 
                 var response = await httpClient.PostAsync(tokenUrl, content);
@@ -72,33 +73,25 @@ namespace bionicpro_auth.Components.Handlers.Implementation
             }
         }
 
-        public async Task<UserInfo> GetUserInfoAsync(string accessToken)
+        public Task<UserInfo> GetUserInfoAsync(string accessToken)
         {
-            try
+
+            var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
+            var jwtToken = handler.ReadJwtToken(accessToken);
+
+            if (jwtToken.Subject is null)
             {
-                var userInfoUrl = $"{settings.CurrentValue.BaseUrl}/realms/{settings.CurrentValue.Realm}/protocol/openid-connect/userinfo";
-
-                httpClient.DefaultRequestHeaders.Clear();
-                httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {accessToken}");
-
-                var response = await httpClient.GetAsync(userInfoUrl);
-                var json = await response.Content.ReadAsStringAsync();
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    return null;
-                }
-
-                return JsonSerializer.Deserialize<UserInfo>(json, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                })!;
+                throw new InvalidOperationException("User id null or empty");
             }
-            catch (Exception ex)
+
+            return Task.FromResult(new UserInfo()
             {
-                logger.LogError(ex, "Failed to get user info");
-                return null;
-            }
+                Name = jwtToken.Claims.FirstOrDefault(c => c.Type == "name")?.Value ?? "Undefiner",
+                PreferredUsername = jwtToken.Claims.FirstOrDefault(c => c.Type == "preferred_username")?.Value ?? "Undefined",
+                Email = jwtToken.Claims.FirstOrDefault(c => c.Type == "email")?.Value ?? "Undefiner",
+                Sub = jwtToken.Claims.FirstOrDefault(c => c.Type == "sub").Value!
+            });
+
 
         }
 
@@ -145,6 +138,17 @@ namespace bionicpro_auth.Components.Handlers.Implementation
                 };
             }
         }
+        public async Task LogoutFromKeycloak(string refreshToken)
+        {
+            var logoutUrl = $"{settings.CurrentValue.BaseUrl.Trim('/')}/realms/{settings.CurrentValue.Realm}/protocol/openid-connect/logout";
 
+            var content = new FormUrlEncodedContent(new[]
+            {
+                    new KeyValuePair<string, string>("client_id",settings.CurrentValue.FrontendCredentional.ClientId),
+                    new KeyValuePair<string, string>("refresh_token", refreshToken),
+                });
+
+            await httpClient.PostAsync(logoutUrl, content);
+        }
     }
 }

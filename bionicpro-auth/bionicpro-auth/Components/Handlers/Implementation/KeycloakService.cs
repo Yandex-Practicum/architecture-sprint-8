@@ -18,7 +18,7 @@ namespace bionicpro_auth.Components.Handlers.Implementation
         public string GenerateAuthorizationUrl(string state, string codeChallange, string redirectUri, string? kcIdpHint = null)
         {
             //var baseUrl = $"{settings.CurrentValue.BaseUrl.TrimEnd('/')}/realms/{settings.CurrentValue.Realm}/protocol/openid-connect/auth";
-            var baseUrl = $"http://localhost:8080/realms/{settings.CurrentValue.Realm}/protocol/openid-connect/auth";
+            var baseUrl = $"http://{settings.CurrentValue.BaseUrl4Front.TrimEnd('/')}/realms/{settings.CurrentValue.Realm}/protocol/openid-connect/auth";
 
             List<string> parameters =
             [
@@ -46,7 +46,7 @@ namespace bionicpro_auth.Components.Handlers.Implementation
         {
             try
             {
-                var tokenUrl = $"{settings.CurrentValue.BaseUrl.TrimEnd('/')}/realms/{settings.CurrentValue.Realm}/protocol/openid-connect/token";
+                var tokenUrl = $"{settings.CurrentValue.BaseUrl4Back.TrimEnd('/')}/realms/{settings.CurrentValue.Realm}/protocol/openid-connect/token";
 
                 var content = new FormUrlEncodedContent([
                         new KeyValuePair<string, string>("grant_type", "authorization_code"),
@@ -100,7 +100,7 @@ namespace bionicpro_auth.Components.Handlers.Implementation
             try
             {
 
-                var tokenEndpoint = $"{settings.CurrentValue.BaseUrl.Trim('/')}/realms/{settings.CurrentValue.Realm}/protocol/openid-connect/token";
+                var tokenEndpoint = $"{settings.CurrentValue.BaseUrl4Back.TrimEnd('/')}/realms/{settings.CurrentValue.Realm}/protocol/openid-connect/token";
                 var content = new FormUrlEncodedContent(new[]
                 {
                     new KeyValuePair<string, string>("grant_type", "refresh_token"),
@@ -140,7 +140,7 @@ namespace bionicpro_auth.Components.Handlers.Implementation
         }
         public async Task LogoutFromKeycloak(string refreshToken)
         {
-            var logoutUrl = $"{settings.CurrentValue.BaseUrl.Trim('/')}/realms/{settings.CurrentValue.Realm}/protocol/openid-connect/logout";
+            var logoutUrl = $"{settings.CurrentValue.BaseUrl4Back.TrimEnd('/')}/realms/{settings.CurrentValue.Realm}/protocol/openid-connect/logout";
 
             var content = new FormUrlEncodedContent(new[]
             {

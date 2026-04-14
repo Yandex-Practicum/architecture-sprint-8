@@ -148,7 +148,9 @@ namespace bionicpro_auth.Components.Handlers.Implementation
                     new KeyValuePair<string, string>("refresh_token", refreshToken),
                 });
 
-            await httpClient.PostAsync(logoutUrl, content);
+            var response = await httpClient.PostAsync(logoutUrl, content);
+            var json = await response.Content.ReadAsStringAsync();
+
         }
     }
 }

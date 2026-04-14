@@ -130,13 +130,14 @@ public class AuthController : ControllerBase
     /// <summary>
     /// Выход
     /// </summary>
+    [SessionRotate]
     [HttpPost("logout")]
     public IActionResult Logout()
     {
-        var sessionId = Request.Cookies["session_id"];
-        if (!string.IsNullOrEmpty(sessionId))
+        var sessionId = HttpContext.Items["Session"] as Guid?;
+        if (sessionId is not null)
         {
-            _authService.LogOutAsync(Guid.Parse(sessionId));
+            _authService.LogOutAsync(sessionId!.Value);
             _contextWrapper.RemoveSession(HttpContext);
         }
 

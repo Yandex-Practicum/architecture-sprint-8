@@ -1,19 +1,20 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { authService, User } from '../services/auth.service';
+// src/contexts/AuthContext.tsx
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { getLoginUrl, checkSession, logout } from '../services/api';
+import { User, SessionResponse } from '../types/index';
 
 interface AuthContextType {
-  user: User | null;
-  isLoading: boolean;
   isAuthenticated: boolean;
-  login: (username: string, password: string, optCode: string) => Promise<{ success: boolean; error?: string }>;
+  user: User | null;
+  loading: boolean;
+  login: (idpHint?: string | null) => Promise<void>;
   logout: () => Promise<void>;
-  validateSession: () => Promise<boolean>;
-  refreshUser: () => Promise<void>;
+  loadSession: () => Promise<SessionResponse | null>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const useAuth = () => {
+export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
   if (!context) {
     throw new Error('useAuth must be used within AuthProvider');
@@ -26,98 +27,69 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loading, setLoading] = useState<boolean>(true);
 
-  useEffect(() => {
-    checkInitialSession();
+  const loadSession = useCallback(async (): Promise<SessionResponse | null> => {
+    try {
+      const session = await checkSession();
+      setIsAuthenticated(session.authenticated);
+      setUser({
+        authenticated: session.authenticated,
+        username: session.username,
+        email: session.email,
+        otpEnabled: session.otpEnabled,
+      });
+      return session;
+    } catch (error) {
+      console.error('Failed to load session:', error);
+      setIsAuthenticated(false);
+      setUser(null);
+      return null;
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const checkInitialSession = async () => {
-    setIsLoading(true);
+  const login = useCallback(async (idpHint: string | null = null): Promise<void> => {
     try {
-      const isValid = await authService.validateSession();
-      if (isValid) {
-        const userData = await authService.getCurrentUser();
-        if (userData) {
-          setUser(userData);
-          setIsAuthenticated(true);
-        }
-      }
+      const url = await getLoginUrl(idpHint);
+      window.location.href = url;
     } catch (error) {
-      console.error('Session check failed:', error);
-    } finally {
-      setIsLoading(false);
+      console.error('Login failed:', error);
+      throw error;
     }
-  };
+  }, []);
 
-  const login = async (username: string, password: string, otpCode: string) => {
-    setIsLoading(true);
+  const handleLogout = useCallback(async (): Promise<void> => {
     try {
-      const result = await authService.login(username, password, otpCode);
-      if (result.success && result.user) {
-        setUser(result.user);
-        setIsAuthenticated(true);
-        return { success: true };
-      }
-      return { success: false, error: result.error };
+      await logout();
     } catch (error) {
-      console.error('Login error:', error);
-      return { success: false, error: 'An unexpected error occurred' };
+      console.error('Logout failed:', error);
     } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const logout = async () => {
-    setIsLoading(true);
-    try {
-      await authService.logout();
-      setUser(null);
       setIsAuthenticated(false);
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      setIsLoading(false);
+      setUser(null);
+      window.location.href = '/login';
     }
-  };
+  }, []);
 
-  const validateSession = async (): Promise<boolean> => {
-    try {
-      const isValid = await authService.validateSession();
-      if (!isValid) {
-        setUser(null);
-        setIsAuthenticated(false);
-      }
-      return isValid;
-    } catch (error) {
-      console.error('Session validation error:', error);
-      return false;
-    }
-  };
+  useEffect(() => {
+    loadSession();
+  }, [loadSession]);
 
-  const refreshUser = async () => {
-    try {
-      const userData = await authService.getCurrentUser();
-      if (userData) {
-        setUser(userData);
-        setIsAuthenticated(true);
-      }
-    } catch (error) {
-      console.error('Refresh user error:', error);
-    }
-  };
-
-  const value = {
-    user,
-    isLoading,
+  const value: AuthContextType = {
     isAuthenticated,
+    user,
+    loading,
     login,
-    logout,
-    validateSession,
-    refreshUser,
+    logout: handleLogout,
+    loadSession,
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 };

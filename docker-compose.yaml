@@ -1,5 +1,44 @@
 services:
 
+  nginx:
+    image: nginx:latest
+    container_name: web_nginx
+    depends_on:
+      - frontend
+      - bionicpro-auth
+      - keycloak
+    volumes:
+      - ./nginx/Docker.nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/certs:/etc/certs:ro
+    ports:
+      - 444:444
+    restart: always
+    networks:
+      - bionicpro-net
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
+      KC_DB_USERNAME: keycloak_user
+      KC_DB_PASSWORD: keycloak_password
+      KC_FEATURES: scripts
+    command:
+      - start-dev
+      - --import-realm
+    volumes:
+      - ./keycloak/keycloak-export-ldap/reports-realm-realm-yandex.json:/opt/keycloak/data/import/reports-realm-realm.json
+    ports:
+      - "8080:8080"
+    depends_on:
+      - keycloak_db
+      - ldap-init
+    networks:
+      - bionicpro-net
+
   openldap:
     image: osixia/openldap:latest
     container_name: openldap
@@ -73,29 +112,6 @@ services:
     networks:
       - bionicpro-net
 
-  keycloak:
-    image: quay.io/keycloak/keycloak:latest
-    environment:
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
-      KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
-      KC_DB_USERNAME: keycloak_user
-      KC_DB_PASSWORD: keycloak_password
-      KC_FEATURES: scripts
-    command:
-      - start-dev
-      - --import-realm
-    volumes:
-      - ./keycloak/keycloak-export-ldap/:/opt/keycloak/data/import/
-    ports:
-      - "8080:8080"
-    depends_on:
-      - keycloak_db
-      - ldap-init
-    networks:
-      - bionicpro-net
-
 
   frontend:
     build:
@@ -104,7 +120,10 @@ services:
     ports:
       - "3000:3000"
     environment:
-      REACT_APP_VITE_API_URL: https://api.bio-pro.local:444
+      REACT_APP_API_URL: https://api.bio-pro.local:444/api
+      REACT_APP_KEYCLOAK_URL: http://localhost:8080
+      REACT_APP_KEYCLOAK_REALM: reports-realm
+      REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
       REACT_APP_VITE_API_TIMEOUT: 30000
     networks:
       - bionicpro-net
@@ -123,21 +142,6 @@ services:
     networks:
       - bionicpro-net
 
-
-  nginx:
-    image: nginx:latest
-    container_name: web_nginx
-    depends_on:
-      - frontend
-      - bionicpro-auth
-    volumes:
-      - ./nginx/Docker.nginx.conf:/etc/nginx/nginx.conf
-      - ./nginx/certs:/etc/certs:ro
-    ports:
-      - 444:444
-    restart: always
-    networks:
-      - bionicpro-net
 
 
 

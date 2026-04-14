@@ -23,6 +23,7 @@ public class AuthController : ControllerBase
     private readonly IContextWrapper _contextWrapper;
     private readonly IMemoryCache _cache;
     private readonly IAuthService _authService;
+    private readonly IOptionsMonitor<KeycloakSettings> _keyCloakSettings;
     private readonly IOptionsMonitor<AppSettings> _settings;
     private readonly ILogger<AuthController> _logger;
 
@@ -33,12 +34,14 @@ public class AuthController : ControllerBase
         ISessionService sessionService,
         IAuthService authService,
         IOptionsMonitor<AppSettings> settings,
+        IOptionsMonitor<KeycloakSettings> keyCloakSettings,
         ILogger<AuthController> logger)
     {
         _authService = authService;
         _settings = settings;
         _contextWrapper = contextWrapper;
         _keycloakService = keycloakService;
+        _keyCloakSettings = keyCloakSettings;
         _sessionService = sessionService;
         _cache = cache;
         _logger = logger;
@@ -53,7 +56,7 @@ public class AuthController : ControllerBase
         var codeVerifier = GenerateCodeVerifier();
         var codeChallenge = GenerateCodeChallenge(codeVerifier);
         var state = Guid.NewGuid().ToString();
-        var redirectUri = $"https://{Request.Host}:444/api/auth/callback";
+        var redirectUri = $"https://api.bio-pro.local:444/api/auth/callback";
 
         // Сохраняем state для проверки
         _cache.Set($"oauth_state_{state}", codeVerifier, TimeSpan.FromMinutes(10));
@@ -82,7 +85,7 @@ public class AuthController : ControllerBase
             return BadRequest("Invalid state");
         }
 
-        var redirectUri = $"https://{Request.Host}:444/api/auth/callback";
+        var redirectUri = $"https://api.bio-pro.local:444/api/auth/callback";
 
         // Обмениваем code на токены
         var tokens = await _keycloakService.ExchangeCodeForTokensAsync(code, codeVerifier!, redirectUri);
@@ -127,9 +130,6 @@ public class AuthController : ControllerBase
         });
     }
 
-    /// <summary>
-    /// Выход
-    /// </summary>
     [SessionRotate]
     [HttpPost("logout")]
     public IActionResult Logout()
@@ -137,11 +137,13 @@ public class AuthController : ControllerBase
         var sessionId = HttpContext.Items["Session"] as Guid?;
         if (sessionId is not null)
         {
-            _authService.LogOutAsync(sessionId!.Value);
             _contextWrapper.RemoveSession(HttpContext);
         }
 
-        return Ok(new { success = true });
+        var redirectUri = Uri.EscapeDataString($"{_settings.CurrentValue.Frontend.TrimEnd('/')}/login");
+        var keycloakLogoutUrl = $"{_keyCloakSettings.CurrentValue.BaseUrl4Front.TrimEnd('/')}/realms/{_keyCloakSettings.CurrentValue.Realm}/protocol/openid-connect/logout?redirect_uri={redirectUri}";
+
+        return Ok(new { logoutUrl = keycloakLogoutUrl });
     }
 
     private string GetFrontendUrl()

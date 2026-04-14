@@ -1,37 +1,25 @@
+// src/components/Navbar.tsx
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import './Navbar.css';
 
-interface NavbarProps {
-  onLogout?: () => void;
-}
-
-export const Navbar: React.FC<NavbarProps> = ({ onLogout }) => {
-  const { user, isAuthenticated, logout } = useAuth();
-
-  const handleLogout = async () => {
-    await logout();
-    if (onLogout) {
-      onLogout();
-    }
-  };
+const Navbar: React.FC = () => {
+  const { isAuthenticated, user, logout } = useAuth();
 
   return (
     <nav className="navbar">
       <div className="navbar-container">
-        <div className="navbar-brand">
-          <span className="brand-icon">🔐</span>
-          <span className="brand-name">BionicPro</span>
-        </div>
-
-        {isAuthenticated && user && (
+        <Link to="/" className="navbar-brand">
+          🔐 BionicPRO
+        </Link>
+        
+        {isAuthenticated && (
           <div className="navbar-menu">
-            <div className="user-info">
-              <span className="user-name">{user.username}</span>
-              <span className="user-badge">Active</span>
-            </div>
-            <button onClick={handleLogout} className="logout-button">
-              <span className="logout-icon">🚪</span>
+            <Link to="/" className="navbar-link">Dashboard</Link>
+            <span style={{ color: '#666', marginRight: '10px' }}>
+              👤 {user?.username}
+            </span>
+            <button onClick={logout} className="logout-btn">
               Logout
             </button>
           </div>
@@ -40,3 +28,5 @@ export const Navbar: React.FC<NavbarProps> = ({ onLogout }) => {
     </nav>
   );
 };
+
+export default Navbar;

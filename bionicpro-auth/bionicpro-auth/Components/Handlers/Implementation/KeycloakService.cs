@@ -18,7 +18,7 @@ namespace bionicpro_auth.Components.Handlers.Implementation
         public string GenerateAuthorizationUrl(string state, string codeChallange, string redirectUri, string? kcIdpHint = null)
         {
             //var baseUrl = $"{settings.CurrentValue.BaseUrl.TrimEnd('/')}/realms/{settings.CurrentValue.Realm}/protocol/openid-connect/auth";
-            var baseUrl = $"http://{settings.CurrentValue.BaseUrl4Front.TrimEnd('/')}/realms/{settings.CurrentValue.Realm}/protocol/openid-connect/auth";
+            var baseUrl = $"{settings.CurrentValue.BaseUrl4Front.TrimEnd('/')}/realms/{settings.CurrentValue.Realm}/protocol/openid-connect/auth";
 
             List<string> parameters =
             [
@@ -58,6 +58,7 @@ namespace bionicpro_auth.Components.Handlers.Implementation
 
                 var response = await httpClient.PostAsync(tokenUrl, content);
                 var json = await response.Content.ReadAsStringAsync();
+                logger.LogInformation($"Excahnge data came: {json}");
 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -145,6 +146,7 @@ namespace bionicpro_auth.Components.Handlers.Implementation
             var content = new FormUrlEncodedContent(new[]
             {
                     new KeyValuePair<string, string>("client_id",settings.CurrentValue.FrontendCredentional.ClientId),
+                    new KeyValuePair<string, string>("client_secret", settings.CurrentValue.FrontendCredentional.Secret),
                     new KeyValuePair<string, string>("refresh_token", refreshToken),
                 });
 

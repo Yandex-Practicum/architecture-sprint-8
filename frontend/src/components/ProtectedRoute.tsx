@@ -1,3 +1,4 @@
+// src/components/ProtectedRoute.tsx
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -6,14 +7,14 @@ interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
-export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { isAuthenticated, isLoading } = useAuth();
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+  const { isAuthenticated, loading } = useAuth();
 
-  if (isLoading) {
+  if (loading) {
     return (
-      <div className="loading-screen">
-        <div className="loading-spinner-large"></div>
-        <p>Checking authentication...</p>
+      <div className="loading">
+        <div className="spinner"></div>
+        <div>Loading...</div>
       </div>
     );
   }
@@ -24,3 +25,5 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
   return <>{children}</>;
 };
+
+export default ProtectedRoute;

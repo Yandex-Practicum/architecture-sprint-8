@@ -1,3 +1,6 @@
+/postgres-keycloak-data
+/postgres-airflow-data
+2024__yandex-architecture-sso.code-workspace
 # Docker volumes / данные баз данных
 postgres-keycloak-data/
 postgres-airflow-data/

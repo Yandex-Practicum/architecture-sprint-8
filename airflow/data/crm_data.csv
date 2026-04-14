@@ -7,3 +7,4 @@ user_uuid,full_name,email,phone,region,registration_date,prosthesis_model,status
 66666666-6666-6666-6666-666666666666,Анна Морозова,anna.morozova@email.de,+491234567890,EU,2025-11-01,BionicPro X2,active
 77777777-7777-7777-7777-777777777777,Thomas Mueller,thomas.mueller@email.de,+491234567891,EU,2025-10-20,BionicPro X3,active
 88888888-8888-8888-8888-888888888888,Sophie Dubois,sophie.dubois@email.fr,+33123456789,EU,2026-01-10,BionicPro X1,active
+03c1190b-6941-4c68-8028-e0a6d18133cf,Ivan Petrov,ivan@example.com,+79001234567,RU,2025-10-15,BionicPro X2,active

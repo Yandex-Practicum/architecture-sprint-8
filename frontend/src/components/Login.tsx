@@ -32,7 +32,7 @@ const Login: React.FC = () => {
     setIsLoggingIn(true);
     setError(null);
     try {
-      await login('yandex');
+      await login('yandex-oauth2');
     } catch (err) {
       setError('Failed to initiate Yandex login. Please try again.');
       setIsLoggingIn(false);

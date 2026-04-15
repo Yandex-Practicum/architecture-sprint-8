@@ -1,7 +1,7 @@
 // src/contexts/AuthContext.tsx
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { getLoginUrl, checkSession, logout } from '../services/api';
-import { User, SessionResponse } from '../types/index';
+import { User, SessionResponse } from '../types/';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -63,15 +63,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   const handleLogout = useCallback(async (): Promise<void> => {
-    try {
-      await logout();
-    } catch (error) {
-      console.error('Logout failed:', error);
-    } finally {
-      setIsAuthenticated(false);
-      setUser(null);
-      window.location.href = '/login';
-    }
+      window.location.href = await logout();
   }, []);
 
   useEffect(() => {

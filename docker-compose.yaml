@@ -12,6 +12,8 @@ services:
       - ./nginx/certs:/etc/certs:ro
     ports:
       - 444:444
+      - 443:443
+      
     restart: always
     networks:
       - bionicpro-net
@@ -25,7 +27,13 @@ services:
       KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
       KC_DB_USERNAME: keycloak_user
       KC_DB_PASSWORD: keycloak_password
-      KC_FEATURES: scripts
+      
+      KC_PROXY: edge
+      KC_PROXY_HEADERS: xforwarded
+      KC_HOSTNAME_STRICT: false
+      KC_HTTP_ENABLED: true
+      KC_HTTPS_ENABLED: false
+      KC_HOSTNAME: key.bio-pro.local
     command:
       - start-dev
       - --import-realm
@@ -33,6 +41,7 @@ services:
       - ./keycloak/keycloak-export-ldap/reports-realm-realm-yandex.json:/opt/keycloak/data/import/reports-realm-realm.json
     ports:
       - "8080:8080"
+      - "8443:8443"
     depends_on:
       - keycloak_db
       - ldap-init

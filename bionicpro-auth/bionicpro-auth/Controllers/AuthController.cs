@@ -130,15 +130,10 @@ public class AuthController : ControllerBase
         });
     }
 
-    [SessionRotate]
     [HttpPost("logout")]
     public IActionResult Logout()
     {
-        var sessionId = HttpContext.Items["Session"] as Guid?;
-        if (sessionId is not null)
-        {
-            _contextWrapper.RemoveSession(HttpContext);
-        }
+        _contextWrapper.RemoveSession(HttpContext);
 
         var redirectUri = Uri.EscapeDataString($"{_settings.CurrentValue.Frontend.TrimEnd('/')}/login");
         var keycloakLogoutUrl = $"{_keyCloakSettings.CurrentValue.BaseUrl4Front.TrimEnd('/')}/realms/{_keyCloakSettings.CurrentValue.Realm}/protocol/openid-connect/logout?redirect_uri={redirectUri}";

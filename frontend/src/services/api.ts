@@ -55,23 +55,19 @@ export const checkSession = async (): Promise<SessionResponse> => {
   return response.data;
 };
 
-export const logout = async (): Promise<void> => {
+export const logout = async (): Promise<string> => {
    try {
     const response = await api.post('/auth/logout');
     const { logoutUrl } = response.data;
     
-    console.error('Logout result:', response.data);
-    
-    // Если есть URL для редиректа на Keycloak — редиректим
     if (logoutUrl) {
-      window.location.href = logoutUrl;
+      return logoutUrl;
     } else {
-      // Иначе просто на страницу логина
-      window.location.href = '/login';
+      return '/login';
     }
   } catch (error) {
     console.error('Logout failed:', error);
-    window.location.href = '/login';
+    return '/login';
   }
 };
 

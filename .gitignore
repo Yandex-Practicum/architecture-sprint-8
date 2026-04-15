@@ -1,2 +1,11 @@
 /postgres-keycloak-data
 2024__yandex-architecture-sso.code-workspace
+Theory/*
+task*/
+task*.txt
+.cursor/*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class

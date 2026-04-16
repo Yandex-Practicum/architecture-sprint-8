@@ -1,0 +1,16 @@
+user_id,prosthesis_id,timestamp,reaction_time_ms,movement_type,is_successful,battery_level,signal_quality
+user_001,pros_001,2026-01-15 08:00:00,85,grasp,1,95,0.9
+user_001,pros_001,2026-01-15 08:01:00,92,release,1,94,0.88
+user_001,pros_001,2026-01-15 08:02:00,120,grasp,0,93,0.85
+user_001,pros_001,2026-01-15 08:03:00,78,point,1,92,0.92
+user_001,pros_001,2026-01-15 08:04:00,95,grasp,1,91,0.87
+user_002,pros_002,2026-01-15 09:00:00,70,grasp,1,98,0.95
+user_002,pros_002,2026-01-15 09:01:00,68,release,1,97,0.94
+user_002,pros_002,2026-01-15 09:02:00,72,grasp,1,96,0.93
+user_003,pros_003,2026-01-15 10:00:00,95,grasp,1,88,0.86
+user_003,pros_003,2026-01-15 10:01:00,105,release,0,87,0.84
+user_003,pros_003,2026-01-15 10:02:00,98,grasp,1,86,0.85
+user_004,pros_004,2026-01-15 11:00:00,60,grasp,1,99,0.97
+user_004,pros_004,2026-01-15 11:01:00,55,point,1,98,0.96
+user_005,pros_005,2026-01-15 12:00:00,110,grasp,0,85,0.82
+user_005,pros_005,2026-01-15 12:01:00,115,release,0,84,0.81

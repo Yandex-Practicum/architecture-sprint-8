@@ -13,7 +13,7 @@ services:
     ports:
       - 444:444
       - 443:443
-      
+
     restart: always
     networks:
       - bionicpro-net
@@ -117,7 +117,7 @@ services:
       POSTGRES_USER: keycloak_user
       POSTGRES_PASSWORD: keycloak_password
     ports:
-      - "5433:5432"
+      - "5431:5432"
     networks:
       - bionicpro-net
 
@@ -154,6 +154,145 @@ services:
 
 
 
+  postgres_airflow:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres_airflow_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: always
+    networks:
+      - bionicpro-net
+  postgres_crm:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: crm_user
+      POSTGRES_PASSWORD: crm_password
+      POSTGRES_DB: crm_db
+    volumes:
+      - ./Task2/scripts/init_crm_db.sql:/docker-entrypoint-initdb.d/init.sql
+      - postgres_crm_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    restart: always
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "crm_user", "-d", "crm_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bionicpro-net
+
+  postgres_telemetry:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: telemetry_user
+      POSTGRES_PASSWORD: telemetry_password
+      POSTGRES_DB: telemetry_db
+    volumes:
+      - ./Task2/scripts/init_telemetry_db.sql:/docker-entrypoint-initdb.d/init.sql
+      - postgres_telemetry_data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    restart: always
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "telemetry_user", "-d", "telemetry_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bionicpro-net
+
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.8
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    environment:
+      CLICKHOUSE_DB: bionicpro 
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+    volumes:
+      - ./Task2/scripts/init_clickhouse.sql:/docker-entrypoint-initdb.d/init.sql
+      - clickhouse_data:/var/lib/clickhouse
+    restart: always
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bionicpro-net
+
+
+  airflow-webserver:
+    build: ./Task2/.
+    depends_on:
+      - postgres_airflow
+      - postgres_crm
+      - postgres_telemetry
+      - clickhouse
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres_airflow/airflow
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'false'
+      AIRFLOW__WEBSERVER__RBAC: 'true'
+      AIRFLOW_CONN_CRM: postgresql://crm_user:crm_password@postgres_crm:5432/crm_db
+      AIRFLOW_CONN_TELEMETRY: postgresql://telemetry_user:telemetry_password@postgres_telemetry:5432/telemetry_db
+      AIRFLOW_CONN_CLICKHOUSE: clickhouse://default:@clickhouse:8123/default
+    volumes:
+      - ./Task2/dags:/opt/airflow/dags
+      - ./Task2/logs:/opt/airflow/logs
+    ports:
+      - "8000:8080"
+    command: >
+      bash -c "
+      airflow db upgrade &&
+      airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com 2>/dev/null || true &&
+      airflow webserver
+      "
+    restart: always
+    networks:
+      - bionicpro-net
+
+
+  airflow-scheduler:
+    build: ./Task2/.
+    depends_on:
+      - postgres_airflow
+      - postgres_crm
+      - postgres_telemetry
+      - clickhouse
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres_airflow/airflow
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'false'
+      AIRFLOW_CONN_CRM: postgresql://crm_user:crm_password@postgres_crm:5432/crm_db
+      AIRFLOW_CONN_TELEMETRY: postgresql://telemetry_user:telemetry_password@postgres_telemetry:5432/telemetry_db
+      AIRFLOW_CONN_CLICKHOUSE: clickhouse://default:@clickhouse:8123/default
+    volumes:
+      - ./Task2/dags:/opt/airflow/dags
+      - ./Task2/logs:/opt/airflow/logs
+    command: ["airflow", "scheduler"]
+    restart: always
+    networks:
+      - bionicpro-net
+
+      
 networks:
   bionicpro-net:
     driver: bridge
+
+
+volumes:
+  postgres_airflow_data:
+  postgres_crm_data:
+  postgres_telemetry_data:
+  clickhouse_data:

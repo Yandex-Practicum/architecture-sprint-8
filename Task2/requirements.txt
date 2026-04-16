@@ -1,0 +1,5 @@
+pandas==3.0.7
+clickhouse-connect==0.6.8
+numpy==1.24.3
+psycopg2-binary==2.9.9
+apache-airflow-providers-postgres==5.5.2

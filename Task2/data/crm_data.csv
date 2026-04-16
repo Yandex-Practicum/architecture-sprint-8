@@ -1,0 +1,6 @@
+user_id,user_name,user_email,prosthesis_id,prosthesis_type,registration_date,last_tuning_date,tuning_count,country
+user_001,Ivan Petrov,ivan@example.com,pros_001,standard,2026-01-15,2026-12-15,3,Russia
+user_002,Olga Sidorova,olga@example.com,pros_002,premium,2026-02-20,2026-12-20,2,Russia
+user_003,Sergey Ivanov,sergey@example.com,pros_003,standard,2026-03-10,2026-01-05,1,Russia
+user_004,Elena Volkov,a@example.com,pros_004,premium,2026-04-05,2026-01-10,4,Germany
+user_005,Mikhail Smirnov,m@example.com,pros_005,standard,2026-05-12,2026-01-08,2,Russia

@@ -1,2 +1,10 @@
 /postgres-keycloak-data
 2024__yandex-architecture-sso.code-workspace
+
+# macOS Finder
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class

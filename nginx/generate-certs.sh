@@ -6,6 +6,7 @@ domains="
   front.bio-pro.local
   api.bio-pro.local
   key.bio-pro.local
+  report.bio-pro.local
 "
 
 certPath="./certs"

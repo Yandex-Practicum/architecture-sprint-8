@@ -12,9 +12,9 @@ const Navbar: React.FC = () => {
         <Link to="/" className="navbar-brand">
           🔐 BionicPRO
         </Link>
-        
         {isAuthenticated && (
           <div className="navbar-menu">
+            <Link to="/reports" className="navbar-link">Reports</Link>
             <Link to="/" className="navbar-link">Dashboard</Link>
             <span style={{ color: '#666', marginRight: '10px' }}>
               👤 {user?.username}

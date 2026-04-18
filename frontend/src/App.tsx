@@ -7,6 +7,7 @@ import Navbar from './components/Navbar';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import AuthCallback from './components/AuthCallback';
+import Reports from './components/Reports';
 import './index.css';
 
 const AppContent: React.FC = () => {
@@ -16,14 +17,8 @@ const AppContent: React.FC = () => {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
-        <Route 
-          path="/" 
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          } 
-        />
+        <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/reports"   element={<ProtectedRoute>  <Reports />    </ProtectedRoute>  } />
       </Routes>
     </>
   );

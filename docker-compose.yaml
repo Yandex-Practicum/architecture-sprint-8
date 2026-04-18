@@ -1,5 +1,36 @@
 version: '3.8'
 
+x-airflow-common: &airflow-common
+ build:
+  context: ./airflow
+  dockerfile: Dockerfile
+ environment: &airflow-common-env
+  AIRFLOW__CORE__EXECUTOR: LocalExecutor #локальный запуск
+  AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow_user:airflow_password@airflow-db/airflow
+  AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow_user:airflow_password@airflow-db/airflow
+  AIRFLOW__CORE__FERNET_KEY: ''
+  AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+  AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+  AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
+  AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
+  AIRFLOW__WEBSERVER__SECRET_KEY: 'your_airflow_webserver_sec_key'
+  _PIP_ADDITIONAL_REQUIREMENTS: ''
+  AIRFLOW_INPUT_DIR: '/opt/airflow/dag-inputs'
+  AIRFLOW_CONN_CRM_DB: postgresql+psycopg2://crm_user:crm_password@crm_db:5432/crm_db
+  AIRFLOW_CONN_TELEMETRY_DB: postgresql+psycopg2://telemetry_user:telemetry_password@telemetry_db:5432/telemetry_db
+  AIRFLOW_CONN_CLICKHOUSE: clickhouse://clickhouse_user:clickhouse_password@clickhouse:9000/clickhouse_db
+ volumes:
+ - ./dags:/opt/airflow/dags
+ - ./dags/sql:/opt/airflow/dags/sql
+ - ./requirements.txt:/opt/airflow/requirements.txt
+ - ./data:/opt/airflow/sample_files
+ user: "${AIRFLOW_UID:-50000}:0"
+ depends_on: &airflow-common-depends-on
+  airflow-db:
+    condition: service_healthy
+ networks:
+ - dag_olap
+
 services:
   keycloak_db:
     image: postgres:14
@@ -40,3 +71,186 @@ services:
       REACT_APP_KEYCLOAK_URL: http://localhost:8080
       REACT_APP_KEYCLOAK_REALM: reports-realm
       REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+
+  crm_db:
+    image: postgres:16.0
+    volumes:
+      - ./crm_db:/docker-entrypoint-initdb.d/
+    environment:
+      POSTGRES_USER: crm_user
+      POSTGRES_PASSWORD: crm_password
+      POSTGRES_DB: crm_db
+    logging:
+      options:
+        max-size: 10m
+        max-file: "3"
+    healthcheck:
+      test:
+        - CMD
+        - pg_isready
+        - -U
+        - crm_user
+        - -d
+        - crm_db
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    restart: always
+    networks:
+      - dag_olap
+
+  telemetry_db:
+    image: postgres:16.0
+    volumes:
+      - ./telemetry_db:/docker-entrypoint-initdb.d/
+    environment:
+      POSTGRES_USER: telemetry_user
+      POSTGRES_PASSWORD: telemetry_password
+      POSTGRES_DB: telemetry_db
+    logging:
+      options:
+        max-size: 10m
+        max-file: "3"
+    healthcheck:
+      test:
+        - CMD
+        - pg_isready
+        - -U
+        - telemetry_user
+        - -d
+        - telemetry_db
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    restart: always
+    networks:
+      - dag_olap
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    environment:
+      CLICKHOUSE_DB: clickhouse_db
+      CLICKHOUSE_USER: clickhouse_user
+      CLICKHOUSE_PASSWORD: clickhouse_password
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - ./clickhouse:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --user clickhouse_user --password clickhouse_password --query 'SELECT 1'"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+    restart: always
+    networks:
+      - dag_olap
+  airflow-webserver:
+    <<: *airflow-common
+
+    ports:
+      - "8070:8080"
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    command: webserver
+    networks:
+      - dag_olap
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:8080/health || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  airflow-scheduler:
+    <<: *airflow-common
+    networks:
+      - dag_olap
+    command: scheduler
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+      airflow-webserver:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:8080/health || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  airflow-triggerer:
+    <<: *airflow-common
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    networks:
+      - dag_olap
+    command: bash -c "airflow triggerer"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - airflow jobs check --job-type TriggererJob --hostname "${HOSTNAME}"
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+
+  airflow-cli:
+    <<: *airflow-common
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+    networks:
+      - dag_olap
+    profiles:
+      - debug
+    command:
+      - bash
+      - -c
+      - airflow
+
+  airflow-init:
+    <<: *airflow-common
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+      crm_db:
+        condition: service_healthy
+      telemetry_db:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    command: >
+      bash -c " airflow db init && airflow users create \ --username admin \ --firstname admin \ --lastname admin \ --role Admin \ --email admin@sample.ru \ --password admin 
+      
+      "
+    networks:
+      - dag_olap
+  airflow-db:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: airflow
+      POSTGRES_USER: airflow_user
+      POSTGRES_PASSWORD: airflow_password
+    volumes:
+        - ./postgres-airflow-data:/var/lib/postgresql/data
+    ports:
+      - "5454:5432"
+    restart: always
+    healthcheck:
+      test:
+        - CMD
+        - pg_isready
+        - -U
+        - airflow_user
+        - -d
+        - airflow
+    networks:
+      - dag_olap
+
+networks:
+  dag_olap:

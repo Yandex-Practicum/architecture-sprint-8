@@ -1,2 +1,5 @@
 /postgres-keycloak-data
 2024__yandex-architecture-sso.code-workspace
+/postgres-airflow-data
+/.vscode
+dags/__pycache__

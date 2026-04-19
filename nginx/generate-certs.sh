@@ -7,6 +7,7 @@ domains="
   api.bio-pro.local
   key.bio-pro.local
   report.bio-pro.local
+  cdn.bio-pro.local
 "
 
 certPath="./certs"

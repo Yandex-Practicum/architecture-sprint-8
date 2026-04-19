@@ -1,6 +1,14 @@
 // src/services/reportsApi.ts
 import api from './api';
 
+export interface ReportResponse {
+  reportId: string;
+  cdnUrl: string;
+  fromCache: boolean;
+  generatedAt: string;
+  cachedUntil: string;
+}
+
 // Тип данных для отчета
 export interface ReportData {
   userId: string;
@@ -44,6 +52,24 @@ class ReportsApi {
     const response = await api.get<ReportData>(`${this.baseUrl}/my`);
     return response.data;
   }
+
+  async getMinioReport(dateFrom: string, dateTo: string): Promise<ReportResponse> {
+    const response = await api.get<ReportResponse>(`${this.baseUrl}/minio`, {
+      params: { dateFrom, dateTo }
+    });
+    return response.data;
+  }
+
+  async fetchReportData(cdnUrl: string): Promise<ReportData> {
+    const response = await fetch(cdnUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch report: ${response.status}`);
+    }
+    return response.json();
+  }
+
 }
+
+
 
 export const reportsApi = new ReportsApi();

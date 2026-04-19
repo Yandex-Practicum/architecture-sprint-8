@@ -106,6 +106,21 @@ public class AuthController : ControllerBase
         return Redirect($"{GetFrontendUrl()}/auth/callback?success=true");
     }
 
+    [HttpGet("token")]
+    public IActionResult GetAccessToken()
+    {
+        var sessionId = HttpContext.Items["Session"] as Guid?;
+
+        if (sessionId is null)
+        {
+            return Unauthorized();
+        }
+
+        SessionData session = _sessionService.GetSession(sessionId!.Value);
+
+        return Ok(new { accessToken = session!.AccessToken });
+    }
+
     /// <summary>
     /// Проверка сессии
     /// </summary>

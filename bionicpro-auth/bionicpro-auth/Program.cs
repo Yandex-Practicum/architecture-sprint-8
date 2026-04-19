@@ -25,6 +25,7 @@ builder.Services.AddScoped<ISessionService, SessionService>();
 builder.Services.AddScoped<IKeyCloakService, KeycloakService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IContextWrapper, ContextWrapper>();
+builder.Services.AddScoped<IReportsProxyService, ReportsProxyService>();
 
 builder.Services.AddScoped<SessionRotateAttribute>();
 
@@ -45,6 +46,11 @@ builder.Services.AddCors(options =>
         });
     });
 
+builder.Services.AddHttpClient("ReportsApi", client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["ReportsApi:Url"] ?? "http://reports.bio-pro.local:5001");
+    client.Timeout = TimeSpan.FromMinutes(5);
+});
 
 // Настройка аутентификации через cookies (для сессий)
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -71,15 +77,15 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
-        options.Authority = $"{builder.Configuration["Keycloak:BaseUrl"]}/realms/{builder.Configuration["Keycloak:Realm"]}";
-        options.Audience = builder.Configuration["Keycloak:BackendClientId"];
+        //options.Authority = $"{builder.Configuration["Keycloak:BaseUrl"]}/realms/{builder.Configuration["Keycloak:Realm"]}";
+        //options.Audience = builder.Configuration["Keycloak:BackendClientId"];
         options.RequireHttpsMetadata = false; // Только для разработки
         options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
         {
-            ValidateIssuer = true,
-            ValidIssuer = $"{builder.Configuration["Keycloak:BaseUrl"]}/realms/{builder.Configuration["Keycloak:Realm"]}",
-            ValidateAudience = true,
-            ValidAudience = builder.Configuration["Keycloak:BackendClientId"],
+            //ValidateIssuer = true,
+            //ValidIssuer = $"{builder.Configuration["Keycloak:BaseUrl"]}/realms/{builder.Configuration["Keycloak:Realm"]}",
+            //ValidateAudience = true,
+            //ValidAudience = builder.Configuration["Keycloak:BackendClientId"],
             ValidateLifetime = true
         };
     });

@@ -1,6 +1,7 @@
 ﻿using bionicpro_report.Models;
 using ClickHouse.Client.ADO;
 using System.Data;
+using System.Text;
 
 namespace bionicpro_report.Components.Implementation
 {
@@ -16,7 +17,7 @@ namespace bionicpro_report.Components.Implementation
             _logger = logger;
         }
 
-        public async Task<List<ProsthesisReport>> GetUserReportsAsync(            string userId)
+        public async Task<List<ProsthesisReport>> GetUserReportsAsync(string userId, DateTime? dateFrom = null, DateTime? dateTo = null)
         {
             var reports = new List<ProsthesisReport>();
 
@@ -39,10 +40,20 @@ namespace bionicpro_report.Components.Implementation
                 last_tuning_date
             FROM bionicpro.user_report_mart
             WHERE user_id = '{0}'
+            {1}
             ORDER BY report_date DESC";
 
-            var dateFilter = "";
-            var formattedQuery = string.Format(query, userId);
+            StringBuilder dateFileter = new();
+            if (dateFrom is not null)
+            {
+                dateFileter.Append($"AND report_date >= '{dateFrom!.Value.ToString("yyyy-MM-dd")}'");
+            }
+            if (dateTo is not null)
+            {
+                dateFileter.Append($"AND report_date <= '{dateTo!.Value.ToString("yyyy-MM-dd")}'");
+            }
+            var formattedQuery = string.Format(query, userId, dateFileter);
+
 
             try
             {

@@ -20,7 +20,7 @@ namespace bionicpro_report.Components.Implementation
         }
 
         public async Task<ReportResponse> GetUserReportAsync(
-            string userId)
+            string userId, DateTime? dateFrom = null, DateTime? dateTo = null)
         {
 
             if (!await _clickHouseService.UserExistsAsync(userId))
@@ -28,8 +28,7 @@ namespace bionicpro_report.Components.Implementation
                 throw new KeyNotFoundException($"User {userId} not found");
             }
 
-            var reports = await _clickHouseService.GetUserReportsAsync(
-                userId);
+            var reports = await _clickHouseService.GetUserReportsAsync(userId, dateFrom, dateTo);
 
             // Формирование ответа
             var response = new ReportResponse
@@ -40,42 +39,9 @@ namespace bionicpro_report.Components.Implementation
                 GeneratedAt = DateTime.UtcNow
             };
 
-            // Сохранение в кеш
-            //var cacheOptions = new DistributedCacheEntryOptions
-            //{
-            //    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(_cacheExpiryMinutes)
-            //};
-
-            //await _cache.SetStringAsync(cacheKey, JsonSerializer.Serialize(response), cacheOptions);
-
-            //_logger.LogInformation("Generated report for user {UserId} with {Count} records", userId, reports.Count);
-
             return response;
         }
 
-        public async Task<bool> CanAccessUserDataAsync(UserContext userContext, string targetUserId)
-        {
-            // Администратор имеет доступ ко всем данным
-            if (userContext.Roles.Contains("admin") || userContext.Roles.Contains("support"))
-            {
-                return true;
-            }
-
-            // Пользователь имеет доступ только к своим данным
-            if (userContext.UserId == targetUserId)
-            {
-                return true;
-            }
-
-            // Проверка, что пользователь владеет протезом (дополнительная проверка)
-            var userProstheses = await _clickHouseService.GetUserProsthesesAsync(targetUserId);
-            if (userProstheses.Any(p => userContext.ProsthesisIds.Contains(p)))
-            {
-                return true;
-            }
-
-            return false;
-        }
 
         private ReportSummary CalculateSummary(List<ProsthesisReport> reports)
         {

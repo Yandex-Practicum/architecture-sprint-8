@@ -3,6 +3,7 @@ using bionicpro_report.Components.Implementation;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using Minio;
 using System.Net;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -10,6 +11,14 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSingleton<IReportService, ReportService>();
 builder.Services.AddSingleton<IClickHouseService, ClickHouseService>();
+builder.Services.AddSingleton<IS3Storage, S3Storage>();
+
+builder.Services.AddMinio(client =>
+{
+    client.WithEndpoint(builder.Configuration["Minio:Endpoint"])
+        .WithCredentials(builder.Configuration["Minio:AccessKey"], builder.Configuration["Minio:SecretKey"])
+        .WithSSL(false);
+});
 
 builder.Services.AddAuthorization();
 builder.Services.AddControllers();

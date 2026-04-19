@@ -4,6 +4,6 @@ namespace bionicpro_report.Components
 {
     public interface IReportService
     {
-        Task<ReportResponse> GetUserReportAsync(string userId);
+        Task<ReportResponse> GetUserReportAsync(string userId, DateTime? dateFrom = null, DateTime? dateTo = null);
     }
 }

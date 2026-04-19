@@ -5,6 +5,7 @@ using bionicpro_auth.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace bionicpro_auth.Controllers
 {
@@ -52,5 +53,36 @@ namespace bionicpro_auth.Controllers
             return Content(content, "application/json");
         }
 
+        // Проксирование запроса с добавлением JWT токена
+        [SessionRotate]
+        [HttpGet("minio")]
+        public async Task<IActionResult> GetMyReportsAsync(DateTime? dateFrom, DateTime? dateTo)
+        {
+            var sessionId = HttpContext.Items["Session"] as Guid?;
+
+            if (sessionId is null)
+            {
+                return Unauthorized();
+            }
+
+            SessionData session = _sessionService.GetSession(sessionId!.Value);
+
+            if (dateFrom is null)
+            {
+                dateFrom = new DateTime(2000, 1, 1);
+            }
+            if (dateTo is null)
+            {
+                dateTo = DateTime.Now;
+            }
+
+            HttpResponseMessage response = await _reportProxyService.ProxyGetAsync($"{_config["ReportsApi:Url"]}/api/minio/my?dateFrom={dateFrom}&dateTo={dateTo}", session!.AccessToken);
+
+            response.EnsureSuccessStatusCode();
+
+            string content = await response.Content.ReadAsStringAsync();
+
+            return Content(content, "application/json");
+        }
     }
 }

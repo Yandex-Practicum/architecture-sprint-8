@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Silent Check SSO</title>
+  </head>
+  <body>
+    <div>Silent Check SSO. Please wait...</div>
+    <script>
+      // Этот скрипт получает токены от Keycloak и отправляет их обратно в основное React-приложение.
+      const parent = window.parent;
+      const origin = window.location.origin;
+
+      if (parent !== window) {
+        parent.postMessage({ sessionState: window.sessionState }, origin);
+      }
+    </script>
+  </body>
+</html>

@@ -1,5 +1,6 @@
 ﻿using bionicpro_report.Models;
 using Minio;
+using Minio.DataModel;
 using Minio.DataModel.Args;
 using System.Text.Json;
 
@@ -43,7 +44,10 @@ namespace bionicpro_report.Components.Implementation
                     .WithBucket(GetBucketName())
                     .WithObject(objectName);
 
-                await _minioClient.StatObjectAsync(args);
+                ObjectStat stat = await _minioClient.StatObjectAsync(args);
+
+                _logger.LogDebug($"Stat {JsonSerializer.Serialize(stat)}");
+
                 return true;
             }
             catch (Exception ex)

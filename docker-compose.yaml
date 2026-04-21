@@ -1,11 +1,13 @@
 services:
 
+# ================= Task 1 ====================
   nginx:
     image: nginx:latest
     container_name: web_nginx
     depends_on:
       - frontend
-      # - bionicpro-auth
+      - bionicpro-auth
+      - bionicpro-report
       - keycloak
     volumes:
       - ./nginx/Docker.nginx.conf:/etc/nginx/nginx.conf
@@ -152,7 +154,7 @@ services:
       - bionicpro-net
 
 
-## TASK 3
+# ================= Task 2 ====================
 
   postgres_airflow:
     image: postgres:13
@@ -167,15 +169,26 @@ services:
     restart: always
     networks:
       - bionicpro-net
+
   postgres_crm:
     image: postgres:13
+    container_name: postgres_crm
     environment:
       POSTGRES_USER: crm_user
       POSTGRES_PASSWORD: crm_password
       POSTGRES_DB: crm_db
     volumes:
       - ./Task2/scripts/init_crm_db.sql:/docker-entrypoint-initdb.d/init.sql
-      - postgres_crm_data:/var/lib/postgresql/data
+      # - postgres_crm_data:/var/lib/postgresql/data
+    command:  >
+      postgres 
+      -c wal_level=logical
+      -c max_replication_slots=10
+      -c max_wal_senders=10
+      -c wal_sender_timeout=60s
+      -c max_connections=200
+      -c shared_buffers=256MB
+      -c listen_addresses='*'
     ports:
       - "5433:5432"
     restart: always
@@ -209,17 +222,17 @@ services:
 
 
   clickhouse:
-    image: clickhouse/clickhouse-server:23.8
+    image: clickhouse/clickhouse-server:latest
+    container_name: clickhouse
+    environment:
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    volumes:
+      - ./Task2/scripts/init_clickhouse.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./Task2/config/clickhouse.xml:/etc/clickhouse-server/config.d/config.xml:ro
+      # - clickhouse_data:/var/lib/clickhouse
     ports:
       - "8123:8123"
       - "9000:9000"
-    environment:
-      CLICKHOUSE_DB: bionicpro 
-      CLICKHOUSE_USER: default
-      CLICKHOUSE_PASSWORD: ""
-    volumes:
-      - ./Task2/scripts/init_clickhouse.sql:/docker-entrypoint-initdb.d/init.sql
-      - clickhouse_data:/var/lib/clickhouse
     restart: always
     healthcheck:
       test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
@@ -265,6 +278,9 @@ services:
     build:
       context: ./bionicpro-report
       dockerfile: Dockerfile
+    depends_on:
+      - keycloak
+      - clickhouse
     environment:
       ConnectionStrings__ClickHouse: Host=clickhouse;Port=8123;Database=bionicpro;Username=default;Password=
       Keycloak__auth-server-url: http://keycloak:8080
@@ -298,7 +314,7 @@ services:
       - bionicpro-net
 
 
-## TASK 3
+# ================= Task 3 ====================
 
 
   minio:
@@ -313,8 +329,6 @@ services:
       MINIO_DEFAULT_BUCKETS: my-first-bucket:policy,my-second-bucket
       MINIO_API_CORS_ALLOW_ORIGIN: front.bio-pro.local
     command: server /data --console-address ":9001"
-    volumes:
-      - minio_data:/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 30s
@@ -340,6 +354,104 @@ services:
     networks:
       - bionicpro-net
 
+# ================= Task 4 ====================
+  # kafka:
+  #   image: confluentinc/cp-kafka:7.4.0 
+  #   container_name: kafka
+  #   environment:
+  #     KAFKA_PROCESS_ROLES: "broker,controller"  
+  #     KAFKA_NODE_ID: 1                         
+  #     KAFKA_CONTROLLER_QUORUM_VOTERS: "1@localhost:9093"  
+  #     KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"     
+  #     KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093" 
+  #     KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT" 
+  #     KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092"  
+  #     KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+  #     KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+  #     KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+  #     CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Q"
+  #     KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+  #     KAFKA_LOG_RETENTION_MS: 604800000 
+  #     KAFKA_LOG_RETENTION_BYTES: -1
+  #     KAFKA_LOG_SEGMENT_BYTES: 1073741824
+  #     KAFKA_LOG_CLEANER_ENABLE: "true"
+  #     KAFKA_DELETE_TOPIC_ENABLE: "true"
+  #     KAFKA_HEAP_OPTS: "-Xmx1G -Xms1G"
+  #   ports:
+  #     - "9092:9092"
+  #   networks:
+  #     - bionicpro-net
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - bionicpro-net
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    ports:
+      - "9092:9092"
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - bionicpro-net
+
+  debezium:
+    image: debezium/connect:2.5
+    container_name: cdc-debezium
+    depends_on:
+      - kafka
+      - postgres_crm
+      - clickhouse
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: 1
+      CONFIG_STORAGE_TOPIC: connect_configs
+      OFFSET_STORAGE_TOPIC: connect_offsets
+      STATUS_STORAGE_TOPIC: connect_statuses
+      CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE: false
+      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: false
+    ports:
+      - "8083:8083"
+    networks:
+      - bionicpro-net
+
+
+  debezium-setup:
+    image: curlimages/curl:latest
+    container_name: debezium-setup
+    depends_on:
+      - debezium
+    volumes:
+      - ./Task4/register-connector.sh:/register-connector.sh
+    entrypoint: ["/bin/sh", "/register-connector.sh"]
+    networks:
+      - bionicpro-net      
+
+
+
+# ================= Components ====================
 
 networks:
   bionicpro-net:

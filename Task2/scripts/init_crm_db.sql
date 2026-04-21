@@ -22,6 +22,23 @@ CREATE TABLE IF NOT EXISTS crm.prostheses (
     status VARCHAR(20) DEFAULT 'active'
 );
 
+-- ====================.  TASK 4 =====================
+
+CREATE USER debezium_user WITH REPLICATION LOGIN PASSWORD 'strong_password';
+
+GRANT CONNECT ON DATABASE crm_db TO debezium_user;
+GRANT USAGE ON SCHEMA crm TO debezium_user;
+GRANT SELECT ON ALL TABLES IN SCHEMA crm TO debezium_user;
+
+ALTER TABLE crm.users REPLICA IDENTITY FULL;
+ALTER TABLE crm.prostheses REPLICA IDENTITY FULL;
+
+CREATE PUBLICATION debezium_publication FOR TABLE 
+    crm.users,
+    crm.prostheses;
+
+SELECT pg_sleep(5);
+
 INSERT INTO crm.users (id, email, phone, first_name, last_name, country, city) VALUES
     ('0aca56c5-b960-4c50-9f1b-0451aea68fe3', 'ivan@example.com', '+79123456789', 'Ivan', 'Petrov', 'Russia', 'Moscow'),
     ('11b225b9-4fda-4ebd-b508-6c90cefd23a7', 'olga@example.com', '+79234567890', 'Olga', 'Sidorova', 'Russia', 'Saint Petersburg'),
@@ -35,3 +52,6 @@ INSERT INTO crm.prostheses (id, user_id, prosthesis_type, manufacture_date, last
     ('cccccccc-cccc-cccc-cccc-cccccccccccc', 'fcf7435c-1f54-4a1e-80cb-6214a733e84a', 'standard', '2024-03-10', '2025-01-05 09:15:00', 1),
     ('dddddddd-dddd-dddd-dddd-dddddddddddd', '44444444-4444-4444-4444-444444444444', 'premium', '2024-04-05', '2025-01-10 11:45:00', 4),
     ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', '55555555-5555-5555-5555-555555555555', 'standard', '2024-05-12', '2025-01-08 16:30:00', 2);
+
+
+

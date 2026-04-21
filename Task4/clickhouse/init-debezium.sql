@@ -1,69 +1,4 @@
--- Создание базы данных для витрины
-CREATE DATABASE IF NOT EXISTS bionicpro;
-
--- Создание витрины отчётов
-CREATE TABLE IF NOT EXISTS bionicpro.user_report_mart (
-    -- Идентификаторы
-    user_id String,
-    user_email String,
-    user_name String,
-    country String,
-    prosthesis_id String,
-    prosthesis_type String,
-    
-    -- Временные метки
-    report_date Date,
-    first_signal_time DateTime,
-    last_signal_time DateTime,
-    
-    -- Агрегированные метрики
-    total_signals UInt32,
-    avg_reaction_time_ms Float32,
-    max_reaction_time_ms UInt32,
-    min_reaction_time_ms UInt32,
-    stddev_reaction_time_ms Float32,
-    
-    -- Качество работы
-    successful_movements UInt32,
-    failed_movements UInt32,
-    success_rate Float32,
-    misclassification_rate Float32,
-    
-    -- Состояние батареи
-    avg_battery_level Float32,
-    min_battery_level UInt8,
-    avg_signal_quality Float32,
-    
-    -- Метрики качества
-    quality_ok UInt8,
-    needs_tuning UInt8,
-    
-    -- Информация о протезе
-    tuning_count UInt32,
-    last_tuning_date DateTime,
-    prosthesis_age_days UInt32,
-    
-    -- Метаданные ETL
-    etl_created_at DateTime DEFAULT now()
-) ENGINE = MergeTree()
-PARTITION BY toYYYYMM(report_date)
-ORDER BY (user_id, report_date)
-SETTINGS index_granularity = 8192;
-
--- Создание индекса для быстрого поиска по пользователю
-ALTER TABLE bionicpro.user_report_mart ADD INDEX idx_user_id user_id TYPE bloom_filter GRANULARITY 1;
-ALTER TABLE bionicpro.user_report_mart ADD INDEX idx_email user_email TYPE bloom_filter GRANULARITY 1;
-
-
-
-
---    ==========================.    TASK 4 ==========================
--- ======================================================================
--- ======================================================================
--- ======================================================================
--- ======================================================================
-
-
+-- clickhouse/init.sql
 -- Создание базы данных
 CREATE DATABASE IF NOT EXISTS crm_analytics;
 
@@ -71,7 +6,7 @@ CREATE DATABASE IF NOT EXISTS crm_analytics;
 -- Kafka Engine таблицы для raw данных
 -- ============================================
 
--- Raw таблица для users
+-- Raw таблица для users (из схемы crm)
 CREATE TABLE crm_analytics.kafka_users_raw
 (
     `before` String,
@@ -90,7 +25,7 @@ SETTINGS
     kafka_num_consumers = 1,
     kafka_skip_broken_messages = 10;
 
--- Raw таблица для prostheses
+-- Raw таблица для prostheses (из схемы crm)
 CREATE TABLE crm_analytics.kafka_prostheses_raw
 (
     `before` String,
@@ -108,11 +43,14 @@ SETTINGS
     kafka_format = 'JSONEachRow',
     kafka_num_consumers = 1;
 
+
+
+
 -- ============================================
 -- Целевые таблицы с ReplacingMergeTree
 -- ============================================
 
--- Таблица для users (без FINAL в определении)
+-- Таблица для users (соответствует структуре crm.users)
 CREATE TABLE crm_analytics.users
 (
     `id` String,
@@ -123,7 +61,7 @@ CREATE TABLE crm_analytics.users
     `country` String,
     `city` String,
     `registration_date` DateTime,
-    `deleted_at` Nullable(DateTime),
+    `deleted_at` DateTime,
     `is_deleted` UInt8 DEFAULT 0,
     `_cdc_version` UInt64,
     `_cdc_operation` LowCardinality(String)
@@ -132,7 +70,7 @@ ENGINE = ReplacingMergeTree(_cdc_version)
 ORDER BY (id)
 SETTINGS index_granularity = 8192;
 
--- Таблица для prostheses
+-- Таблица для prostheses (соответствует структуре crm.prostheses)
 CREATE TABLE crm_analytics.prostheses
 (
     `id` String,
@@ -147,13 +85,14 @@ CREATE TABLE crm_analytics.prostheses
     `_cdc_operation` LowCardinality(String)
 )
 ENGINE = ReplacingMergeTree(_cdc_version)
-ORDER BY (id);
+ORDER BY (id)
+SETTINGS index_granularity = 8192;
 
 -- ============================================
--- Materialized Views (без FINAL)
+-- Materialized Views для трансформации данных
 -- ============================================
 
--- MV для users
+-- MV для users (извлекаем данные из поля 'after')
 CREATE MATERIALIZED VIEW crm_analytics.mv_users
 TO crm_analytics.users
 AS
@@ -192,33 +131,38 @@ FROM crm_analytics.kafka_prostheses_raw
 WHERE op IN ('c', 'u', 'r');
 
 -- ============================================
--- Витрины для отчетности (без FINAL в MV)
+-- Витрины для отчетности
 -- ============================================
 
--- Витрина по пользователям
+-- Витрина 1: Статистика по пользователям
 CREATE TABLE crm_analytics.users_stats_mart
 (
     `report_date` Date DEFAULT today(),
     `total_users` UInt64,
     `active_users` UInt64,
+    `deleted_users` UInt64,
+    `users_by_country` String,
+    `users_by_city` String,
     `updated_at` DateTime DEFAULT now()
 )
 ENGINE = SummingMergeTree()
 ORDER BY (report_date);
 
--- MV для витрины пользователей (без FINAL)
+-- MV для наполнения витрины пользователей
 CREATE MATERIALIZED VIEW crm_analytics.mv_users_stats_mart
 TO crm_analytics.users_stats_mart
 AS
 SELECT
     today() AS report_date,
-    count() AS total_users,
+    count(*) AS total_users,
     countIf(deleted_at IS NULL) AS active_users,
+    countIf(deleted_at IS NOT NULL) AS deleted_users,
+    '' AS users_by_country,
+    '' AS users_by_city,
     now() AS updated_at
-FROM crm_analytics.users
-WHERE is_deleted = 0;
+FROM crm_analytics.users FINAL;
 
--- Витрина по протезам
+-- Витрина 2: Статистика по протезам
 CREATE TABLE crm_analytics.prostheses_stats_mart
 (
     `report_date` Date DEFAULT today(),
@@ -226,22 +170,80 @@ CREATE TABLE crm_analytics.prostheses_stats_mart
     `total_count` UInt64,
     `active_count` UInt64,
     `avg_tuning_count` Float64,
+    `needs_tuning_count` UInt64,
     `updated_at` DateTime DEFAULT now()
 )
 ENGINE = SummingMergeTree()
 ORDER BY (report_date, prosthesis_type);
 
--- MV для витрины протезов (без FINAL)
+-- MV для наполнения витрины протезов
 CREATE MATERIALIZED VIEW crm_analytics.mv_prostheses_stats_mart
 TO crm_analytics.prostheses_stats_mart
 AS
 SELECT
     today() AS report_date,
     prosthesis_type,
-    count() AS total_count,
+    count(*) AS total_count,
     countIf(status = 'active') AS active_count,
     avg(tuning_count) AS avg_tuning_count,
+    countIf(last_tuning_date < now() - INTERVAL 90 DAY) AS needs_tuning_count,
     now() AS updated_at
-FROM crm_analytics.prostheses
+FROM crm_analytics.prostheses FINAL
 WHERE is_deleted = 0
 GROUP BY prosthesis_type;
+
+-- Витрина 3: Детальная информация по пользователям и их протезам (для API)
+CREATE TABLE crm_analytics.users_with_prostheses
+(
+    `user_id` String,
+    `user_email` String,
+    `user_name` String,
+    `user_city` String,
+    `prosthesis_id` String,
+    `prosthesis_type` String,
+    `prosthesis_status` String,
+    `last_tuning_date` DateTime,
+    `tuning_count` Int32,
+    `updated_at` DateTime DEFAULT now()
+)
+ENGINE = ReplacingMergeTree(updated_at)
+ORDER BY (user_id, prosthesis_id);
+
+-- MV для наполнения детальной витрины
+CREATE MATERIALIZED VIEW crm_analytics.mv_users_with_prostheses
+TO crm_analytics.users_with_prostheses
+AS
+SELECT
+    u.id AS user_id,
+    u.email AS user_email,
+    concat(coalesce(u.first_name, ''), ' ', coalesce(u.last_name, '')) AS user_name,
+    u.city AS user_city,
+    p.id AS prosthesis_id,
+    p.prosthesis_type,
+    p.status AS prosthesis_status,
+    p.last_tuning_date,
+    p.tuning_count,
+    now() AS updated_at
+FROM crm_analytics.users FINAL AS u
+LEFT JOIN crm_analytics.prostheses FINAL AS p ON u.id = p.user_id AND p.is_deleted = 0
+WHERE u.is_deleted = 0;
+
+-- ============================================
+-- Функции для проверки
+-- ============================================
+
+-- Проверка количества записей
+SELECT 'users' AS table_name, count(*) AS count FROM crm_analytics.users FINAL
+UNION ALL
+SELECT 'prostheses', count(*) FROM crm_analytics.prostheses FINAL;
+
+-- Последние изменения
+SELECT 
+    'users' AS source,
+    id,
+    email,
+    registration_date,
+    _cdc_operation
+FROM crm_analytics.users FINAL
+ORDER BY _cdc_version DESC
+LIMIT 5;

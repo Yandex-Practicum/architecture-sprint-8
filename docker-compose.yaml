@@ -62,6 +62,212 @@ services:
       - keycloak
       - openldap
 
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.8
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_DATA_DIR: /var/lib/zookeeper/data
+    ports:
+      - "2181:2181"
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+
+  crm_postgres:
+    image: postgres:14
+    command:
+      - postgres
+      - -c
+      - wal_level=logical
+      - -c
+      - max_wal_senders=8
+      - -c
+      - max_replication_slots=8
+    environment:
+      POSTGRES_DB: crm
+      POSTGRES_USER: crm_user
+      POSTGRES_PASSWORD: crm_pass
+    ports:
+      - "5434:5432"
+    volumes:
+      - ./crm-postgres/init:/docker-entrypoint-initdb.d
+      - crm-data:/var/lib/postgresql/data
+
+  kafka-connect:
+    image: debezium/connect:2.5
+    depends_on:
+      - kafka
+      - crm_postgres
+    ports:
+      - "8083:8083"
+    environment:
+      BOOTSTRAP_SERVERS: kafka:29092
+      GROUP_ID: 1
+      CONFIG_STORAGE_TOPIC: bionic_connect_configs
+      OFFSET_STORAGE_TOPIC: bionic_connect_offsets
+      STATUS_STORAGE_TOPIC: bionic_connect_status
+      KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      KEY_CONVERTER_SCHEMAS_ENABLE: "false"
+      VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+      CONNECT_REST_ADVERTISED_HOST_NAME: kafka-connect
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
+
+  clickhouse-schema:
+    image: clickhouse/clickhouse-client:23.8
+    depends_on:
+      clickhouse:
+        condition: service_started
+      kafka:
+        condition: service_started
+    volumes:
+      - ./clickhouse/schema:/schema:ro
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        i=0
+        while [ "$$i" -lt 90 ]; do
+          clickhouse-client -h clickhouse -q 'SELECT 1' && break
+          i=$$((i + 1))
+          sleep 2
+        done
+        clickhouse-client -h clickhouse --multiquery < /schema/001_cdc.sql
+    restart: "no"
+
+  debezium-register:
+    image: curlimages/curl:8.5.0
+    depends_on:
+      kafka-connect:
+        condition: service_started
+      crm_postgres:
+        condition: service_started
+      clickhouse-schema:
+        condition: service_completed_successfully
+    volumes:
+      - ./debezium/register-connector.sh:/scripts/register-connector.sh:ro
+      - ./debezium/crm-connector.json:/scripts/crm-connector.json:ro
+    entrypoint: ["/bin/sh", "/scripts/register-connector.sh"]
+    restart: "no"
+
+  airflow:
+    image: apache/airflow:2.8.1
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
+    command: standalone
+    ports:
+      - "8085:8080"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+    depends_on:
+      clickhouse:
+        condition: service_started
+      clickhouse-schema:
+        condition: service_completed_successfully
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9002:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: /bin/sh
+    command: >
+      -c "
+      for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do
+        mc alias set local http://minio:9000 minioadmin minioadmin && break;
+        sleep 1;
+      done;
+      mc mb -p local/bionicpro-reports || true;
+      mc anonymous set download local/bionicpro-reports;
+      "
+
+  report-cdn:
+    image: nginx:1.25-alpine
+    ports:
+      - "8090:8090"
+    volumes:
+      - ./cdn-report-cache/nginx.conf:/etc/nginx/nginx.conf:ro
+      - cdn-cache:/var/cache/nginx/reports
+    depends_on:
+      - minio
+
+  reports-service:
+    build:
+      context: ./reports-service
+      dockerfile: Dockerfile
+    environment:
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: "9000"
+      INTERNAL_SERVICE_TOKEN: bionicpro-internal-token
+      S3_ENDPOINT_URL: http://minio:9000
+      S3_BUCKET: bionicpro-reports
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      CDN_PUBLIC_BASE: http://localhost:8090
+      ENABLE_S3_CACHE: "true"
+      CLICKHOUSE_MART_TABLE: prosthetics_usage_mart_cdc
+    ports:
+      - "8010:8010"
+    depends_on:
+      clickhouse:
+        condition: service_started
+      clickhouse-schema:
+        condition: service_completed_successfully
+      debezium-register:
+        condition: service_completed_successfully
+      minio:
+        condition: service_started
+      minio-init:
+        condition: service_completed_successfully
+
   bionicpro-auth:
     build:
       context: ./bionicpro-auth
@@ -76,9 +282,10 @@ services:
       OAUTH2_REDIRECT_URI: http://localhost:8000/auth/callback
       FRONTEND_URL: http://localhost:3000/
       CORS_ORIGIN: http://localhost:3000
-      # Для HTTPS в production установите "true" (задача 3: флаг Secure у cookie).
       SESSION_SECURE_COOKIES: "false"
       PROFILE_DB_PATH: /data/profiles.db
+      REPORTS_SERVICE_URL: http://reports-service:8010
+      INTERNAL_SERVICE_TOKEN: bionicpro-internal-token
     ports:
       - "8000:8000"
     volumes:
@@ -87,6 +294,7 @@ services:
       - redis
       - keycloak
       - keycloak-config
+      - reports-service
 
   frontend:
     build:
@@ -102,3 +310,9 @@ services:
 
 volumes:
   bionicpro-auth-data: {}
+  clickhouse-data: {}
+  minio-data: {}
+  cdn-cache: {}
+  zookeeper-data: {}
+  kafka-data: {}
+  crm-data: {}

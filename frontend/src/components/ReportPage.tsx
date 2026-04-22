@@ -9,11 +9,20 @@ const apiBase = process.env.REACT_APP_API_URL ?? '';
 
 const reportsUrl = apiBase ? `${apiBase.replace(/\/$/, '')}/reports` : '/reports';
 
+type ReportResponse = {
+  source?: string;
+  cdn_url?: string | null;
+  data_through_date?: string;
+  rows?: unknown[] | null;
+  count?: number | null;
+};
+
 const ReportPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [checked, setChecked] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
+  const [lastReport, setLastReport] = useState<ReportResponse | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -49,10 +58,12 @@ const ReportPage: React.FC = () => {
         return;
       }
       if (!response.ok) {
-        setError(await response.text());
+        const t = await response.text();
+        setError(t || `HTTP ${response.status}`);
         return;
       }
-      const data = await response.json();
+      const data = (await response.json()) as ReportResponse;
+      setLastReport(data);
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -107,6 +118,22 @@ const ReportPage: React.FC = () => {
             Logout
           </a>
         </div>
+        {lastReport?.cdn_url && (
+          <p className="mb-4 text-sm text-gray-700">
+            Cached report (CDN):{' '}
+            <a
+              href={lastReport.cdn_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 underline break-all"
+            >
+              {lastReport.cdn_url}
+            </a>
+            {lastReport.source === 's3' && (
+              <span className="block mt-1 text-gray-500">Served from object storage; OLAP was not queried.</span>
+            )}
+          </p>
+        )}
         {error && (
           <div className="mt-4 p-4 bg-red-100 text-red-700 rounded">
             {error}

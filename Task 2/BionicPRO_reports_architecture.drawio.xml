@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" version="24.8.4">
+  <diagram name="Reports-ETL" id="reports-etl-1">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <object placeholders="1" c4Name="CRM (Битрикс24)" c4Type="Software System" c4Technology="REST / вебхуки" c4Description="Заказы, контакты клиентов" label="&lt;font style=&quot;font-size: 14px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%]&lt;/div&gt;&lt;br&gt;&lt;font color=&quot;#cccccc&quot;&gt;%c4Description%&lt;/font&gt;" id="crm-1">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#8C8496;fontColor=#ffffff;align=center;" parent="1" vertex="1">
+            <mxGeometry x="40" y="120" width="200" height="88" as="geometry"/>
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="OLTP / телеметрия" c4Type="Container" c4Technology="PostgreSQL" c4Description="Сырые события с протезов" label="&lt;font style=&quot;font-size: 14px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%: %c4Technology%]&lt;/div&gt;" id="oltp-1">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#23A2D9;fontColor=#ffffff;align=center;" parent="1" vertex="1">
+            <mxGeometry x="40" y="260" width="200" height="88" as="geometry"/>
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Apache Airflow" c4Type="Container" c4Technology="Python DAG" c4Description="ETL: извлечение из CRM + телеметрия, расчёт агрегатов по клиентам, загрузка витрины по расписанию" label="&lt;font style=&quot;font-size: 14px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%: %c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;" id="af-1">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1D6F42;fontColor=#ffffff;align=center;" parent="1" vertex="1">
+            <mxGeometry x="320" y="180" width="240" height="120" as="geometry"/>
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="ClickHouse (OLAP)" c4Type="Container" c4Technology="MergeTree / ReplacingMergeTree" c4Description="Витрина reports.prosthetics_usage_mart + watermark etl_watermark" label="&lt;font style=&quot;font-size: 14px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%: %c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;" id="ch-1">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FF9900;fontColor=#000000;align=center;" parent="1" vertex="1">
+            <mxGeometry x="640" y="180" width="240" height="120" as="geometry"/>
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="reports-service" c4Type="Container" c4Technology="FastAPI" c4Description="GET /reports — только чтение витрины, фильтр по текущему пользователю (доверенные заголовки от bionicpro-auth)" label="&lt;font style=&quot;font-size: 14px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%: %c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;" id="rs-1">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#438DD5;fontColor=#ffffff;align=center;" parent="1" vertex="1">
+            <mxGeometry x="640" y="380" width="240" height="120" as="geometry"/>
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="bionicpro-auth" c4Type="Container" c4Technology="BFF" c4Description="Сессия, прокси /reports → reports-service с X-User-Email" label="&lt;font style=&quot;font-size: 14px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%: %c4Technology%]&lt;/div&gt;&lt;br&gt;&lt;font color=&quot;#E6E6E6&quot;&gt;%c4Description%&lt;/font&gt;" id="bff-1">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1D6F42;fontColor=#ffffff;align=center;" parent="1" vertex="1">
+            <mxGeometry x="320" y="400" width="200" height="100" as="geometry"/>
+          </mxCell>
+        </object>
+        <object placeholders="1" c4Name="Frontend" c4Type="Container" c4Technology="React" c4Description="Кнопка «Скачать отчёт» → /reports с cookie" label="&lt;font style=&quot;font-size: 14px&quot;&gt;&lt;b&gt;%c4Name%&lt;/b&gt;&lt;/font&gt;&lt;div&gt;[%c4Type%: %c4Technology%]&lt;/div&gt;" id="fe-1">
+          <mxCell style="rounded=1;whiteSpace=wrap;html=1;fillColor=#23A2D9;fontColor=#ffffff;align=center;" parent="1" vertex="1">
+            <mxGeometry x="40" y="400" width="180" height="88" as="geometry"/>
+          </mxCell>
+        </object>
+        <mxCell id="e1" style="endArrow=classic;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.25;" parent="1" source="crm-1" target="af-1" edge="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e1l" value="extract" style="edgeLabel;html=1;align=center;" parent="e1" vertex="1" connectable="0">
+          <mxGeometry x="-0.2" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry>
+        </mxCell>
+        <mxCell id="e2" style="endArrow=classic;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.75;" parent="1" source="oltp-1" target="af-1" edge="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e3" style="endArrow=classic;html=1;" parent="1" source="af-1" target="ch-1" edge="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e3l" value="load mart" style="edgeLabel;html=1;align=center;" parent="e3" vertex="1" connectable="0">
+          <mxGeometry x="-0.1" y="1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry>
+        </mxCell>
+        <mxCell id="e4" style="endArrow=classic;html=1;entryX=0.5;entryY=0;" parent="1" source="ch-1" target="rs-1" edge="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e4l" value="SELECT витрины" style="edgeLabel;html=1;align=center;" parent="e4" vertex="1" connectable="0">
+          <mxGeometry x="0.2" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry>
+        </mxCell>
+        <mxCell id="e5" style="endArrow=classic;html=1;" parent="1" source="fe-1" target="bff-1" edge="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e6" style="endArrow=classic;html=1;" parent="1" source="bff-1" target="rs-1" edge="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e6l" value="internal + user scope" style="edgeLabel;html=1;align=center;" parent="e6" vertex="1" connectable="0">
+          <mxGeometry x="-0.1" y="-1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

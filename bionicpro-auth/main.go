@@ -43,6 +43,8 @@ type sessionRecord struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
 	ExpiresAt    int64  `json:"expires_at"`
+	UserSub      string `json:"user_sub,omitempty"`
+	Email        string `json:"email,omitempty"`
 }
 
 func openProfileDB(path string) (*sql.DB, error) {
@@ -94,17 +96,19 @@ func main() {
 	defer pdb.Close()
 
 	h := &handler{
-		rdb:           rdb,
-		profileDB:     pdb,
-		keycloakURL:   strings.TrimRight(getenv("KEYCLOAK_URL", "http://localhost:8080"), "/"),
-		realm:         getenv("KEYCLOAK_REALM", "reports-realm"),
-		clientID:      getenv("KEYCLOAK_CLIENT_ID", "bionicpro-auth"),
-		clientSecret:  getenv("KEYCLOAK_CLIENT_SECRET", ""),
-		redirectURI:   getenv("OAUTH2_REDIRECT_URI", "http://localhost:8000/auth/callback"),
-		frontendURL:   getenv("FRONTEND_URL", "http://localhost:3000/"),
-		secureCookie:  getenv("SESSION_SECURE_COOKIES", "false") == "true",
-		cookieName:    getenv("SESSION_COOKIE_NAME", "BIONIC_SESSION"),
-		sessionMaxAge: 24 * time.Hour,
+		rdb:               rdb,
+		profileDB:         pdb,
+		keycloakURL:       strings.TrimRight(getenv("KEYCLOAK_URL", "http://localhost:8080"), "/"),
+		realm:             getenv("KEYCLOAK_REALM", "reports-realm"),
+		clientID:          getenv("KEYCLOAK_CLIENT_ID", "bionicpro-auth"),
+		clientSecret:      getenv("KEYCLOAK_CLIENT_SECRET", ""),
+		redirectURI:       getenv("OAUTH2_REDIRECT_URI", "http://localhost:8000/auth/callback"),
+		frontendURL:       getenv("FRONTEND_URL", "http://localhost:3000/"),
+		secureCookie:      getenv("SESSION_SECURE_COOKIES", "false") == "true",
+		cookieName:        getenv("SESSION_COOKIE_NAME", "BIONIC_SESSION"),
+		sessionMaxAge:     24 * time.Hour,
+		reportsServiceURL: getenv("REPORTS_SERVICE_URL", "http://localhost:8010"),
+		internalToken:     getenv("INTERNAL_SERVICE_TOKEN", "bionicpro-internal-token"),
 	}
 
 	mux := http.NewServeMux()
@@ -127,17 +131,19 @@ func getenv(k, def string) string {
 }
 
 type handler struct {
-	rdb            *redis.Client
-	profileDB      *sql.DB
-	keycloakURL    string
-	realm          string
-	clientID       string
-	clientSecret   string
-	redirectURI    string
-	frontendURL    string
-	secureCookie   bool
-	cookieName     string
-	sessionMaxAge  time.Duration
+	rdb               *redis.Client
+	profileDB         *sql.DB
+	keycloakURL       string
+	realm             string
+	clientID          string
+	clientSecret      string
+	redirectURI       string
+	frontendURL       string
+	secureCookie      bool
+	cookieName        string
+	sessionMaxAge     time.Duration
+	reportsServiceURL string
+	internalToken     string
 }
 
 func (h *handler) tokenURL() string {
@@ -235,11 +241,25 @@ func (h *handler) handleCallback(w http.ResponseWriter, r *http.Request) {
 		expiresAt = time.Now().Add(90 * time.Second).Unix()
 	}
 
+	claims, uerr := h.fetchUserinfoClaims(tp.AccessToken)
+	if uerr != nil {
+		http.Error(w, "userinfo: "+uerr.Error(), http.StatusBadGateway)
+		return
+	}
+	sub, _ := claims["sub"].(string)
+	email, _ := claims["email"].(string)
+	if sub == "" {
+		http.Error(w, "no sub in userinfo", http.StatusBadGateway)
+		return
+	}
+
 	sid := uuid.NewString()
 	sr := sessionRecord{
 		AccessToken:  tp.AccessToken,
 		RefreshToken: tp.RefreshToken,
 		ExpiresAt:    expiresAt,
+		UserSub:      sub,
+		Email:        email,
 	}
 	sb, _ := json.Marshal(sr)
 	if err := h.rdb.Set(ctx, sessionPrefix+sid, sb, h.sessionMaxAge).Err(); err != nil {
@@ -247,28 +267,33 @@ func (h *handler) handleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.setSessionCookie(w, sid, h.sessionMaxAge)
-	_ = h.syncUserProfile(tp.AccessToken)
+	_ = h.syncUserProfileFromClaims(claims)
 	http.Redirect(w, r, h.frontendURL, http.StatusFound)
 }
 
-func (h *handler) syncUserProfile(accessToken string) error {
+func (h *handler) fetchUserinfoClaims(accessToken string) (map[string]any, error) {
 	req, err := http.NewRequest(http.MethodGet, h.userinfoURL(), nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("userinfo %d", res.StatusCode)
+		b, _ := io.ReadAll(res.Body)
+		return nil, fmt.Errorf("status %d: %s", res.StatusCode, string(b))
 	}
 	var claims map[string]any
 	if err := json.NewDecoder(res.Body).Decode(&claims); err != nil {
-		return err
+		return nil, err
 	}
+	return claims, nil
+}
+
+func (h *handler) syncUserProfileFromClaims(claims map[string]any) error {
 	sub, _ := claims["sub"].(string)
 	if sub == "" {
 		return errors.New("no sub")
@@ -297,17 +322,41 @@ func (h *handler) handleLogout(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, h.frontendURL, http.StatusFound)
 }
 
-func (h *handler) handleMe(w http.ResponseWriter, r *http.Request) {
+func (h *handler) handleMe(w http.ResponseWriter, _ *http.Request, _ *sessionRecord) {
 	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte(`{"ok":true}`))
+	_ = json.NewEncoder(w).Encode(map[string]any{"ok": true})
 }
 
-func (h *handler) handleReports(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte(`{"report":"usage-summary","status":"ok","message":"Report placeholder (session authenticated)"}`))
+func (h *handler) handleReports(w http.ResponseWriter, r *http.Request, sr *sessionRecord) {
+	if sr.Email == "" {
+		http.Error(w, "no email in session — cannot scope report", http.StatusForbidden)
+		return
+	}
+	u := strings.TrimRight(h.reportsServiceURL, "/") + "/reports"
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, u, nil)
+	if err != nil {
+		http.Error(w, "upstream", http.StatusInternalServerError)
+		return
+	}
+	req.Header.Set("X-Internal-Token", h.internalToken)
+	req.Header.Set("X-User-Sub", sr.UserSub)
+	req.Header.Set("X-User-Email", sr.Email)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		http.Error(w, "reports service: "+err.Error(), http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+	for _, k := range []string{"Content-Type"} {
+		if v := resp.Header.Get(k); v != "" {
+			w.Header().Set(k, v)
+		}
+	}
+	w.WriteHeader(resp.StatusCode)
+	_, _ = io.Copy(w, resp.Body)
 }
 
-func (h *handler) withSessionRotation(inner http.HandlerFunc, rotate bool) http.HandlerFunc {
+func (h *handler) withSessionRotation(inner func(http.ResponseWriter, *http.Request, *sessionRecord), rotate bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		sid, err := h.readSessionCookie(r)
 		if err != nil || sid == "" {
@@ -321,6 +370,7 @@ func (h *handler) withSessionRotation(inner http.HandlerFunc, rotate bool) http.
 			return
 		}
 		sr := *srPtr
+		preserveSub, preserveEmail := sr.UserSub, sr.Email
 		if time.Now().Unix() >= sr.ExpiresAt-5 {
 			if sr.RefreshToken == "" {
 				http.Error(w, "session expired", http.StatusUnauthorized)
@@ -332,6 +382,12 @@ func (h *handler) withSessionRotation(inner http.HandlerFunc, rotate bool) http.
 				return
 			}
 			sr = *nr
+			if sr.UserSub == "" {
+				sr.UserSub = preserveSub
+			}
+			if sr.Email == "" {
+				sr.Email = preserveEmail
+			}
 			sb, _ := json.Marshal(sr)
 			_ = h.rdb.Set(ctx, sessionPrefix+sid, sb, h.sessionMaxAge).Err()
 		}
@@ -347,7 +403,7 @@ func (h *handler) withSessionRotation(inner http.HandlerFunc, rotate bool) http.
 			}
 			h.setSessionCookie(w, newID, h.sessionMaxAge)
 		}
-		inner(w, r)
+		inner(w, r, &sr)
 	}
 }
 

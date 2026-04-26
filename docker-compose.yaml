@@ -5,13 +5,14 @@ services:
       - "6379:6379"
 
   openldap:
-    image: osixia/openldap:1.5.0
+    build:
+      context: ./ldap
+      dockerfile: Dockerfile
+    image: bionicpro-openldap:local
     environment:
       LDAP_ORGANISATION: "Example Inc"
       LDAP_DOMAIN: example.com
       LDAP_ADMIN_PASSWORD: admin
-    volumes:
-      - ./ldap/config.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/50-bionic.ldif
     ports:
       - "389:389"
 
@@ -148,7 +149,8 @@ services:
       CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
 
   clickhouse-schema:
-    image: clickhouse/clickhouse-client:23.8
+    # Образ clickhouse-client:23.8 на Docker Hub отсутствует; в clickhouse-server уже есть clickhouse-client.
+    image: clickhouse/clickhouse-server:23.8
     depends_on:
       clickhouse:
         condition: service_started
@@ -275,7 +277,7 @@ services:
     environment:
       LISTEN_ADDR: ":8000"
       REDIS_ADDR: redis:6379
-      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_URL: http://localhost:8080
       KEYCLOAK_REALM: reports-realm
       KEYCLOAK_CLIENT_ID: bionicpro-auth
       KEYCLOAK_CLIENT_SECRET: bionicpro-auth-secret-change-me

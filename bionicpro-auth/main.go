@@ -176,7 +176,7 @@ func (h *handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	q.Set("client_id", h.clientID)
 	q.Set("redirect_uri", h.redirectURI)
 	q.Set("response_type", "code")
-	q.Set("scope", "openid profile email")
+	q.Set("scope", "openid email")
 	q.Set("state", state)
 	q.Set("code_challenge", challenge)
 	q.Set("code_challenge_method", "S256")

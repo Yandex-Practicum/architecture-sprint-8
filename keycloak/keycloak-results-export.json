@@ -450,7 +450,7 @@
   "identityProviders": [
     {
       "alias": "yandex",
-      "displayName": "Yandex ID",
+      "displayName": "Yandex Cloud (OIDC)",
       "providerId": "oidc",
       "enabled": true,
       "updateProfileFirstLoginMode": "on",
@@ -463,8 +463,13 @@
         "clientAuthMethod": "client_secret_post",
         "clientId": "REPLACE_YANDEX_CLIENT_ID",
         "clientSecret": "REPLACE_YANDEX_CLIENT_SECRET",
-        "discoveryUrl": "https://oauth.yandex.ru/.well-known/openid-configuration",
-        "defaultScope": "openid login:email login:info",
+        "authorizationUrl": "https://auth.yandex.cloud/oauth/authorize",
+        "tokenUrl": "https://auth.yandex.cloud/oauth/token",
+        "userInfoUrl": "https://auth.yandex.cloud/oauth/userinfo",
+        "jwksUrl": "https://auth.yandex.cloud/oauth/jwks/keys",
+        "issuer": "https://auth.yandex.cloud",
+        "discoveryUrl": "",
+        "defaultScope": "openid email",
         "syncMode": "IMPORT",
         "useJwksUrl": "true",
         "validateSignature": "true"

@@ -163,8 +163,8 @@
   "identityProviders": [
     {
       "alias": "yandex",
-      "displayName": "Yandex Cloud (OIDC)",
-      "providerId": "oidc",
+      "displayName": "Yandex",
+      "providerId": "oauth2",
       "enabled": true,
       "updateProfileFirstLoginMode": "on",
       "trustEmail": true,
@@ -174,18 +174,23 @@
       "firstBrokerLoginFlowAlias": "first broker login",
       "config": {
         "clientAuthMethod": "client_secret_post",
-        "clientId": "**",
-        "clientSecret": "**",
-        "authorizationUrl": "https://auth.yandex.cloud/oauth/authorize",
-        "tokenUrl": "https://auth.yandex.cloud/oauth/token",
-        "userInfoUrl": "https://auth.yandex.cloud/oauth/userinfo",
-        "jwksUrl": "https://auth.yandex.cloud/oauth/jwks/keys",
-        "issuer": "https://auth.yandex.cloud",
-        "discoveryUrl": "",
-        "defaultScope": "openid email",
+        "clientId": "1c7d38a387e847e78e88422c3ba5c6c3",
+        "clientSecret": "5de983ca0ea24e4dad74682574bf1059",
+        "userInfoUrl": "https://login.yandex.ru/info",
+        "tokenUrl": "https://oauth.yandex.ru/token",
+        "acceptsPromptNoneForwardFromClient": "false",
+        "showInAccountConsole": "ALWAYS",
+        "caseSensitiveOriginalUsername": "false",
+        "pkceEnabled": "false",
+        "authorizationUrl": "https://oauth.yandex.ru/authorize",
         "syncMode": "IMPORT",
-        "useJwksUrl": "true",
-        "validateSignature": "true"
+        "requiresShortStateParameter": "false",
+        "allowedClockSkew": "0",
+        "defaultScope": "login:info login:email login:birthday",
+        "userIDClaim": "id",
+        "userNameClaim": "login",
+        "emailClaim": "default_email",
+        "fullNameClaim": "display_name"
       }
     }
   ]

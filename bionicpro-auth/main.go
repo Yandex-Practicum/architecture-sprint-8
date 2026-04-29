@@ -95,10 +95,19 @@ func main() {
 	}
 	defer pdb.Close()
 
+	kcInternal := strings.TrimRight(getenv("KEYCLOAK_URL", "http://localhost:8080"), "/")
+	kcPublic := getenv("KEYCLOAK_PUBLIC_URL", "")
+	if kcPublic == "" {
+		kcPublic = kcInternal
+	} else {
+		kcPublic = strings.TrimRight(kcPublic, "/")
+	}
+
 	h := &handler{
 		rdb:               rdb,
 		profileDB:         pdb,
-		keycloakURL:       strings.TrimRight(getenv("KEYCLOAK_URL", "http://localhost:8080"), "/"),
+		keycloakURL:       kcInternal,
+		keycloakPublicURL: kcPublic,
 		realm:             getenv("KEYCLOAK_REALM", "reports-realm"),
 		clientID:          getenv("KEYCLOAK_CLIENT_ID", "bionicpro-auth"),
 		clientSecret:      getenv("KEYCLOAK_CLIENT_SECRET", ""),
@@ -119,7 +128,7 @@ func main() {
 	mux.HandleFunc("/reports", h.withSessionRotation(h.handleReports, true))
 
 	addr := getenv("LISTEN_ADDR", ":8000")
-	log.Printf("bionicpro-auth listening on %s", addr)
+	log.Printf("bionicpro-auth listening on %s (Keycloak internal=%s browser redirect=%s)", addr, kcInternal, kcPublic)
 	log.Fatal(http.ListenAndServe(addr, withCORS(mux, getenv("CORS_ORIGIN", "http://localhost:3000"))))
 }
 
@@ -134,6 +143,7 @@ type handler struct {
 	rdb               *redis.Client
 	profileDB         *sql.DB
 	keycloakURL       string
+	keycloakPublicURL string
 	realm             string
 	clientID          string
 	clientSecret      string
@@ -151,7 +161,7 @@ func (h *handler) tokenURL() string {
 }
 
 func (h *handler) authURL() string {
-	return fmt.Sprintf("%s/realms/%s/protocol/openid-connect/auth", h.keycloakURL, h.realm)
+	return fmt.Sprintf("%s/realms/%s/protocol/openid-connect/auth", h.keycloakPublicURL, h.realm)
 }
 
 func (h *handler) userinfoURL() string {

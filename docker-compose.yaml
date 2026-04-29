@@ -37,6 +37,12 @@ services:
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      # Hostname v2 (Keycloak 26+): фиксируем issuer на localhost:8080.
+      # Это важно, иначе /userinfo может отвечать 401 invalid_token (Invalid token issuer),
+      # когда browser ходит на localhost:8080, а backchannel (контейнеры) — на keycloak:8080.
+      KC_HOSTNAME: localhost
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_STRICT_HTTPS: "false"
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
       KC_DB_USERNAME: keycloak_user
@@ -202,7 +208,18 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
       AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
-    command: standalone
+      # Фиксированный вход в UI (см. https://airflow.apache.org/docs/docker-stack/entrypoint.html )
+      _AIRFLOW_DB_MIGRATE: "true"
+      _AIRFLOW_WWW_USER_CREATE: "true"
+      _AIRFLOW_WWW_USER_USERNAME: admin
+      _AIRFLOW_WWW_USER_PASSWORD: admin
+    # standalone иногда падает с «pid file stale / Already running» после рестарта — чистим PID перед стартом
+    entrypoint:
+      - /bin/bash
+      - -c
+      - >-
+        rm -f /opt/airflow/airflow-webserver.pid /opt/airflow/airflow-scheduler.pid 2>/dev/null || true;
+        exec /usr/bin/dumb-init -- /entrypoint standalone
     ports:
       - "8085:8080"
     volumes:
@@ -256,7 +273,8 @@ services:
       dockerfile: Dockerfile
     environment:
       CLICKHOUSE_HOST: clickhouse
-      CLICKHOUSE_PORT: "9000"
+      # clickhouse_connect — HTTP-интерфейс ClickHouse (не native 9000)
+      CLICKHOUSE_PORT: "8123"
       INTERNAL_SERVICE_TOKEN: bionicpro-internal-token
       S3_ENDPOINT_URL: http://minio:9000
       S3_BUCKET: bionicpro-reports
@@ -286,7 +304,9 @@ services:
     environment:
       LISTEN_ADDR: ":8000"
       REDIS_ADDR: redis:6379
-      KEYCLOAK_URL: http://localhost:8080
+      # Сервер→Keycloak из контейнера; браузер ходит на localhost (см. KEYCLOAK_PUBLIC_URL)
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_PUBLIC_URL: http://localhost:8080
       KEYCLOAK_REALM: reports-realm
       KEYCLOAK_CLIENT_ID: bionicpro-auth
       KEYCLOAK_CLIENT_SECRET: bionicpro-auth-secret-change-me
@@ -313,7 +333,8 @@ services:
       dockerfile: Dockerfile
       args:
         REACT_APP_API_URL: ""
-        REACT_APP_AUTH_PREFIX: ""
+        # Прямой URL auth на хосте: обход nginx proxy /auth/ (иначе при сбое DNS до bionicpro-auth в контейнере фронта — 502 и нет редиректа на Keycloak)
+        REACT_APP_AUTH_PREFIX: http://localhost:8000
     ports:
       - "3000:3000"
     depends_on:

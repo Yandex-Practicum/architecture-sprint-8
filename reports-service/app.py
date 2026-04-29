@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 import re
+from datetime import date
 from typing import Any
 
 import boto3
@@ -19,7 +20,7 @@ from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import JSONResponse
 
 CLICKHOUSE_HOST = os.getenv("CLICKHOUSE_HOST", "localhost")
-CLICKHOUSE_PORT = int(os.getenv("CLICKHOUSE_PORT", "9000"))
+CLICKHOUSE_PORT = int(os.getenv("CLICKHOUSE_PORT", "8123"))
 INTERNAL_TOKEN = os.getenv("INTERNAL_SERVICE_TOKEN", "change-me-internal")
 
 S3_BUCKET = os.getenv("S3_BUCKET", "").strip()
@@ -113,7 +114,13 @@ def fetch_mart_rows(client, email: str, data_through, user_sub: str) -> list[dic
     """
     result = client.query(q, parameters=params)
     columns = list(result.column_names)
-    return [dict(zip(columns, row)) for row in result.result_rows]
+    out: list[dict[str, Any]] = []
+    for row in result.result_rows:
+        row_d = dict(zip(columns, row))
+        out.append(
+            {k: (v.isoformat() if isinstance(v, date) else v) for k, v in row_d.items()}
+        )
+    return out
 
 
 def build_report_payload(

@@ -119,7 +119,7 @@
         "directAccessGrantsEnabled": true
       },
       {
-        "clientId": "reports-api",
+        "clientId": "reports_api",
         "enabled": true,
         "clientAuthenticatorType": "client-secret",
         "secret": "oNwoLQdvJAvRcL89SydqCWCe5ry1jMgq", 

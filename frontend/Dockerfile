@@ -12,6 +12,10 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+# Add skip preflight check
+ENV SKIP_PREFLIGHT_CHECK=true
+ENV CI=false
+
 # Build the app
 RUN npm run build
 

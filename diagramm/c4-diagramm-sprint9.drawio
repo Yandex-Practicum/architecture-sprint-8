@@ -1,0 +1,118 @@
+<mxfile host="drawio-plugin" modified="2026-05-13T08:54:04.263Z" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36" version="22.1.22" etag="0qjhYXr6nGz-LC6SYCF1" type="embed">
+  <diagram id="s3enrIGnRp0S99N1et1Z" name="Page-1">
+    <mxGraphModel dx="652" dy="1108" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1654" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="actor_buyer" value="&lt;b&gt;Покупатель протеза&lt;/b&gt;&lt;br&gt;[Person]" style="shape=mxgraph.c4.person2;whiteSpace=wrap;html=1;fillColor=#686868;fontColor=#ffffff;strokeColor=#686868;" parent="1" vertex="1">
+          <mxGeometry x="40" y="180" width="120" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="actor_pilot" value="&lt;b&gt;Пилот протеза&lt;/b&gt;&lt;br&gt;[Person]&lt;br&gt;&lt;i&gt;С этого человека&lt;br&gt;считываются данные&lt;/i&gt;" style="shape=mxgraph.c4.person2;whiteSpace=wrap;html=1;fillColor=#686868;fontColor=#ffffff;strokeColor=#686868;" parent="1" vertex="1">
+          <mxGeometry x="40" y="500" width="120" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="actor_operator" value="&lt;b&gt;Оператор&lt;br&gt;производства&lt;/b&gt;&lt;br&gt;[Person]" style="shape=mxgraph.c4.person2;whiteSpace=wrap;html=1;fillColor=#1f3864;fontColor=#ffffff;strokeColor=#1f3864;" parent="1" vertex="1">
+          <mxGeometry x="1500" y="180" width="120" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="actor_ml" value="&lt;b&gt;ML-инженер&lt;/b&gt;&lt;br&gt;[Person]" style="shape=mxgraph.c4.person2;whiteSpace=wrap;html=1;fillColor=#1f3864;fontColor=#ffffff;strokeColor=#1f3864;" parent="1" vertex="1">
+          <mxGeometry x="1500" y="750" width="120" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="ext_keycloak" value="&lt;b&gt;Keycloak&lt;/b&gt;&lt;br&gt;[External: Identity Provider]&lt;br&gt;&lt;i&gt;SSO, PKCE, LDAP federation,&lt;br&gt;OTP, Identity Brokering&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;arcSize=5;strokeWidth=2;dashed=1;" parent="1" vertex="1">
+          <mxGeometry x="1130" y="330" width="200" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="ext_yandex" value="&lt;b&gt;Yandex ID&lt;/b&gt;&lt;br&gt;[External: Identity Provider]&lt;br&gt;&lt;i&gt;OAuth 2.0 / OIDC&lt;br&gt;&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#333333;arcSize=5;strokeWidth=2;dashed=1;" parent="1" vertex="1">
+          <mxGeometry x="1130" y="160" width="200" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="ext_ldap" value="&lt;b&gt;OpenLDAP&lt;/b&gt;&lt;br&gt;[Container: osixia/openldap]&lt;br&gt;&lt;i&gt;Каталог пользователей&lt;br&gt;зарубежного представительства.&lt;br&gt;dc=example,dc=com&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=#333333;arcSize=5;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="1130" y="490" width="200" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="boundary" value="BionicPRO [Software System]" style="points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];shape=mxgraph.c4.system_boundary;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#666666;strokeWidth=2;dashed=1;fontSize=14;fontStyle=1;verticalAlign=bottom;" parent="1" vertex="1">
+          <mxGeometry x="130" y="120" width="900" height="900" as="geometry" />
+        </mxCell>
+        <mxCell id="c_shop" value="&lt;b&gt;Интернет-магазин&lt;/b&gt;&lt;br&gt;[Container: Битрикс24]&lt;br&gt;&lt;i&gt;Выбор протеза, заказ, оплата&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1ba1e2;strokeColor=#006EAF;fontColor=#ffffff;arcSize=5;" parent="1" vertex="1">
+          <mxGeometry x="380" y="160" width="180" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="c_crm" value="&lt;b&gt;CRM&lt;/b&gt;&lt;br&gt;[Container: Битрикс24]&lt;br&gt;&lt;i&gt;Управление заказами,&lt;br&gt;производством, клиентами&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1ba1e2;strokeColor=#006EAF;fontColor=#ffffff;arcSize=5;" parent="1" vertex="1">
+          <mxGeometry x="650" y="160" width="180" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="c_crmdb" value="&lt;b&gt;CRM DB&lt;/b&gt;&lt;br&gt;[Container: Oracle Database 12]" style="shape=mxgraph.c4.database2;whiteSpace=wrap;html=1;fillColor=#1ba1e2;strokeColor=#006EAF;fontColor=#ffffff;" parent="1" vertex="1">
+          <mxGeometry x="670" y="310" width="140" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="c_chip" value="&lt;b&gt;Программа в чипе&lt;/b&gt;&lt;br&gt;[Software System: ESP32/C++]&lt;br&gt;&lt;i&gt;Чтение миосигналов,&lt;br&gt;распознавание движений,&lt;br&gt;передача телеметрии&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1ba1e2;strokeColor=#006EAF;fontColor=#ffffff;arcSize=5;" parent="1" vertex="1">
+          <mxGeometry x="230" y="470" width="170" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="c_app" value="&lt;b&gt;Мобильное приложение&lt;/b&gt;&lt;br&gt;[Container: iOS, Android]&lt;br&gt;&lt;i&gt;Донастройка протеза,&lt;br&gt;скачивание отчётов&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1ba1e2;strokeColor=#006EAF;fontColor=#ffffff;arcSize=5;" parent="1" vertex="1">
+          <mxGeometry x="230" y="640" width="180" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="c_bff" value="&lt;b&gt;★ bionicpro-auth&lt;/b&gt;&lt;br&gt;[Container: Spring Boot, BFF]&lt;br&gt;&lt;i&gt;PKCE token exchange.&lt;br&gt;Хранит access/refresh token&lt;br&gt;в памяти. Выдаёт HTTP-only&lt;br&gt;session cookie фронтенду.&lt;br&gt;Ротация сессии на каждый&lt;br&gt;запрос к API.&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#000000;arcSize=5;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="500" y="470" width="200" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="c_api" value="&lt;b&gt;API&lt;/b&gt;&lt;br&gt;[Container: Spring Boot]&lt;br&gt;&lt;i&gt;Бизнес-логика, отчёты,&lt;br&gt;данные протезов&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1ba1e2;strokeColor=#006EAF;fontColor=#ffffff;arcSize=5;" parent="1" vertex="1">
+          <mxGeometry x="760" y="580" width="180" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="c_db" value="&lt;b&gt;База данных&lt;/b&gt;&lt;br&gt;[Container: PostgreSQL]" style="shape=mxgraph.c4.database2;whiteSpace=wrap;html=1;fillColor=#1ba1e2;strokeColor=#006EAF;fontColor=#ffffff;" parent="1" vertex="1">
+          <mxGeometry x="780" y="720" width="140" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="c_cli" value="&lt;b&gt;CLI Tool&lt;/b&gt;&lt;br&gt;[Container: Spring Boot]&lt;br&gt;&lt;i&gt;Инструменты ML-инженера&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1ba1e2;strokeColor=#006EAF;fontColor=#ffffff;arcSize=5;" parent="1" vertex="1">
+          <mxGeometry x="950" y="750" width="140" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="Выбор протеза,&lt;br&gt;заказ, оплата" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" parent="1" source="actor_buyer" target="c_shop" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="Заказы" style="edgeStyle=orthogonalEdgeStyle;html=1;" parent="1" source="c_shop" target="c_crm" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;" parent="1" source="c_crm" target="c_crmdb" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="Миосигналы" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" parent="1" source="actor_pilot" target="c_chip" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="Управление&lt;br&gt;протезом" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.8;entryX=0;entryY=0.5;" parent="1" source="actor_pilot" target="c_app" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="Отправка телеметрии&lt;br&gt;(4G, real-time)" style="edgeStyle=orthogonalEdgeStyle;html=1;" parent="1" source="c_chip" target="c_api" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="HTTP-only session cookie&lt;br&gt;(без токенов в JS)" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;strokeWidth=2;fontStyle=1;" parent="1" source="c_app" target="c_bff" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" value="PKCE token exchange&lt;br&gt;(Authorization Code + code_verifier)" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;strokeWidth=2;fontStyle=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" parent="1" source="c_bff" target="ext_keycloak" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" value="Проксирование запроса&lt;br&gt;с Bearer token" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;strokeWidth=2;fontStyle=1;" parent="1" source="c_bff" target="c_api" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e10" value="User Federation&lt;br&gt;(LDAP Sync)" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6c8ebf;strokeWidth=2;fontStyle=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;dashed=1;" parent="1" source="ext_keycloak" target="ext_ldap" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e11" value="Identity Brokering&lt;br&gt;(OAuth 2.0 / OIDC)" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#d6b656;strokeWidth=2;fontStyle=1;exitX=0.5;exitY=0;entryX=0.5;entryY=1;dashed=1;" parent="1" source="ext_keycloak" target="ext_yandex" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e12" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;" parent="1" source="c_api" target="c_db" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e13" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" parent="1" source="actor_ml" target="c_cli" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e14" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;" parent="1" source="c_cli" target="c_db" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e15" value="Управление&lt;br&gt;производством" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=0;exitY=0.5;entryX=1;entryY=0.3;" parent="1" source="actor_operator" target="c_crm" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="legend_title" value="&lt;b&gt;Легенда&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=12;fontStyle=1;" parent="1" vertex="1">
+          <mxGeometry x="40" y="820" width="120" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="legend_new" value="★ — новые компоненты Sprint 9" style="text;html=1;strokeColor=none;fillColor=#d5e8d4;align=left;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="40" y="845" width="230" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="legend_edge_new" value="━━ зелёные стрелки — новые связи (BFF паттерн)" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="40" y="870" width="280" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="legend_edge_ldap" value="- - синие стрелки — LDAP/Yandex ID интеграция" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="40" y="895" width="280" height="25" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

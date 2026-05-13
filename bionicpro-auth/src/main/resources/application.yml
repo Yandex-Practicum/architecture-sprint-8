@@ -1,0 +1,24 @@
+server:
+  port: 8000
+
+keycloak:
+  url: ${KEYCLOAK_URL:http://keycloak:8080}
+  realm: ${KEYCLOAK_REALM:reports-realm}
+  client-id: ${KEYCLOAK_CLIENT_ID:bionicpro-auth-client}
+  client-secret: ${KEYCLOAK_CLIENT_SECRET:bionicpro-auth-secret}
+  # Where Keycloak redirects after login — must match Keycloak client config
+  callback-url: ${KEYCLOAK_CALLBACK_URL:http://localhost:8000/auth/callback}
+
+app:
+  frontend-url: ${FRONTEND_URL:http://localhost:3000}
+  # Session lifetime in seconds (must exceed access_token lifetime of 120s)
+  session-max-age: ${SESSION_MAX_AGE:3600}
+
+reports-api:
+  url: ${REPORTS_API_URL:http://reports-api:8001}
+
+# Logging for debugging auth flows
+logging:
+  level:
+    com.bionicpro: DEBUG
+    org.springframework.security: INFO

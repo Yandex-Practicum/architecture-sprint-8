@@ -1,0 +1,41 @@
+{
+  "name": "bionicpro-cdc",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+
+    "database.hostname": "crm-db",
+    "database.port":     "5432",
+    "database.user":     "crm_user",
+    "database.password": "crm_password",
+    "database.dbname":   "crm_db",
+    "database.server.name": "bionicpro",
+
+    "plugin.name":        "pgoutput",
+    "slot.name":          "debezium_slot",
+    "publication.name":   "debezium_pub",
+    "publication.autocreate.mode": "filtered",
+
+    "table.include.list": "public.patients,public.telemetry",
+
+    "key.converter":                 "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter.schemas.enable":  "false",
+    "value.converter":               "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter.schemas.enable": "false",
+
+    "transforms":              "unwrap",
+    "transforms.unwrap.type":  "io.debezium.transforms.ExtractNewRecordState",
+    "transforms.unwrap.drop.tombstones": "false",
+    "transforms.unwrap.add.fields":      "op,ts_ms",
+    "transforms.unwrap.delete.handling.mode": "rewrite",
+
+    "decimal.handling.mode": "double",
+    "time.precision.mode":   "connect",
+
+    "snapshot.mode": "initial",
+
+    "heartbeat.interval.ms": "30000",
+    "max.batch.size":         "2048",
+    "max.queue.size":         "8192",
+    "poll.interval.ms":       "500"
+  }
+}

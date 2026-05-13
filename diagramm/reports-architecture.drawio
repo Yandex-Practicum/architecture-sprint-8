@@ -1,0 +1,312 @@
+<mxfile host="Electron" modified="2026-05-13T00:00:00.000Z" agent="Claude" version="21.0.0" type="device">
+  <diagram id="reports-etl-s3" name="Assignment 2+3 — Reports ETL &amp; S3/CDN">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1654" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- ══ TITLE ══════════════════════════════════════════════════════ -->
+        <mxCell id="t1" value="BionicPRO — Reports Service Architecture (Assignments 2 &amp; 3)" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=18;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="200" y="20" width="1200" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- ══ LANE LABELS ════════════════════════════════════════════════ -->
+        <mxCell id="lane1" value="ETL Pipeline (nightly)" style="text;html=1;strokeColor=none;fillColor=#f5f5f5;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=12;fontStyle=1;fontColor=#666;rotation=-90;" vertex="1" parent="1">
+          <mxGeometry x="20" y="80" width="140" height="240" as="geometry" />
+        </mxCell>
+        <mxCell id="lane2" value="Report Request Flow" style="text;html=1;strokeColor=none;fillColor=#f5f5f5;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=12;fontStyle=1;fontColor=#666;rotation=-90;" vertex="1" parent="1">
+          <mxGeometry x="20" y="360" width="140" height="240" as="geometry" />
+        </mxCell>
+        <mxCell id="lane3" value="File Download (CDN)" style="text;html=1;strokeColor=none;fillColor=#f5f5f5;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=12;fontStyle=1;fontColor=#666;rotation=-90;" vertex="1" parent="1">
+          <mxGeometry x="20" y="640" width="140" height="200" as="geometry" />
+        </mxCell>
+
+        <!-- ══ ETL PIPELINE ROW ════════════════════════════════════════════ -->
+        <!-- CRM DB -->
+        <mxCell id="crm" value="&lt;b&gt;CRM DB&lt;/b&gt;&lt;br&gt;PostgreSQL&lt;br&gt;patients, telemetry" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=18;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="130" y="100" width="150" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- Airflow -->
+        <mxCell id="airflow" value="&lt;b&gt;Apache Airflow&lt;/b&gt;&lt;br&gt;ETL DAG&lt;br&gt;Schedule: 0 1 * * *&lt;br&gt;Extract → Transform → Load" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="360" y="95" width="190" height="100" as="geometry" />
+        </mxCell>
+
+        <!-- OLAP DB -->
+        <mxCell id="olap" value="&lt;b&gt;OLAP DB&lt;/b&gt;&lt;br&gt;PostgreSQL&lt;br&gt;user_report_mart&lt;br&gt;(daily aggregates)" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=18;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="640" y="100" width="160" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- ETL arrows -->
+        <mxCell id="e1" value="Extract patients&lt;br&gt;&amp; telemetry" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="crm" target="airflow" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="Aggregate &amp; upsert&lt;br&gt;user_report_mart" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="airflow" target="olap" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ══ REQUEST FLOW ROW ════════════════════════════════════════════ -->
+        <!-- User -->
+        <mxCell id="user" value="&lt;b&gt;User&lt;/b&gt;&lt;br&gt;Browser" style="shape=mxgraph.cisco.computers_and_peripherals.pc;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="150" y="400" width="80" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- Frontend -->
+        <mxCell id="frontend" value="&lt;b&gt;Frontend&lt;/b&gt;&lt;br&gt;React + Tailwind&lt;br&gt;:3000" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="310" y="405" width="150" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- BFF -->
+        <mxCell id="bff" value="&lt;b&gt;bionicpro-auth&lt;/b&gt;&lt;br&gt;BFF · Spring Boot&lt;br&gt;:8000&lt;br&gt;session cookie + JWT inject" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="530" y="395" width="180" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- Reports API -->
+        <mxCell id="rapi" value="&lt;b&gt;reports-api&lt;/b&gt;&lt;br&gt;FastAPI · Python&lt;br&gt;:8001&lt;br&gt;1. Verify JWT&lt;br&gt;2. Check S3&lt;br&gt;3. Generate if MISS&lt;br&gt;4. Return CDN URL" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="790" y="380" width="170" height="120" as="geometry" />
+        </mxCell>
+
+        <!-- OLAP DB (query box) -->
+        <mxCell id="olap2" value="&lt;b&gt;OLAP DB&lt;/b&gt;&lt;br&gt;(cache MISS only)" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=18;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="1050" y="400" width="140" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- MinIO S3 -->
+        <mxCell id="minio" value="&lt;b&gt;MinIO S3&lt;/b&gt;&lt;br&gt;Bucket: bionicpro-reports&lt;br&gt;Key: reports/{user}/{etl_date}/report.csv&lt;br&gt;Lifecycle: 7 days" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=18;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="1050" y="270" width="200" height="100" as="geometry" />
+        </mxCell>
+
+        <!-- Request flow arrows -->
+        <mxCell id="e3" value="GET /reports&lt;br&gt;(session cookie)" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="user" target="frontend" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="GET /api/reports" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="frontend" target="bff" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="Bearer token" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="bff" target="rapi" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="SELECT (cache MISS)" style="edgeStyle=orthogonalEdgeStyle;dashed=1;" edge="1" source="rapi" target="olap2" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="HEAD + PUT report.csv" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="rapi" target="minio" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" value="{report_url}" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="rapi" target="bff" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="875" y="550" />
+              <mxPoint x="620" y="550" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e9" value="{report_url}" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="bff" target="frontend" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="620" y="560" />
+              <mxPoint x="385" y="560" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ══ CDN DOWNLOAD ROW ════════════════════════════════════════════ -->
+        <!-- Nginx CDN -->
+        <mxCell id="cdn" value="&lt;b&gt;Nginx CDN&lt;/b&gt;&lt;br&gt;:8100&lt;br&gt;proxy_cache: 1h&lt;br&gt;X-Cache-Status: HIT/MISS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="790" y="670" width="180" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- MinIO → CDN origin -->
+        <mxCell id="e10" value="origin (MISS)" style="edgeStyle=orthogonalEdgeStyle;dashed=1;" edge="1" source="minio" target="cdn" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1150" y="375" />
+              <mxPoint x="1150" y="715" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- User → CDN (direct download via CDN URL) -->
+        <mxCell id="e11" value="GET report.csv (CDN URL)" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="user" target="cdn" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="190" y="700" />
+              <mxPoint x="190" y="715" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ══ LEGEND ══════════════════════════════════════════════════════ -->
+        <mxCell id="leg" value="Cache invalidation: ETL date embedded in S3 key.&amp;#xa;After Airflow run → new etl_date → new S3 key → CDN cache bypassed automatically.&amp;#xa;Old objects expire via MinIO lifecycle policy (7 days)." style="text;html=1;strokeColor=#666;fillColor=#f5f5f5;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="130" y="820" width="600" height="60" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+
+  <diagram id="cdc-arch" name="Assignment 4 — CDC: Debezium → Kafka → ClickHouse">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1654" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- ══ TITLE ══════════════════════════════════════════════════════ -->
+        <mxCell id="t1" value="BionicPRO — CDC Pipeline: Debezium → Kafka → ClickHouse (Assignment 4)" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;fontSize=18;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="200" y="20" width="1200" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- ══ SOURCE ════════════════════════════════════════════════════ -->
+        <mxCell id="crm" value="&lt;b&gt;CRM DB&lt;/b&gt;&lt;br&gt;PostgreSQL 14&lt;br&gt;wal_level = logical&lt;br&gt;tables: patients, telemetry" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=18;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="80" y="120" width="170" height="100" as="geometry" />
+        </mxCell>
+
+        <!-- Debezium -->
+        <mxCell id="debezium" value="&lt;b&gt;Debezium&lt;/b&gt;&lt;br&gt;PostgreSQL Connector&lt;br&gt;Kafka Connect :8083&lt;br&gt;plugin: pgoutput&lt;br&gt;SMT: ExtractNewRecordState" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0a30a;strokeColor=#BD7000;fontColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="80" y="310" width="200" height="110" as="geometry" />
+        </mxCell>
+
+        <!-- WAL arrow -->
+        <mxCell id="e1" value="WAL (logical replication)&lt;br&gt;Publication: debezium_pub&lt;br&gt;Slot: debezium_slot" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="crm" target="debezium" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ══ KAFKA ══════════════════════════════════════════════════════ -->
+        <mxCell id="kafka-box" value="&lt;b&gt;Apache Kafka&lt;/b&gt; (KRaft, :9092)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1ba1e2;strokeColor=#006EAF;fontColor=#ffffff;fontStyle=1;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="380" y="200" width="260" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- Kafka topics -->
+        <mxCell id="topic1" value="Topic: bionicpro.public.patients&lt;br&gt;{id, username, email, full_name,&lt;br&gt;device_serial, device_model, registration_date,&lt;br&gt;__op, __ts_ms}" style="shape=mxgraph.flowchart.queue;whiteSpace=wrap;html=1;fillColor=#1ba1e2;strokeColor=#006EAF;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="370" y="290" width="280" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="topic2" value="Topic: bionicpro.public.telemetry&lt;br&gt;{id, patient_username, recorded_at,&lt;br&gt;battery_level, active_hours, steps_count,&lt;br&gt;event_type, __op, __ts_ms}" style="shape=mxgraph.flowchart.queue;whiteSpace=wrap;html=1;fillColor=#1ba1e2;strokeColor=#006EAF;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="370" y="400" width="280" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- Debezium → Kafka -->
+        <mxCell id="e2" value="JSON (flat, no schema)&lt;br&gt;decimal.handling.mode=double&lt;br&gt;time.precision.mode=connect" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="debezium" target="topic1" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2b" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="debezium" target="topic2" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ══ CLICKHOUSE ══════════════════════════════════════════════════ -->
+        <mxCell id="ch-box" value="&lt;b&gt;ClickHouse&lt;/b&gt; (DB: bionicpro, :8123)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0a30a;strokeColor=#BD7000;fontColor=#000000;fontStyle=1;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="750" y="100" width="700" height="600" as="geometry" />
+        </mxCell>
+
+        <!-- kafka_patients (KafkaEngine) -->
+        <mxCell id="kp" value="&lt;b&gt;kafka_patients&lt;/b&gt;&lt;br&gt;ENGINE = Kafka()&lt;br&gt;format: JSONEachRow&lt;br&gt;group: clickhouse_patients" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="780" y="160" width="190" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- kafka_telemetry (KafkaEngine) -->
+        <mxCell id="kt" value="&lt;b&gt;kafka_telemetry&lt;/b&gt;&lt;br&gt;ENGINE = Kafka()&lt;br&gt;format: JSONEachRow&lt;br&gt;group: clickhouse_telemetry" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="780" y="310" width="190" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- topic → KafkaEngine arrows -->
+        <mxCell id="e3" value="consume" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="topic1" target="kp" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3b" value="consume" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="topic2" target="kt" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- patients_local (ReplacingMergeTree) -->
+        <mxCell id="pl" value="&lt;b&gt;patients_local&lt;/b&gt;&lt;br&gt;ENGINE = ReplacingMergeTree&lt;br&gt;ORDER BY username" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="1050" y="160" width="170" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- telemetry_local (MergeTree) -->
+        <mxCell id="tl" value="&lt;b&gt;telemetry_local&lt;/b&gt;&lt;br&gt;ENGINE = MergeTree&lt;br&gt;PARTITION BY toYYYYMM(recorded_at)&lt;br&gt;ORDER BY (patient_username, recorded_at)" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="1050" y="300" width="170" height="100" as="geometry" />
+        </mxCell>
+
+        <!-- patients_dict (Dictionary) -->
+        <mxCell id="dict" value="&lt;b&gt;patients_dict&lt;/b&gt;&lt;br&gt;Dictionary · HASHED layout&lt;br&gt;Refresh: 60-300s&lt;br&gt;used by: report_mart_mv" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="1050" y="450" width="170" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- user_report_mart (SummingMergeTree) -->
+        <mxCell id="mart" value="&lt;b&gt;user_report_mart&lt;/b&gt;&lt;br&gt;ENGINE = SummingMergeTree&lt;br&gt;ORDER BY (username, report_date)&lt;br&gt;Accumulates partial aggregates&lt;br&gt;per Kafka batch" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="1270" y="390" width="150" height="110" as="geometry" />
+        </mxCell>
+
+        <!-- MVs -->
+        <mxCell id="mv1" value="patients_mv&lt;br&gt;MaterializedView" style="shape=parallelogram;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1000" y="195" width="130" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="mv2" value="telemetry_mv&lt;br&gt;MaterializedView" style="shape=parallelogram;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1000" y="340" width="130" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="mv3" value="report_mart_mv&lt;br&gt;MaterializedView&lt;br&gt;(dictGet enrichment)" style="shape=parallelogram;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1210" y="340" width="150" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- ClickHouse internal arrows -->
+        <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="kp" target="mv1" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="mv1" target="pl" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="kt" target="mv2" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="mv2" target="tl" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" value="reads" style="edgeStyle=orthogonalEdgeStyle;dashed=1;" edge="1" source="pl" target="dict" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="kt" target="mv3" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="970" y="355" />
+              <mxPoint x="970" y="365" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e10" value="dictGet" style="edgeStyle=orthogonalEdgeStyle;dashed=1;" edge="1" source="dict" target="mv3" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e11" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="mv3" target="mart" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ══ CONSUMER LAYER ══════════════════════════════════════════════ -->
+        <!-- reports-api -->
+        <mxCell id="rapi" value="&lt;b&gt;reports-api&lt;/b&gt;&lt;br&gt;FastAPI + clickhouse-connect&lt;br&gt;:8001&lt;br&gt;SELECT ... FROM user_report_mart&lt;br&gt;WHERE username = ?" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="1290" y="600" width="200" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="e12" value="SELECT (GROUP BY for merge)" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="mart" target="rapi" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- MinIO -->
+        <mxCell id="minio" value="&lt;b&gt;MinIO S3&lt;/b&gt;&lt;br&gt;report cache" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="1420" y="780" width="130" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="e13" value="PUT/HEAD report.csv" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="rapi" target="minio" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- BFF -->
+        <mxCell id="bff" value="&lt;b&gt;bionicpro-auth BFF&lt;/b&gt;&lt;br&gt;:8000" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="990" y="620" width="150" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="e14" value="{report_url}" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="rapi" target="bff" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ══ NOTE BOX ════════════════════════════════════════════════════ -->
+        <mxCell id="note" value="&lt;b&gt;Why CDC eliminates CRM load:&lt;/b&gt;&lt;br&gt;• Airflow bulk SELECT replaced by streaming WAL events&lt;br&gt;• OLTP queries on CRM DB are unaffected&lt;br&gt;• ClickHouse ingests changes in near-real-time via KafkaEngine&lt;br&gt;• SummingMergeTree accumulates partial aggregates (no full re-scan)" style="text;html=1;strokeColor=#82b366;fillColor=#d5e8d4;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="760" width="600" height="90" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

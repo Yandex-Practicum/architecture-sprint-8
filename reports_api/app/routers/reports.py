@@ -2,7 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from datetime import datetime, timedelta
 from app.dependencies import get_current_user
 from app.db.clickhouse_client import get_clickhouse_client
+import logging
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -18,19 +20,15 @@ async def get_report(
         if current_user.get("username") != user_id:
             raise HTTPException(status_code=403, detail="Access denied: you can only request your own reports")
 
-    # Валидация формата дат
     try:
         from_dt = datetime.strptime(from_date, "%Y-%m-%d")
         to_dt = datetime.strptime(to_date, "%Y-%m-%d")
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
 
-    yesterday = (datetime.now() - timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
-    if from_dt > yesterday:
-        # raise HTTPException(status_code=400, detail="from_date must be before or equal to to_date")
-        logger.warning(f"User {user_id} requested future date: {to_date}")
+    if from_dt > to_dt:
+        raise HTTPException(status_code=400, detail="from_date must be before or equal to to_date")
 
-    # Нельзя запрашивать будущие даты (Airflow ещё не обработал)
     yesterday = (datetime.now() - timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
     if to_dt > yesterday:
         raise HTTPException(
@@ -39,29 +37,29 @@ async def get_report(
                    f"Data for today is not yet processed by Airflow."
         )
 
-    # Ограничение периода (максимум 90 дней)
     if (to_dt - from_dt).days > 90:
         raise HTTPException(status_code=400, detail="Maximum report period is 90 days")
 
-    # Запрос в ClickHouse
-    ch = get_clickhouse_client()
+    try:
+        ch = get_clickhouse_client()
 
-    query = """
+        query = """
             SELECT
                 date, total_movements, avg_signal_quality, min_battery_level, calibration_count
             FROM daily_user_stats
             WHERE user_id = %(user_id)s
-              AND date BETWEEN %(from_date)s \
-              AND %(to_date)s
-            ORDER BY date \
-            """
+              AND date BETWEEN %(from_date)s AND %(to_date)s
+            ORDER BY date
+        """
 
-    try:
         result = ch.execute(
             query,
             {'user_id': user_id, 'from_date': from_date, 'to_date': to_date}
         )
+        logger.info(f"Query successful for user {user_id}, got {len(result)} rows")
+
     except Exception as e:
+        logger.error(f"Database error: {e}")
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
     if not result:
@@ -79,7 +77,7 @@ async def get_report(
             {
                 "date": str(row[0]),
                 "total_movements": row[1],
-                "avg_signal_quality": row[2],
+                "avg_signal_quality": float(row[2]) if row[2] else 0.0,
                 "min_battery_level": row[3],
                 "calibration_count": row[4]
             }

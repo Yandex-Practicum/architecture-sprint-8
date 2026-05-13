@@ -1,63 +1,65 @@
-version: '3.8'
-
 services:
   openldap:
     image: osixia/openldap:latest
     container_name: openldap
     ports:
       - "389:389"
-    environment:
-      LDAP_ORGANISATION: "BionicPRO"
-      LDAP_DOMAIN: "example.com"
-      LDAP_ADMIN_PASSWORD: "admin"
-      LDAP_TLS: "false"
-      LDAP_TLS_ENFORCE: "false"
-      LDAP_REMOVE_CONFIG_AFTER_SETUP: "false"
-      LDAP_BOOTSTRAP_CONFIG: "false"
-      LDAP_LOG_LEVEL: "256"
+    env_file:
+      - .env
     networks:
       - bionic-net
 
   clickhouse:
-    container_name: clickhouse
     image: clickhouse/clickhouse-server:latest
+    container_name: clickhouse
     ports:
       - "8123:8123"
       - "9000:9000"
     volumes:
-      - ./clickhouse/init:/docker-entrypoint-initdb.d
+      - ./clickhouse/init:/docker-entrypoint-initdb.d:ro
+      - ./clickhouse/no_password.xml:/etc/clickhouse-server/users.d/no_password.xml:ro
+    environment:
+      CLICKHOUSE_DB: reports
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
     networks:
       - bionic-net
 
   airflow:
-    image: apache/airflow:2.7.0
+    build: ./airflow
     container_name: airflow
     depends_on:
       - clickhouse
-    environment:
-      - AIRFLOW__CORE__EXECUTOR=SequentialExecutor
-      - AIRFLOW__CORE__LOAD_EXAMPLES=False
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=sqlite:////opt/airflow/airflow.db
+    env_file:
+      - .env
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/requirements.txt:/opt/airflow/requirements.txt
+      - airflow_data:/opt/airflow
     ports:
       - "8081:8080"
     command: >
-      bash -c "pip install clickhouse-driver &&
-               airflow db migrate &&
-               airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com 2>/dev/null || true &&
-               airflow webserver -p 8080 &
-               airflow scheduler"
+      bash -c "
+        pip install --user clickhouse-driver &&
+        airflow db init &&
+        airflow users create \
+          --username admin \
+          --password admin \
+          --firstname Admin \
+          --lastname User \
+          --role Admin \
+          --email admin@example.com 2>/dev/null || true &&
+        airflow webserver -p 8080 &
+        airflow scheduler
+      "
     networks:
       - bionic-net
 
   keycloak_db:
     image: postgres:14
-    environment:
-      POSTGRES_DB: keycloak_db
-      POSTGRES_USER: keycloak_user
-      POSTGRES_PASSWORD: keycloak_password
+    env_file:
+      - .env
     volumes:
       - postgres-keycloak-data:/var/lib/postgresql/data
     networks:
@@ -67,13 +69,6 @@ services:
     image: quay.io/keycloak/keycloak:21.1
     env_file:
       - .env
-    environment:
-      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
-      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
-      KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
-      KC_DB_USERNAME: keycloak_user
-      KC_DB_PASSWORD: keycloak_password
     command:
       - start-dev
       - --import-realm
@@ -91,8 +86,16 @@ services:
     container_name: reports_api
     env_file:
       - .env
+    environment:
+      - CLICKHOUSE_HOST=clickhouse
+      - CLICKHOUSE_PORT=9000
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=
+      - CLICKHOUSE_DATABASE=reports
     ports:
       - "${REPORTS_API_PORT:-8000}:8000"
+    volumes:
+      - ./reports_api/app:/app/app
     depends_on:
       - clickhouse
       - keycloak
@@ -105,11 +108,8 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
-    environment:
-      REACT_APP_API_URL: http://localhost:8000
-      REACT_APP_KEYCLOAK_URL: http://localhost:8080
-      REACT_APP_KEYCLOAK_REALM: reports-realm
-      REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+    env_file:
+      - .env
     depends_on:
       - keycloak
       - reports_api
@@ -118,6 +118,7 @@ services:
 
 volumes:
   postgres-keycloak-data:
+  airflow_data:
 
 networks:
   bionic-net:

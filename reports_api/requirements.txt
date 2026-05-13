@@ -3,3 +3,4 @@ uvicorn[standard]==0.24.0
 clickhouse-driver==0.2.5
 python-jose[cryptography]==3.3.0
 httpx==0.25.0
+requests==2.31.0

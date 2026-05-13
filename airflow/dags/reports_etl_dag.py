@@ -4,6 +4,7 @@ from airflow.operators.python import PythonOperator
 import requests
 import os
 import logging
+from clickhouse_driver import Client
 
 default_args = {
     "owner": "bionicpro",
@@ -59,8 +60,6 @@ def extract_users_from_keycloak(**context):
 def load_users_to_clickhouse(**context):
     """Загружает пользователей в ClickHouse"""
     try:
-        from clickhouse_driver import Client
-
         users = context["task_instance"].xcom_pull(key="keycloak_users")
         ch_client = Client(host="clickhouse", port=9000, database="reports")
 
@@ -75,7 +74,6 @@ def load_users_to_clickhouse(**context):
             else:
                 role = "user"
 
-            # Используем параметризованный запрос вместо форматирования строк
             sql = """
                   INSERT INTO dim_users (user_id, email, full_name, role, region, created_at)
                   VALUES (%(user_id)s, %(email)s, %(full_name)s, %(role)s, %(region)s, now()) \
@@ -84,11 +82,11 @@ def load_users_to_clickhouse(**context):
             full_name = f"{user.get('firstName', '')} {user.get('lastName', '')}".strip()
 
             ch_client.execute(sql, {
-                'user_id': user["username"],
-                'email': user.get("email", ""),
-                'full_name': full_name,
-                'role': role,
-                'region': 'RU'
+                "user_id": user["username"],
+                "email": user.get("email", ""),
+                "full_name": full_name,
+                "role": role,
+                "region": "RU"
             })
             inserted += 1
 
@@ -101,8 +99,6 @@ def load_users_to_clickhouse(**context):
 def build_daily_stats_mart(**context):
     """Строит витрину daily_user_stats за вчерашний день"""
     try:
-        from clickhouse_driver import Client
-
         ch_client = Client(host="clickhouse", port=9000, database="reports")
 
         # Исправленный SQL запрос

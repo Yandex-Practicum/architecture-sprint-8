@@ -1,3 +1,14 @@
+# BionicPRO Reports System
+
+Система для генерации отчетов по использованию протезов с микросервисной архитектурой.
+
+### Требования
+
+- Docker Desktop (последняя версия)
+- Docker Compose v2
+- 4GB+ RAM
+- Порты: 3000, 389, 8000, 8080, 8081, 8123, 9000
+
 Задание 1
 
 1) Архитектурное решение для управления учётными данными
@@ -123,56 +134,139 @@ if "administrator" not in current_user["roles"]:
 ```
 
 г) Сервис запрашивает отчёт из OLAP (ClickHouse)
+Да
 
 д) Генерация отчётов только за период, уже обработанный Airflow
-Пользователь может запросить сегодняшнюю дату, а Airflow запускается раз в 6 часов или ночью
+да.будет ошибка, если выбрать сегодняшнюю или будущую дату
 
 е) Запрос данных, которых ещё нет в OLAP
-
-
+Будет ошибка
 
 ## Запуск
-
-Скопируйте и заполните .env
+Создайте файл .env в корне проекта:
 ```shell
-cp frontend/.env.example frontend/.env
-cp reports_api/.env.example reports_api/.env
 cp .env.example .env
 ```
+Отредактируйте .env при необходимости (стандартные настройки уже работают)
 
-Создайте таблицы в ClickHouse
+Запустите систему
+
 ```shell
-# Войти в ClickHouse клиент
-docker exec -it clickhouse clickhouse-client
+docker compose up -d
+```
 
-# Выполнить SQL из файла (или по частям)
-CREATE DATABASE IF NOT EXISTS reports;
+Проверка работы
+```shell
+# Проверить статус всех сервисов
+docker compose ps
 
-CREATE TABLE IF NOT EXISTS reports.daily_user_stats
-(
-    user_id              String,
-    prosthesis_id        String,
-    date                 Date,
-    total_movements      UInt32,
-    avg_signal_quality   Float32,
-    min_battery_level    UInt8,
-    calibration_count    UInt16,
-    region               LowCardinality(String)
-)
-ENGINE = SummingMergeTree()
-ORDER BY (user_id, date);
+# Должны быть все "Up" или "running"
 
-# Проверить, что таблица создалась
-SHOW TABLES FROM reports;
+# Проверить ClickHouse
+docker exec -it clickhouse clickhouse-client --query "SELECT COUNT(*) FROM reports.daily_user_stats"
+# Должно вернуть: 6
 
-# Выйти
-exit;
+# Проверить API
+curl http://localhost:8000/health
+# Должно вернуть: {"status":"ok"}
+```
+
+Тестовые пользователи
+
+| Username   | Password     | Роль                 |
+|------------|--------------|----------------------|
+| prothetic1 | prothetic123 | Пользователь протеза |
+| prothetic2 | prothetic123 | Пользователь протеза |
+| prothetic3 | prothetic123 | Пользователь протеза |
+| user1      | password123  | Обычный пользователь |
+| user2      | password123  | Обычный пользователь |
+| admin1     | admin123     | Администратор        |
+
+Для получения отчета через Web UI откройте http://localhost:3000, залогиньтесь одним из пользователей, выберите даты и скачайте отчет
+Нельзя выбрать сегодняшнюю или будущую даты, так как отчет не сформируется ввиду отсутствия данных
+После выбора дат нажмите на кнопку "Download Report"
+
+Тестирование через терминал
+
+```shell
+# Получить токен
+TOKEN=$(curl -s -X POST http://localhost:8080/realms/reports-realm/protocol/openid-connect/token \
+  -d "client_id=reports-frontend" \
+  -d "username=prothetic1" \
+  -d "password=prothetic123" \
+  -d "grant_type=password" | jq -r '.access_token')
+
+# Запросить отчет
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:8000/reports/prothetic1?from_date=2026-05-06&to_date=2026-05-11" | jq '.'
+```
+
+Получить свой отчет
+```shell
+# Получить токен для prothetic1
+TOKEN=$(curl -s -X POST http://localhost:8080/realms/reports-realm/protocol/openid-connect/token \
+  -d "client_id=reports-frontend" \
+  -d "username=prothetic1" \
+  -d "password=prothetic123" \
+  -d "grant_type=password" | python3 -c "import sys, json; print(json.load(sys.stdin).get('access_token', ''))")
+
+echo "Token получен: ${TOKEN:0:50}..."
+
+# Запросить СВОЙ отчет (должно работать)
+echo "=== Тест 1: Запрос своего отчета ==="
+curl -s -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:8000/reports/prothetic1?from_date=2026-05-06&to_date=2026-05-11" | python3 -m json.tool | head -20
+```
+
+Получить чужой отчет (должен вернуть 403 Forbidden)
+
+```shell
+# Запросить ЧУЖОЙ отчет (должно быть запрещено)
+echo ""
+echo "=== Тест 2: Запрос чужого отчета (должен вернуть 403) ==="
+curl -s -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:8000/reports/prothetic2?from_date=2026-05-06&to_date=2026-05-11" | python3 -m json.tool
+```
+
+Администратор может видеть все отчеты
+
+```shell
+# Получить токен администратора
+ADMIN_TOKEN=$(curl -s -X POST http://localhost:8080/realms/reports-realm/protocol/openid-connect/token \
+  -d "client_id=reports-frontend" \
+  -d "username=admin1" \
+  -d "password=admin123" \
+  -d "grant_type=password" | python3 -c "import sys, json; print(json.load(sys.stdin).get('access_token', ''))")
+
+echo ""
+echo "=== Тест 3: Администратор запрашивает чужой отчет (должен работать) ==="
+curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
+  "http://localhost:8000/reports/prothetic1?from_date=2026-05-06&to_date=2026-05-11" | python3 -m json.tool | head -20
+```
+
+Будущие даты (должен вернуть ошибку)
+
+```shell
+# Запросить будущие даты (должно быть запрещено)
+FUTURE_DATE=$(date -v+5d +%Y-%m-%d 2>/dev/null || date -d "+5 days" +%Y-%m-%d)
+echo ""
+echo "=== Тест 4: Запрос будущих дат (должен вернуть 400) ==="
+curl -s -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:8000/reports/prothetic1?from_date=2026-05-06&to_date=$FUTURE_DATE" | python3 -m json.tool
 ```
 
 
+Структура базы данных
 
-
-
-
+| Поле               | Тип     | Описание                  |
+|--------------------|---------|---------------------------|
+| user_id            | String  | ID пользователя           |
+| prosthesis_id      | String  | ID протеза                |
+| date               | Date    | Дата                      |
+| total_movements    | UInt32  | Количество движений       |
+| avg_signal_quality | Float32 | Среднее качество сигнала  |
+| min_battery_level  | UInt8   | Минимальный заряд батареи |
+| calibration_count  | UInt16  | Количество калибровок     |
+| region             | String  | Регион                    |
 
 

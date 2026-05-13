@@ -26,9 +26,11 @@ async def get_report(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
 
+    # Проверка: from <= to
     if from_dt > to_dt:
         raise HTTPException(status_code=400, detail="from_date must be before or equal to to_date")
 
+    # Нельзя запрашивать будущие даты (Airflow ещё не обработал)
     yesterday = (datetime.now() - timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
     if to_dt > yesterday:
         raise HTTPException(
@@ -37,9 +39,11 @@ async def get_report(
                    f"Data for today is not yet processed by Airflow."
         )
 
+    # Ограничение периода (максимум 90 дней)
     if (to_dt - from_dt).days > 90:
         raise HTTPException(status_code=400, detail="Maximum report period is 90 days")
 
+    # Запрос в ClickHouse
     try:
         ch = get_clickhouse_client()
 
@@ -62,6 +66,7 @@ async def get_report(
         logger.error(f"Database error: {e}")
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
+    # Если данных нет — понятное сообщение
     if not result:
         return {
             "user_id": user_id,

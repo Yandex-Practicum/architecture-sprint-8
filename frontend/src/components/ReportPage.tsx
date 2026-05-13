@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useKeycloak } from '@react-keycloak/web';
 
 interface ReportStat {
@@ -19,25 +19,71 @@ interface ReportData {
   message?: string;
 }
 
-const ReportPage: React.FC = () => {
+const ReportPage = () => {
   const { keycloak, initialized } = useKeycloak();
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [reportData, setReportData] = useState<ReportData | null>(null);
 
   // Состояния для дат
-  const [fromDate, setFromDate] = useState(() => {
+  const [fromDate, setFromDate] = useState<string>(() => {
     const date = new Date();
     date.setMonth(date.getMonth() - 1);
     return date.toISOString().split('T')[0];
   });
-  const [toDate, setToDate] = useState(() => {
+
+  const [toDate, setToDate] = useState<string>(() => {
     return new Date().toISOString().split('T')[0];
   });
 
-  const downloadReport = async () => {
+  // Авто-обновление токена
+  useEffect(() => {
+    if (!keycloak || !initialized) return;
+
+    const interval = setInterval(() => {
+      keycloak.updateToken(30)
+        .then(refreshed => {
+          if (refreshed) {
+            console.log('Token auto-refreshed');
+          }
+        })
+        .catch(err => console.error('Failed to auto-refresh token', err));
+    }, 4 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [keycloak, initialized]);
+
+  const refreshToken = async (): Promise<boolean> => {
+    if (!keycloak || !initialized) {
+      console.error('Keycloak not initialized');
+      return false;
+    }
+
+    try {
+      const refreshed = await keycloak.updateToken(30);
+      if (refreshed) {
+        console.log('Token refreshed successfully');
+      }
+      return true;
+    } catch (error) {
+      console.error('Failed to refresh token', error);
+      keycloak.login();
+      return false;
+    }
+  };
+
+  const downloadReport = async (): Promise<void> => {
     if (!keycloak?.token) {
       setError('Not authenticated');
+      return;
+    }
+
+    const refreshed = await refreshToken();
+    if (!refreshed) return;
+
+    const currentToken = keycloak.token;
+    if (!currentToken) {
+      setError('Failed to get valid token');
       return;
     }
 
@@ -62,7 +108,7 @@ const ReportPage: React.FC = () => {
 
       const response = await fetch(url, {
         headers: {
-          'Authorization': `Bearer ${keycloak.token}`,
+          'Authorization': `Bearer ${currentToken}`,
           'Content-Type': 'application/json',
         }
       });

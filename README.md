@@ -169,26 +169,7 @@ SHOW TABLES FROM reports;
 exit;
 ```
 
-Добавьте тестовые данные
 
-```shell
-docker exec -it clickhouse clickhouse-client
-
-INSERT INTO reports.daily_user_stats 
-(user_id, prosthesis_id, date, total_movements, avg_signal_quality, min_battery_level, calibration_count, region)
-VALUES 
-('prothetic1', 'PROST-001', '2026-05-06', 1245, 0.87, 65, 2, 'RU'),
-('prothetic1', 'PROST-001', '2026-05-07', 1382, 0.89, 62, 1, 'RU'),
-('prothetic1', 'PROST-001', '2026-05-08', 1100, 0.85, 70, 0, 'RU'),
-('prothetic1', 'PROST-001', '2026-05-09', 1450, 0.91, 58, 3, 'RU'),
-('prothetic1', 'PROST-001', '2026-05-10', 1280, 0.88, 64, 1, 'RU'),
-('prothetic1', 'PROST-001', '2026-05-11', 1190, 0.86, 67, 2, 'RU');
-
-# Проверить данные
-SELECT * FROM reports.daily_user_stats;
-
-exit;
-```
 
 
 

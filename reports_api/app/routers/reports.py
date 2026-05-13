@@ -25,9 +25,10 @@ async def get_report(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
 
-    # Проверка: from <= to
-    if from_dt > to_dt:
-        raise HTTPException(status_code=400, detail="from_date must be before or equal to to_date")
+    yesterday = (datetime.now() - timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    if from_dt > yesterday:
+        # raise HTTPException(status_code=400, detail="from_date must be before or equal to to_date")
+        logger.warning(f"User {user_id} requested future date: {to_date}")
 
     # Нельзя запрашивать будущие даты (Airflow ещё не обработал)
     yesterday = (datetime.now() - timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -63,7 +64,6 @@ async def get_report(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
-    # Если данных нет — понятное сообщение
     if not result:
         return {
             "user_id": user_id,

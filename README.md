@@ -96,6 +96,8 @@ RBAC (Role-Based Access Control)
 
 2) Построение витрины (в Airflow, после загрузки CRM)
 
+[Улучшенная диаграмма](images/BionicPRO_C4_model_kafka.drawio.png)
+
 CREATE TABLE default.daily_user_stats
 (
     user_id          String,

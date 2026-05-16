@@ -1,4 +1,4 @@
-version: '3.8'
+#version: '3.8'
 
 services:
   keycloak_db:
@@ -40,3 +40,49 @@ services:
       REACT_APP_KEYCLOAK_URL: http://localhost:8080
       REACT_APP_KEYCLOAK_REALM: reports-realm
       REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.8
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    environment:
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=password123
+    volumes:
+      - ch_data:/var/lib/clickhouse
+
+  airflow:
+    image: apache/airflow:2.7.1-python3.10
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://keycloak_user:keycloak_password@keycloak_db:5432/keycloak_db
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/requirements.txt:/requirements.txt
+    ports:
+      - "8081:8080"
+    command: ["bash", "-c", "pip install --no-cache-dir -r /requirements.txt && airflow standalone"]
+    depends_on:
+      - keycloak_db
+      - clickhouse
+  backend-reports:
+    build:
+      context: ./backend-reports #путь
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+        #откуда брать ключ для проверки JWT.
+        #в реальном приложении это будет URL Keycloak /certs,
+        # но для простоты можно использовать статичный ключ, если вы доверяете Keycloak
+      KEYCLOAK_PUBLIC_KEY: "-----BEGIN PUBLIC KEY-----MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsS4tyYnjwxujBa/cMcsY+20QcSTg+QQSVrTUWkJ9NzOcUKcEO32kHM0Miq1labXUDioC+d/uMXH0MjNqsTursgNWP8l1p8IDchT2j8Kcef5jLqp/wEqdFIDb3WK8+nNlQv7B9/ASVFlklQcBzP/LyT9yAZQdthpwclgTXhvWaTjeRD9vYFq583ziFUVl/t0kyqWihsO0q2/e3nFPGrMHZ8pIkvl/hCXM/WbPy8tJgx8qhv8GvP/vlWIm6oZ5doVjcIl7m9d+mEa7X4ZGC1Ug5ORTZB/bDDewexYduX5fUdnMPDuJS3pvwgz9JscBLJW0bI7H3xhBOrjyg9ZC+wEMiwIDAQAB-----END PUBLIC KEY-----"
+        #URL Keycloak для получения публичных ключей (по необходимости)
+      KEYCLOAK_CERTS_URL: "http://keycloak:8080/realms/reports-realm/protocol/openid-connect/certs"
+    depends_on:
+      - clickhouse 
+      - keycloak  
+    volumes:
+        - ./backend-reports:/app
+volumes:
+  ch_data:

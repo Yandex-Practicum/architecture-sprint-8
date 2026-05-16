@@ -17,10 +17,25 @@ const ReportPage: React.FC = () => {
       setError(null);
 
       const response = await fetch(`${process.env.REACT_APP_API_URL}/reports`, {
+        method: 'GET',
         headers: {
-          'Authorization': `Bearer ${keycloak.token}`
-        }
+          'Authorization': `Bearer ${keycloak.token}`,
+          'Content-Type': 'application/json',
+        },
       });
+      if (!response.ok) {
+        if (response.status === 403) throw new Error('Permission denied');
+        throw new Error('Failed to generate report');
+      }
+      // скачивание файла
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `report-${keycloak.subject}.json`; // Имя файла
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
 
       
     } catch (err) {
@@ -31,15 +46,16 @@ const ReportPage: React.FC = () => {
   };
 
   if (!initialized) {
-    return <div>Loading...</div>;
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
   }
 
   if (!keycloak.authenticated) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
+        <h1 className="text-xl mb-4">Please login to access reports</h1>
         <button
           onClick={() => keycloak.login()}
-          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          className="px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
         >
           Login
         </button>
@@ -49,21 +65,22 @@ const ReportPage: React.FC = () => {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
-      <div className="p-8 bg-white rounded-lg shadow-md">
-        <h1 className="text-2xl font-bold mb-6">Usage Reports</h1>
+      <div className="p-8 bg-white rounded-lg shadow-md w-96 text-center">
+        <h1 className="text-2xl font-bold mb-2">BionicPRO</h1>
+        <p className="text-gray-600 mb-6">Prothetic Usage Report</p>
         
         <button
           onClick={downloadReport}
           disabled={loading}
-          className={`px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 ${
+          className={`w-full px-4 py-3 bg-green-500 text-white rounded font-semibold hover:bg-green-600 transition ${
             loading ? 'opacity-50 cursor-not-allowed' : ''
           }`}
         >
-          {loading ? 'Generating Report...' : 'Download Report'}
+          {loading ? 'Generating Report...' : 'Download Report (.JSON)'}
         </button>
 
         {error && (
-          <div className="mt-4 p-4 bg-red-100 text-red-700 rounded">
+          <div className="mt-4 p-3 bg-red-100 text-red-700 rounded text-sm">
             {error}
           </div>
         )}

@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+cryptography
+PyJWT
+clickhouse-connect
+python-multipart

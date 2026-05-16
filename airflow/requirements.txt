@@ -1,0 +1,11 @@
+apache-airflow==2.7.1
+airflow-operators
+pandas
+clickhouse-connect
+sqlalchemy
+pendulum
+psycopg2-binary
+python-dotenv
+clickhouse-driver==0.2.7
+apache-airflow-providers-postgres==5.10.0
+requests==2.31.0

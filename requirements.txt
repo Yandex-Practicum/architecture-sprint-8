@@ -1,0 +1,8 @@
+pandas
+apache-airflow
+clickhouse_connect
+sqlalchemy
+jose
+pendulum
+fastapi
+jwt

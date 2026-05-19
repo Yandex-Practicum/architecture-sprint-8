@@ -25,3 +25,16 @@
 `code_challenge=MvTTvunTp6KVJ0oFEfhFMikmnJgxLPIowW7i8CuZgzE`
 `code_challenge_method=S256`
 ![PKCE (code_challenge и code_challenge_method)](PKCE.png)
+
+
+## Задача 3. Обеспечьте безопасное получение и хранение access-и refresh-токенов. 
+- разработан сервис bionicpro-auth на языке C# с учетом требований. 
+
+запуск через docker-compose:
+    В директории bionicpro-auth docker-compose звпускает сервис `bionicpro-auth` + `keycloack`
+    В корневом каталоге docker-compose звпускает сервис `frontend` + `bionicpro-auth` + `keycloack`
+
+![Запущенное решение](1.3%20docker.png)
+
+## Задача 4. Обеспечьте безопасное получение и хранение access-и refresh-токенов. 
+

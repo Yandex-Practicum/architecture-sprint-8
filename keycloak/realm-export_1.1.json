@@ -114,22 +114,13 @@
         "clientId": "reports-frontend",
         "name": "Reports Frontend",
         "enabled": true,
-        "publicClient": true,
-        "standardFlowEnabled": true,
-        "directAccessGrantsEnabled": false,
-        "redirectUris": [
-            "http://localhost:3000/*",
-            "http://localhost:7000/*",
-			"http://localhost:7000/signin-oidc"
-        ],
-        "webOrigins": [
-            "http://localhost:3000",
-            "http://localhost:7000" 
-        ],
+		"publicClient": true,
+		"standardFlowEnabled": true,
+		"directAccessGrantsEnabled": false,
+        "redirectUris": ["http://localhost:3000/*"],
+        "webOrigins": ["http://localhost:3000"],
         "attributes": {
-          "pkce.code.challenge.method": "S256",
-          "use.refresh.tokens": "true",
-          "access.token.lifespan": "60"
+          "pkce.code.challenge.method": "S256"
         }
       },
       {
@@ -137,8 +128,8 @@
         "name": "Reports API",
         "enabled": true,
         "bearerOnly": true,
-        "standardFlowEnabled": false,
-        "directAccessGrantsEnabled": false,
+		"standardFlowEnabled": false,
+		"directAccessGrantsEnabled": false,
         "clientAuthenticatorType": "client-secret",
         "secret": "oNwoLQdvJAvRcL89SydqCWCe5ry1jMgq"
       }

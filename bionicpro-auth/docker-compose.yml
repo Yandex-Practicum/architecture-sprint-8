@@ -9,7 +9,7 @@ services:
       POSTGRES_USER: keycloak_user
       POSTGRES_PASSWORD: keycloak_password
     volumes:
-      - ./postgres-keycloak-data:/var/lib/postgresql/data
+      - ../postgres-keycloak-data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
     networks:
@@ -34,7 +34,7 @@ services:
       - start-dev
       - --import-realm
     volumes:
-      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
+      - ../keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
     ports:
       - "8080:8080"
     networks:
@@ -43,29 +43,18 @@ services:
       keycloak_db:
         condition: service_healthy
 
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
-    environment:
-      REACT_APP_API_URL: http://localhost:8000
-      REACT_APP_KEYCLOAK_URL: http://localhost:8080
-      REACT_APP_KEYCLOAK_REALM: reports-realm
-      REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
 
   bionicpro-auth:
     image: ${DOCKER_REGISTRY-}bionicproauth
     container_name: bionicpro-auth
     environment:
-      ASPNETCORE_ENVIRONMENT: Development
-      ASPNETCORE_HTTP_PORTS: 8080
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=8080
     ports:
       - "7000:8080"
     build:
       context: .
-      dockerfile: bionicpro-auth/bionicpro-auth/Dockerfile
+      dockerfile: bionicpro-auth/Dockerfile
     networks:
       - bionic-network
     depends_on:

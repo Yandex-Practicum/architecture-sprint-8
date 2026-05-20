@@ -1,6 +1,22 @@
 version: '3.8'
 
 services:
+
+  openldap:
+    image: osixia/openldap:1.5.0  # Явно фиксируем стабильную версию
+    container_name: openldap
+    command: --copy-service
+    #volumes:
+      #- ./ldap/ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom:ro
+    environment:
+      - LDAP_ORGANISATION=bionicpro
+      - LDAP_DOMAIN=example.com
+      - LDAP_ADMIN_PASSWORD=admin
+    ports:
+      - "389:389"
+    networks:
+      - bionic-network
+
   keycloak_db:
     image: postgres:14
     container_name: keycloak_db

@@ -1,4 +1,5 @@
 services:
+
   keycloak_db:
     image: postgres:14
     environment:
@@ -19,15 +20,126 @@ services:
       KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
       KC_DB_USERNAME: keycloak_user
       KC_DB_PASSWORD: keycloak_password
-    command:
-      - start-dev
-      - --import-realm
+    command: [ start-dev, --import-realm ]
     volumes:
       - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
     ports:
       - "8080:8080"
     depends_on:
       - keycloak_db
+
+  keycloak-init:
+    image: quay.io/keycloak/keycloak:21.1
+    depends_on:
+      - keycloak
+    entrypoint: >
+      bash -c "
+        /opt/keycloak/bin/kcadm.sh config credentials
+          --server http://keycloak:8080
+          --realm master
+          --user admin
+          --password admin &&
+        /opt/keycloak/bin/kcadm.sh update realms/master -s sslRequired=NONE &&
+        /opt/keycloak/bin/kcadm.sh update realms/reports-realm -s sslRequired=NONE
+      "
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.8
+    environment:
+      CLICKHOUSE_DB: bionicpro
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    volumes:
+      - ./db/clickhouse_init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    healthcheck:
+      test: [ "CMD", "wget", "--spider", "-q", "http://localhost:8123/ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  airflow_db:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: airflow_db
+      POSTGRES_USER: airflow_user
+      POSTGRES_PASSWORD: airflow_password
+    volumes:
+      - airflow_pg_data:/var/lib/postgresql/data
+
+  airflow-init:
+    image: apache/airflow:2.9.1
+    environment: &airflow_env
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow_user:airflow_password@airflow_db:5432/airflow_db
+      AIRFLOW__CORE__FERNET_KEY: UKMzEm3yGIuFYEq1y3-2FxPNWSVwRASpahmQ9bNfrMbk=
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+      AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session"
+      AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
+      AIRFLOW__WEBSERVER__SECRET_KEY: "bionicpro_webserver_secret_key"
+      DATA_DIR: /opt/airflow/data
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_DB: bionicpro
+    volumes:
+      - ./airflow/requirements.txt:/requirements.txt
+      - ./data:/opt/airflow/data:ro
+    command: >
+      bash -c "pip install --quiet -r /requirements.txt &&
+               airflow db migrate &&
+               airflow users create --username admin --password admin
+                 --firstname Admin --lastname User --role Admin --email admin@bionicpro.local"
+    depends_on:
+      - airflow_db
+
+  airflow-webserver:
+    image: apache/airflow:2.9.1
+    environment: *airflow_env
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/requirements.txt:/requirements.txt
+      - ./data:/opt/airflow/data:ro
+    command: >
+      bash -c "pip install --quiet -r /requirements.txt && airflow webserver"
+    ports:
+      - "8081:8080"
+    depends_on:
+      - airflow-init
+      - clickhouse
+
+  airflow-scheduler:
+    image: apache/airflow:2.9.1
+    environment: *airflow_env
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/requirements.txt:/requirements.txt
+      - ./data:/opt/airflow/data:ro
+    command: >
+      bash -c "pip install --quiet -r /requirements.txt && airflow scheduler"
+    depends_on:
+      - airflow-init
+      - clickhouse
+
+  report_api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: reports-realm
+      KEYCLOAK_CLIENT_ID: reports-api
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: "9000"
+      CLICKHOUSE_DB: bionicpro
+    ports:
+      - "8000:8000"
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
 
   frontend:
     build:
@@ -40,3 +152,9 @@ services:
       REACT_APP_KEYCLOAK_URL: http://localhost:8080
       REACT_APP_KEYCLOAK_REALM: reports-realm
       REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+    depends_on:
+      - keycloak
+      - report_api
+
+volumes:
+  airflow_pg_data:

@@ -1,0 +1,4 @@
+user_id,device_id,client_name,client_email,prosthesis_model,purchase_date
+prothetic1,device001,Prothetic One,prothetic1@example.com,BionicArm Pro v2,2024-01-15
+prothetic2,device002,Prothetic Two,prothetic2@example.com,BionicLeg Basic v1,2024-02-20
+prothetic3,device003,Prothetic Three,prothetic3@example.com,BionicArm Elite v3,2024-03-10

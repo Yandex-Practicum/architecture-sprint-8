@@ -1,0 +1,11 @@
+user_id,device_id,timestamp,signal_type,signal_value,movement_detected
+prothetic1,device001,2026-05-19 00:00:00,flex,0.75,true
+prothetic1,device001,2026-05-19 01:00:00,extend,0.82,true
+prothetic1,device001,2026-05-19 02:00:00,grip,0.91,true
+prothetic1,device001,2026-05-19 03:00:00,flex,0.70,true
+prothetic2,device002,2026-05-19 00:00:00,flex,0.68,true
+prothetic2,device002,2026-05-19 01:00:00,extend,0.79,false
+prothetic2,device002,2026-05-19 02:00:00,grip,0.65,true
+prothetic3,device003,2026-05-19 00:00:00,flex,0.85,true
+prothetic3,device003,2026-05-19 00:30:00,grip,0.93,true
+prothetic3,device003,2026-05-19 01:00:00,extend,0.88,true

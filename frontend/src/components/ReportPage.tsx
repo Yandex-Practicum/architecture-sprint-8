@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
-import { useKeycloak } from '@react-keycloak/web';
+import { useOidc } from '@axa-fr/react-oidc';
 
 const ReportPage: React.FC = () => {
-  const { keycloak, initialized } = useKeycloak();
+  const { login, logout, isAuthenticated } = useOidc();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const downloadReport = async () => {
-    if (!keycloak?.token) {
+    if (!isAuthenticated) {
       setError('Not authenticated');
       return;
     }
@@ -16,13 +16,22 @@ const ReportPage: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/reports`, {
+      // Call our secure BFF api which authenticates via the session cookie
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/reports`, {
+        method: 'GET',
         headers: {
-          'Authorization': `Bearer ${keycloak.token}`
-        }
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include' // crucial to send the HttpOnly session cookie
       });
 
-      
+      if (!response.ok) {
+        throw new Error(`BFF returned error status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Report generated:', data);
+
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -30,15 +39,11 @@ const ReportPage: React.FC = () => {
     }
   };
 
-  if (!initialized) {
-    return <div>Loading...</div>;
-  }
-
-  if (!keycloak.authenticated) {
+  if (!isAuthenticated) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
         <button
-          onClick={() => keycloak.login()}
+          onClick={() => login()}
           className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
         >
           Login
@@ -50,14 +55,21 @@ const ReportPage: React.FC = () => {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
       <div className="p-8 bg-white rounded-lg shadow-md">
-        <h1 className="text-2xl font-bold mb-6">Usage Reports</h1>
-        
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold">Usage Reports</h1>
+          <button
+            onClick={() => logout()}
+            className="px-3 py-1 text-sm bg-gray-500 text-white rounded hover:bg-gray-600"
+          >
+            Logout
+          </button>
+        </div>
+
         <button
           onClick={downloadReport}
           disabled={loading}
-          className={`px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 ${
-            loading ? 'opacity-50 cursor-not-allowed' : ''
-          }`}
+          className={`px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 ${loading ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
         >
           {loading ? 'Generating Report...' : 'Download Report'}
         </button>

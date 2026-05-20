@@ -1,0 +1,19 @@
+{
+  "name": "bionicpro/auth-service",
+  "description": "BFF auth service with Keycloak + Redis session management",
+  "require": {
+    "php": "^8.2",
+    "slim/slim": "^4.12",
+    "slim/psr7": "^1.6",
+    "predis/predis": "^2.2",
+    "guzzlehttp/guzzle": "^7.8",
+    "ramsey/uuid": "^4.7",
+    "php-di/slim-bridge": "^3.3",
+    "vlucas/phpdotenv": "^5.5"
+  },
+  "autoload": {
+    "psr-4": {
+      "App\\": "src/"
+    }
+  }
+}

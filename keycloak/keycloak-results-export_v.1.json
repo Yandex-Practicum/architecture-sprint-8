@@ -757,10 +757,6 @@
       "id": "4bfcd882-ee4c-4c79-b091-442e20ea0def",
       "clientId": "reports-frontend",
       "name": "Reports Frontend",
-      "description": "",
-      "rootUrl": "",
-      "adminUrl": "",
-      "baseUrl": "",
       "surrogateAuthRequired": false,
       "enabled": true,
       "alwaysDisplayInConsole": false,
@@ -776,7 +772,7 @@
       ],
       "notBefore": 0,
       "bearerOnly": false,
-      "consentRequired": true,
+      "consentRequired": false,
       "standardFlowEnabled": true,
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
@@ -786,13 +782,8 @@
       "protocol": "openid-connect",
       "attributes": {
         "access.token.lifespan": "60",
-        "oidc.ciba.grant.enabled": "false",
-        "backchannel.logout.session.required": "true",
         "post.logout.redirect.uris": "+",
-        "display.on.consent.screen": "false",
-        "oauth2.device.authorization.grant.enabled": "false",
         "pkce.code.challenge.method": "S256",
-        "backchannel.logout.revoke.offline.tokens": "false",
         "use.refresh.tokens": "true"
       },
       "authenticationFlowBindingOverrides": {},
@@ -1416,72 +1407,8 @@
   "enabledEventTypes": [],
   "adminEventsEnabled": false,
   "adminEventsDetailsEnabled": false,
-  "identityProviders": [
-    {
-      "alias": "yandex",
-      "displayName": "Яндекс ID",
-      "internalId": "9af64648-7c83-4a87-b091-b53f02cc62f0",
-      "providerId": "oidc",
-      "enabled": true,
-      "updateProfileFirstLoginMode": "on",
-      "trustEmail": false,
-      "storeToken": false,
-      "addReadTokenRoleOnCreate": false,
-      "authenticateByDefault": false,
-      "linkOnly": false,
-      "firstBrokerLoginFlowAlias": "first broker login",
-      "config": {
-        "userInfoUrl": "https://yandex.ru",
-        "validateSignature": "false",
-        "pkceEnabled": "true",
-        "clientId": "106a0f56918549e49552a3e95083b527",
-        "tokenUrl": "https://oauth.yandex.ru/token",
-        "authorizationUrl": "https://oauth.yandex.ru/authorize",
-        "clientAuthMethod": "client_secret_post",
-        "clientAssertionSigningAlg": "ES256",
-        "clientSecret": "**********",
-        "pkceMethod": "S256"
-      }
-    }
-  ],
-  "identityProviderMappers": [
-    {
-      "id": "a68e3244-586e-4289-863d-1611479855e6",
-      "name": "Yandex-FirstName",
-      "identityProviderAlias": "yandex",
-      "identityProviderMapper": "oidc-user-attribute-idp-mapper",
-      "config": {
-        "syncMode": "INHERIT",
-        "are.claim.values.regex": "false",
-        "claim": "first_name",
-        "user.attribute": "firstName"
-      }
-    },
-    {
-      "id": "74597cb1-71e8-4beb-bfd1-9b67aacc93b0",
-      "name": "Yandex-LastName",
-      "identityProviderAlias": "yandex",
-      "identityProviderMapper": "oidc-user-attribute-idp-mapper",
-      "config": {
-        "syncMode": "INHERIT",
-        "are.claim.values.regex": "false",
-        "claim": "last_name",
-        "user.attribute": "lastName"
-      }
-    },
-    {
-      "id": "8f0ac623-9c1e-4337-8f9f-17712df64e88",
-      "name": "Yandex-Email",
-      "identityProviderAlias": "yandex",
-      "identityProviderMapper": "oidc-user-attribute-idp-mapper",
-      "config": {
-        "syncMode": "INHERIT",
-        "are.claim.values.regex": "false",
-        "claim": "default_email",
-        "user.attribute": "email"
-      }
-    }
-  ],
+  "identityProviders": [],
+  "identityProviderMappers": [],
   "components": {
     "org.keycloak.services.clientregistration.policy.ClientRegistrationPolicy": [
       {

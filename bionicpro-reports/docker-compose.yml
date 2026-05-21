@@ -12,14 +12,33 @@ services:
     volumes:
       - shared-auth-keys:/app/shared-auth-keys
     ports:
-      - "7000:8080"
+      - "7001:8080"
     build:
       context: .
       dockerfile: bionicpro-reports/Dockerfile
     networks:
       - bionicpro-network
 
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    ports:
+      - "9000:9000"       
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minio_admin
+      MINIO_ROOT_PASSWORD: minio_password
+    command: server /data --console-address ":9001"
+    networks:
+      - bionicpro-network
+    volumes:
+      - minio-data:/data
+
 networks:
   bionicpro-network:
     driver: bridge
+
+volumes:
+  shared-auth-keys:
+  minio-data:
 

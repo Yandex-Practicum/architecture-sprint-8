@@ -1,53 +1,75 @@
-import React, { useState } from 'react';
-import { useOidc } from '@axa-fr/react-oidc';
+import React, { useState, useEffect } from 'react';
+
+const BFF_URL = 'http://localhost:8081';
+
+interface User {
+  sub: string | null;
+  name: string | null;
+  email: string | null;
+  roles: string[];
+}
 
 const ReportPage: React.FC = () => {
-  const { login, logout, isAuthenticated } = useOidc();
-  const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [reportLoading, setReportLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const downloadReport = async () => {
-    if (!isAuthenticated) {
-      setError('Not authenticated');
-      return;
-    }
+  useEffect(() => {
+    fetch(`${BFF_URL}/auth/me`, { credentials: 'include' })
+      .then(res => (res.ok ? res.json() : Promise.reject()))
+      .then(data => setUser(data.user))
+      .catch(() => setUser(null))
+      .finally(() => setAuthLoading(false));
+  }, []);
 
+  const login = () => {
+    fetch(`${BFF_URL}/auth/login`, { credentials: 'include' })
+      .then(res => res.json())
+      .then(data => { window.location.href = data.authorization_url; });
+  };
+
+  const logout = () => {
+    fetch(`${BFF_URL}/auth/session`, { method: 'DELETE', credentials: 'include' })
+      .finally(() => setUser(null));
+  };
+
+  const downloadReport = async () => {
     try {
-      setLoading(true);
+      setReportLoading(true);
       setError(null);
 
-      // Call our secure BFF api which authenticates via the session cookie
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/reports`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include' // crucial to send the HttpOnly session cookie
-      });
+      const res = await fetch(`${BFF_URL}/api/reports`, { credentials: 'include' });
 
-      if (!response.ok) {
-        throw new Error(`BFF returned error status: ${response.status}`);
-      }
+      if (!res.ok) throw new Error(`BFF returned error status: ${res.status}`);
 
-      const data = await response.json();
+      const data = await res.json();
       console.log('Report generated:', data);
-
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
-      setLoading(false);
+      setReportLoading(false);
     }
   };
 
-  if (!isAuthenticated) {
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-100">
+        <p className="text-gray-600">Loading...</p>
+      </div>
+    );
+  }
+
+  if (!user) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
         <button
-          onClick={() => login()}
+          onClick={login}
           className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
         >
           Login
         </button>
+        {error && <p className="mt-4 text-red-600">{error}</p>}
       </div>
     );
   }
@@ -58,26 +80,27 @@ const ReportPage: React.FC = () => {
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">Usage Reports</h1>
           <button
-            onClick={() => logout()}
+            onClick={logout}
             className="px-3 py-1 text-sm bg-gray-500 text-white rounded hover:bg-gray-600"
           >
             Logout
           </button>
         </div>
 
+        <p className="mb-4 text-gray-600">Welcome, {user.name ?? user.email ?? user.sub}</p>
+
         <button
           onClick={downloadReport}
-          disabled={loading}
-          className={`px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 ${loading ? 'opacity-50 cursor-not-allowed' : ''
-            }`}
+          disabled={reportLoading}
+          className={`px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 ${
+            reportLoading ? 'opacity-50 cursor-not-allowed' : ''
+          }`}
         >
-          {loading ? 'Generating Report...' : 'Download Report'}
+          {reportLoading ? 'Generating Report...' : 'Download Report'}
         </button>
 
         {error && (
-          <div className="mt-4 p-4 bg-red-100 text-red-700 rounded">
-            {error}
-          </div>
+          <div className="mt-4 p-4 bg-red-100 text-red-700 rounded">{error}</div>
         )}
       </div>
     </div>

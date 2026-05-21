@@ -29,6 +29,7 @@ services:
       - "8080:8080"
     depends_on:
       - keycloak_db
+      - openldap
   frontend:
     build:
       context: ./frontend
@@ -40,6 +41,18 @@ services:
       REACT_APP_KEYCLOAK_URL: http://localhost:8080
       REACT_APP_KEYCLOAK_REALM: reports-realm
       REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+
+  openldap:
+    image: osixia/openldap:1.5.0
+    environment:
+      LDAP_ORGANISATION: "BionicPRO"
+      LDAP_DOMAIN: "example.com"
+      LDAP_ADMIN_PASSWORD: "admin"
+    volumes:
+      - ./ldap/config.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/config.ldif
+    ports:
+      - "389:389"
+    command: --copy-service
 
   redis:
     image: redis:7-alpine
@@ -54,6 +67,7 @@ services:
       - "8081:8081"
     environment:
       KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_PUBLIC_URL: http://localhost:8080
       KEYCLOAK_REALM: reports-realm
       KEYCLOAK_CLIENT_ID: reports-frontend
       SESSION_SECRET: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef

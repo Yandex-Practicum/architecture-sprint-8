@@ -77,19 +77,24 @@ $app->get('/auth/login', function (Request $request, Response $response) use ($s
 $app->post('/auth/callback', function (Request $request, Response $response) use (
     $sessionManager, $keycloak, $cookieName, $cookieTtl
 ): Response {
-    $body  = (array) $request->getParsedBody();
-    $code  = $body['code']  ?? '';
-    $state = $body['state'] ?? '';
+    $body         = (array) $request->getParsedBody();
+    $code         = $body['code']          ?? '';
+    $state        = $body['state']         ?? '';
+    $codeVerifier = $body['code_verifier'] ?? '';
 
-    if ($code === '' || $state === '') {
-        $response->getBody()->write(json_encode(['error' => 'Missing code or state']));
+    if ($code === '') {
+        $response->getBody()->write(json_encode(['error' => 'Missing code']));
         return $response->withStatus(400)->withHeader('Content-Type', 'application/json');
     }
 
-    // Извлекаем и удаляем code_verifier из Redis (одноразовое использование)
-    $codeVerifier = $sessionManager->consumeCodeVerifier($state);
-    if ($codeVerifier === null) {
-        $response->getBody()->write(json_encode(['error' => 'Invalid or expired state']));
+    // Если библиотека прислала code_verifier напрямую — используем его.
+    // Иначе достаём из Redis по state (BFF-инициированный flow через /auth/login).
+    if ($codeVerifier === '' && $state !== '') {
+        $codeVerifier = $sessionManager->consumeCodeVerifier($state) ?? '';
+    }
+
+    if ($codeVerifier === '') {
+        $response->getBody()->write(json_encode(['error' => 'Missing code_verifier']));
         return $response->withStatus(400)->withHeader('Content-Type', 'application/json');
     }
 
@@ -136,30 +141,21 @@ $app->get('/auth/me', function (Request $request, Response $response) use (
         return $errorResponse;
     }
 
-    // Ротация сессии — создаём новый session_id, старый удаляем
-    $newSessionId = $sessionManager->rotateSession(
-        $sessionId,
-        $tokens['access_token'],
-        $tokens['refresh_token']
-    );
-
     $userInfo = $sessionManager->decodeTokenPayload($tokens['access_token']);
 
-    $cookieValue = "{$cookieName}={$newSessionId}; Path=/; HttpOnly; SameSite=Lax; Max-Age={$cookieTtl}";
+    $cookieValue = "{$cookieName}={$sessionId}; Path=/; HttpOnly; SameSite=Lax; Max-Age={$cookieTtl}";
 
     $response->getBody()->write(json_encode([
         'authenticated' => true,
         'user' => [
-            'sub'   => $userInfo['sub']                ?? null,
-            'name'  => $userInfo['name']               ?? null,
-            'email' => $userInfo['email']              ?? null,
+            'sub'   => $userInfo['sub']                   ?? null,
+            'name'  => $userInfo['name']                  ?? null,
+            'email' => $userInfo['email']                 ?? null,
             'roles' => $userInfo['realm_access']['roles'] ?? [],
         ],
     ]));
 
-    return $response
-        ->withHeader('Content-Type', 'application/json')
-        ->withHeader('Set-Cookie', $cookieValue);
+    return $response->withHeader('Content-Type', 'application/json');
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -208,12 +204,16 @@ $app->get('/api/reports', function (Request $request, Response $response) use (
 // Logout: удаляет сессию из Redis и сбрасывает cookie.
 // ─────────────────────────────────────────────────────────────────────────────
 $app->delete('/auth/session', function (Request $request, Response $response) use (
-    $sessionManager, $cookieName
+    $sessionManager, $keycloak, $cookieName
 ): Response {
     $cookies   = $request->getCookieParams();
     $sessionId = $cookies[$cookieName] ?? null;
 
     if ($sessionId !== null) {
+        $tokens = $sessionManager->getSession($sessionId);
+        if ($tokens !== null) {
+            $keycloak->logout($tokens['refresh_token']);
+        }
         $sessionManager->destroySession($sessionId);
     }
 

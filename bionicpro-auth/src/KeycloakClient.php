@@ -34,7 +34,7 @@ class KeycloakClient
      */
     public function buildAuthorizationUrl(string $codeChallenge, string $state): string
     {
-        $baseUrl = rtrim($_ENV['KEYCLOAK_URL'], '/');
+        $baseUrl = rtrim($_ENV['KEYCLOAK_PUBLIC_URL'] ?? $_ENV['KEYCLOAK_URL'], '/');
         $realm   = $_ENV['KEYCLOAK_REALM'];
         $authUrl = "{$baseUrl}/realms/{$realm}/protocol/openid-connect/auth";
 
@@ -72,6 +72,27 @@ class KeycloakClient
             return json_decode((string) $response->getBody(), true);
         } catch (GuzzleException $e) {
             throw new \RuntimeException('Failed to exchange code: ' . $e->getMessage(), 0, $e);
+        }
+    }
+
+    /**
+     * Завершает Keycloak SSO-сессию, инвалидируя refresh_token на стороне Keycloak.
+     */
+    public function logout(string $refreshToken): void
+    {
+        $baseUrl  = rtrim($_ENV['KEYCLOAK_URL'], '/');
+        $realm    = $_ENV['KEYCLOAK_REALM'];
+        $logoutUrl = "{$baseUrl}/realms/{$realm}/protocol/openid-connect/logout";
+
+        try {
+            $this->http->post($logoutUrl, [
+                'form_params' => [
+                    'client_id'     => $this->clientId,
+                    'refresh_token' => $refreshToken,
+                ],
+            ]);
+        } catch (GuzzleException $e) {
+            // Даже если Keycloak вернул ошибку — продолжаем удалять локальную сессию
         }
     }
 

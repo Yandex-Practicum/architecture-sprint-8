@@ -14,11 +14,12 @@ x-airflow-common: &airflow-common
     AIRFLOW__WEBSERVER__SECRET_KEY: 'your_airflow_webserver_sec_key'
     _PIP_ADDITIONAL_REQUIREMENTS: ''
     AIRFLOW_INPUT_DIR: '/opt/airflow/dag-inputs'
+    AIRFLOW_CONN_WRITE_TO_POSTGRES: 'postgresql://airflow:airflow@postgres:5432/airflow'
   volumes:
     - ./dags:/opt/airflow/dags
     - ./dags/sql:/opt/airflow/dags/sql
     - ./requirements.txt:/opt/airflow/requirements.txt
-    - ./data:/opt/airflow/sample_files
+    - ./data:/opt/airflow/data
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on: &airflow-common-depends-on
     postgres:
@@ -56,7 +57,7 @@ services:
     <<: *airflow-common
 
     ports:
-      - "8080:8080"
+      - "8090:8080"
     depends_on:
       postgres:
         condition: service_healthy

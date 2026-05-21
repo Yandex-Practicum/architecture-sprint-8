@@ -17,10 +17,9 @@ namespace bionicpro_reports
     public class ReportsController : ControllerBase
     {
         private readonly string _connectionString;
+
         private readonly IAmazonS3 _s3Client;
-
         private const string BucketName = "reports";
-
         // Семафоры для защиты от Cache Stampede (нагрузки при одновременном запросе отчета)
         private static readonly ConcurrentDictionary<string, SemaphoreSlim> _locks = new();
 
@@ -28,18 +27,19 @@ namespace bionicpro_reports
         public ReportsController(IConfiguration configuration, IAmazonS3 s3Client)
         {
             // Строка подключения к вашей БД PostgreSQL
-            _connectionString = configuration.GetConnectionString("Reports")
-                ?? "Host=postgres;Database=airflow;Username=airflow;Password=airflow";
+            _connectionString = configuration.GetConnectionString("Reports");
+            if (string.IsNullOrWhiteSpace(_connectionString)) throw new NullReferenceException("Section with connection strING IS EMPTY");
+
 
             _s3Client = s3Client;
         }
 
         [HttpGet("my")]
-        public async Task<IActionResult> GetBuyerSummaryReport()
+        public async Task<IActionResult> GetMySummaryReport()
         {
             var currentUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
 
-            if (string.IsNullOrEmpty(currentUserId)) return Unauthorized("Идентификатор пользователя не найден в текущей сессии.");
+            if (string.IsNullOrEmpty(currentUserId)) return Unauthorized();
 
             // Структурированный путь внутри бакета MinIO
             var datePath = $"year={DateTime.UtcNow:yyyy}/month={DateTime.UtcNow:MM}/day={DateTime.UtcNow:dd}";
@@ -75,7 +75,11 @@ namespace bionicpro_reports
 
 
                 // ШАГ 2. Чтение данных из OLAP-базы данных
-                using var connection = new NpgsqlConnection(_connectionString);
+                //using var connection = new NpgsqlConnection(_connectionString);
+
+                // Используем ClickHouseConnection вместо NpgsqlConnection
+                using var connection = new ClickHouseConnection(_clickHouseConnectionString);
+
 
                 var query = $@"
                     SELECT 

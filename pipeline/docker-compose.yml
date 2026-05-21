@@ -30,6 +30,7 @@ x-airflow-common: &airflow-common
 services:
   postgres:
     image: postgres:16.0
+    command: postgres -c wal_level=logical
     volumes:
       - ./db/init-db.sql:/docker-entrypoint-initdb.d/db.sql
     environment:

@@ -105,7 +105,8 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_HTTP_PORTS: 8080
       ASPNETCORE_SERVER__KESTREL__LIMITS__MAXREQUESTHEADERSIZE: 32768
-      ConnectionStrings__DefaultConnection: "Host=postgres;Database=airflow;Username=airflow;Password=airflow"
+      ConnectionStrings__PGReports: "Host=postgres;Database=airflow;Username=airflow;Password=airflow"
+      ConnectionStrings__Reports: "URL=http://clickhouse:8123/default" 
     ports:
       - "7001:8080" # Порт для сервиса отчетов    
     build:
@@ -133,6 +134,66 @@ services:
     volumes:
       - minio-data:/data
 
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - bionicpro-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    depends_on:
+      - zookeeper
+    networks:
+      - bionicpro-network
+
+  debezium:
+    image: debezium/connect:2.4
+    container_name: debezium
+    ports:
+      - "8083:8083"
+    environment:
+      BOOTSTRAP_SERVERS: kafka:29092
+      GROUP_ID: 1
+      CONFIG_STORAGE_TOPIC: bionicpro_connect_configs
+      OFFSET_STORAGE_TOPIC: bionicpro_connect_offsets
+      STATUS_STORAGE_TOPIC: bionicpro_connect_statuses
+      # Настройки конвертации сообщений в чистый JSON без тяжелых мета-схем внутри топиков
+      KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE: "false"
+      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+    depends_on:
+      - kafka
+      - postgres
+    networks:
+      - bionicpro-network
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.8
+    container_name: clickhouse
+    ports:
+      - "8123:8123" # HTTP интерфейс для получения запросов от .NET API
+      - "9000:9000" # Native протокол
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+    networks:
+      - bionicpro-network
+
+
 networks:
   bionicpro-network:
     name: bionicpro-network
@@ -141,3 +202,4 @@ networks:
 volumes:
   shared-auth-keys:
   minio-data:
+  clickhouse-data:

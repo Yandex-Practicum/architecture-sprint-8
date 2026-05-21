@@ -1,7 +1,10 @@
 version: '3.8'
+name: bionicpro-platform
+
+include:
+  - ./pipeline/docker-compose.yml
 
 services:
-
   openldap:
     image: osixia/openldap:1.5.0  # Явно фиксируем стабильную версию
     container_name: openldap
@@ -15,7 +18,7 @@ services:
     ports:
       - "389:389"
     networks:
-      - bionic-network
+      - bionicpro-network
 
   keycloak_db:
     image: postgres:14
@@ -29,7 +32,7 @@ services:
     ports:
       - "5433:5432"
     networks:
-      - bionic-network
+      - bionicpro-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U keycloak_user -d keycloak_db"]
       interval: 3s
@@ -46,6 +49,7 @@ services:
       KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
       KC_DB_USERNAME: keycloak_user
       KC_DB_PASSWORD: keycloak_password
+      KC_HOSTNAME_URL: http://localhost:8080
     command: 
       - start-dev
       - --import-realm
@@ -54,7 +58,7 @@ services:
     ports:
       - "8080:8080"
     networks:
-      - bionic-network
+      - bionicpro-network
     depends_on:
       keycloak_db:
         condition: service_healthy
@@ -74,19 +78,51 @@ services:
   bionicpro-auth:
     image: ${DOCKER_REGISTRY-}bionicproauth
     container_name: bionicpro-auth
+    user: "0:0" # ДОБАВЬТЕ ЭТУ СТРОКУ (Чтобы сервис отчетов мог читать эти ключи)
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_HTTP_PORTS: 8080
+      ASPNETCORE_SERVER__KESTREL__LIMITS__MAXREQUESTHEADERSIZE: 32768
+      Keycloak__Authority: "http://localhost:8080/realms/reports-realm"
+      Keycloak__MetadataAddress: "http://keycloak:8080/realms/reports-realm/.well-known/openid-configuration"
+    volumes:
+      - shared-auth-keys:/app/shared-auth-keys
     ports:
       - "7000:8080"
     build:
       context: .
       dockerfile: bionicpro-auth/bionicpro-auth/Dockerfile
-    networks:
-      - bionic-network
     depends_on:
       - keycloak
+    networks:
+      - bionicpro-network
+
+  bionicpro-reports:
+    image: ${DOCKER_REGISTRY-}bionicproreports
+    container_name: bionicpro-reports
+    user: "0:0" # ДОБАВЬТЕ ЭТУ СТРОКУ (Чтобы сервис отчетов мог читать эти ключи)
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_HTTP_PORTS: 8080
+      ASPNETCORE_SERVER__KESTREL__LIMITS__MAXREQUESTHEADERSIZE: 32768
+      ConnectionStrings__DefaultConnection: "Host=postgres;Database=airflow;Username=airflow;Password=airflow"
+    ports:
+      - "7001:8080" # Порт для сервиса отчетов    
+    build:
+      context: .
+      dockerfile: bionicpro-reports/bionicpro-reports/Dockerfile
+    volumes:
+      - shared-auth-keys:/app/shared-auth-keys # Монтируем ТУ ЖЕ самую папку ключей
+    depends_on:
+      - postgres 
+    networks:
+      - bionicpro-network
+
 
 networks:
-  bionic-network:
+  bionicpro-network:
+    name: bionicpro-network
     driver: bridge
+
+volumes:
+  shared-auth-keys:

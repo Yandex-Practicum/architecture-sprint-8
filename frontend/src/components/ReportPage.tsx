@@ -1,14 +1,29 @@
 import React, { useState, useEffect } from 'react';
 
+// Описываем интерфейс данных, которые приходят из bionicpro_reports
+interface BuyerSummaryReport {
+  buyerId: number;
+  totalOrders: number;
+  totalSpent: number;
+  totalDiscount: number;
+  avgSensorValue: number;
+  maxPower: number;
+}
+
+// Задаем константы урлов в зависимости от вашего сборщика (пример для Vite)
+const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://localhost:7000';
+const REPORTS_SERVICE_URL = process.env.REPORTS_SERVICE_URL || 'http://localhost:7001';
+
 const ReportPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  // Добавляем стейт для данных отчета
+  const [reportData, setReportData] = useState<BuyerSummaryReport | null>(null);
 
-
-  // При загрузке страницы проверяем, жива ли кука-сессия
+  // Проверка сессии при загрузке
   useEffect(() => {
-    fetch(`${process.env.AUTH_SERVER_URL}/api/Auth/token`, { credentials: 'include' })
+    fetch(`${AUTH_SERVICE_URL}/api/auth/token`, { credentials: 'include' })
       .then(response => {
         if (response.ok) {
           setIsAuthenticated(true);
@@ -20,9 +35,7 @@ const ReportPage: React.FC = () => {
   }, []);
 
   const handleLogin = () => {
-    // Отправляем пользователя на ваш эндпоинт входа. 
-    // После авторизации в Keycloak ваш сервер вернет его обратно на фронтенд.
-    window.location.href = `${process.env.AUTH_SERVER_URL}/api/Auth/login?returnUrl=${window.location.href}`;
+    window.location.href = `${AUTH_SERVICE_URL}/api/auth/login?returnUrl=${encodeURIComponent(window.location.href)}`;
   };
 
   const downloadReport = async () => {
@@ -30,11 +43,9 @@ const ReportPage: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      // Запрос идет на ваш сервер. Токен Bearer больше не нужен!
-      const response = await fetch(`${process.env.AUTH_SERVER_URL}/api/Reports/common`, {
+      const response = await fetch(`${REPORTS_SERVICE_URL}/api/reports/my`, {
         method: 'GET',
-        // КРИТИЧЕСКИ ВАЖНО: заставляет браузер автоматически прикрепить куку reports_session
-        credentials: 'include', 
+        credentials: 'include', // Передает куку сессии reports_session
         headers: {
           'Content-Type': 'application/json'
         }
@@ -47,7 +58,12 @@ const ReportPage: React.FC = () => {
       }
 
       if (response.status === 403) {
-        setError('Ошибка 403: У вас нет прав (роли) для скачивания этого отчета.');
+        setError('У вас нет прав для просмотра этого отчета.');
+        return;
+      }
+
+      if (response.status === 404) {
+        setError('Данные отчета для вашего аккаунта еще не сформированы в БД.');
         return;
       }
 
@@ -55,9 +71,8 @@ const ReportPage: React.FC = () => {
         throw new Error(`Ошибка сервера: ${response.status}`);
       }
 
-      // Обработка успешного скачивания (например, парсинг файла или JSON)
-      const data = await response.json();
-      console.log('Данные успешно получены через куку:', data);
+      const data: BuyerSummaryReport = await response.json();
+      setReportData(data); // Сохраняем данные в стейт
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Произошла непредвиденная ошибка');
@@ -66,12 +81,10 @@ const ReportPage: React.FC = () => {
     }
   };
 
-  // Состояние загрузки проверки сессии при первом открытии
   if (isAuthenticated === null) {
     return <div className="flex items-center justify-center min-h-screen">Загрузка сессии...</div>;
   }
 
-  // Если куки нет — показываем кнопку входа, которая ведет на BFF-сервер
   if (!isAuthenticated) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
@@ -88,25 +101,36 @@ const ReportPage: React.FC = () => {
     );
   }
 
-  // Если пользователь успешно авторизован по куке
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
-      <div className="p-8 bg-white rounded-lg shadow-md w-96">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
+      <div className="p-8 bg-white rounded-lg shadow-md w-full max-w-md">
         <h1 className="text-2xl font-bold mb-6 text-center">Usage Reports</h1>
         
         <button
           onClick={downloadReport}
           disabled={loading}
-          className={`w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors ${
+          className={`w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors mb-4 ${
             loading ? 'opacity-50 cursor-not-allowed' : ''
           }`}
         >
-          {loading ? 'Генерация отчета...' : 'Скачать отчет'}
+          {loading ? 'Получение данных...' : 'Показать мой отчет'}
         </button>
 
         {error && (
-          <div className="mt-4 p-4 bg-red-100 text-red-700 rounded text-sm break-words">
+          <div className="p-4 bg-red-100 text-red-700 rounded text-sm break-words mb-4">
             {error}
+          </div>
+        )}
+
+        {/* ВИЗУАЛИЗАЦИЯ ДАННЫХ ОТЧЕТА */}
+        {reportData && (
+          <div className="mt-4 p-4 border rounded bg-gray-50 text-gray-800 space-y-2">
+            <h2 className="font-semibold text-lg border-b pb-1 mb-2">Ваша статистика (ID: {reportData.buyerId})</h2>
+            <div className="flex justify-between text-sm"><span>Всего заказов:</span> <strong>{reportData.totalOrders}</strong></div>
+            <div className="flex justify-between text-sm"><span>Потрачено всего:</span> <strong>{reportData.totalSpent} ₽</strong></div>
+            <div className="flex justify-between text-sm"><span>Получено скидок:</span> <strong>{reportData.totalDiscount} ₽</strong></div>
+            <div className="flex justify-between text-sm"><span>Ср. значение датчиков:</span> <strong>{reportData.avgSensorValue}</strong></div>
+            <div className="flex justify-between text-sm"><span>Макс. мощность:</span> <strong>{reportData.maxPower} кВт</strong></div>
           </div>
         )}
       </div>

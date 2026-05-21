@@ -1,0 +1,47 @@
+## Visual Studio Build Outputs
+**/bin/
+**/obj/
+/[Dd]ebug/
+/[Rr]elease/
+*.xap
+*.aps
+*.pdb
+
+## .NET Core / .NET 5+ / .NET 8+ Artifacts
+*.user
+*.userosscache
+*.sln.docstates
+
+## JetBrains Rider & Resharper
+.idea/
+*.sln.iml
+_ReSharper*/
+
+## Visual Studio Code
+**/.vs
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.history/
+
+## User-specific files & local settings
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
+appsettings.Development.json
+appsettings.Local.json
+
+## NuGet Packages
+*.nupkg
+**/packages/
+!**/packages/repositories.config
+project.lock.json
+project.fragment.lock.json
+
+## OS generated files
+.DS_Store
+Thumbs.db

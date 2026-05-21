@@ -1,0 +1,25 @@
+version: '3.8'
+name: bionicpro-reports-compose
+
+services:
+
+  bionicpro-reports:
+    image: ${DOCKER_REGISTRY-}bionicproreports
+    container_name: bionicpro-reports
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=8080
+    volumes:
+      - shared-auth-keys:/app/shared-auth-keys
+    ports:
+      - "7000:8080"
+    build:
+      context: .
+      dockerfile: bionicpro-reports/Dockerfile
+    networks:
+      - bionicpro-network
+
+networks:
+  bionicpro-network:
+    driver: bridge
+

@@ -1,0 +1,6 @@
+@bionicpro_reports_HostAddress = http://localhost:5265
+
+GET {{bionicpro_reports_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

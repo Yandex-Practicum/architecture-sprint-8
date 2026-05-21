@@ -25,7 +25,7 @@ x-airflow-common: &airflow-common
     postgres:
       condition: service_healthy
   networks:
-    - dag_sample
+    - bionicpro-network
 
 services:
   postgres:
@@ -51,7 +51,7 @@ services:
       start_period: 5s
     restart: always
     networks:
-      - dag_sample
+      - bionicpro-network
 
   airflow-webserver:
     <<: *airflow-common
@@ -65,7 +65,7 @@ services:
         condition: service_completed_successfully
     command: webserver
     networks:
-      - dag_sample
+      - bionicpro-network
     healthcheck:
       test: [ "CMD-SHELL", "curl -f http://localhost:8080/health || exit 1" ]
       interval: 30s
@@ -75,7 +75,7 @@ services:
   airflow-scheduler:
     <<: *airflow-common
     networks:
-      - dag_sample
+      - bionicpro-network
     command: scheduler
     depends_on:
       postgres:
@@ -96,7 +96,7 @@ services:
       airflow-init:
         condition: service_completed_successfully
     networks:
-      - dag_sample
+      - bionicpro-network
     command: bash -c "airflow triggerer"
     healthcheck:
       test:
@@ -114,7 +114,7 @@ services:
       postgres:
         condition: service_healthy
     networks:
-      - dag_sample
+      - bionicpro-network
     profiles:
       - debug
     command:
@@ -132,7 +132,8 @@ services:
       
       "
     networks:
-      - dag_sample
+      - bionicpro-network
 
 networks:
-  dag_sample:
+  bionicpro-network:
+    name: bionicpro-network

@@ -1,4 +1,5 @@
 version: '3.8'
+name: bionicpro-auth-compose
 
 services:
   keycloak_db:
@@ -13,7 +14,7 @@ services:
     ports:
       - "5433:5432"
     networks:
-      - bionic-network
+      - bionicpro-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U keycloak_user -d keycloak_db"]
       interval: 3s
@@ -38,7 +39,7 @@ services:
     ports:
       - "8080:8080"
     networks:
-      - bionic-network
+      - bionicpro-network
     depends_on:
       keycloak_db:
         condition: service_healthy
@@ -50,16 +51,21 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_HTTP_PORTS=8080
+    volumes:
+      - shared-auth-keys:/app/shared-auth-keys
     ports:
       - "7000:8080"
     build:
       context: .
       dockerfile: bionicpro-auth/Dockerfile
     networks:
-      - bionic-network
+      - bionicpro-network
     depends_on:
       - keycloak
 
 networks:
-  bionic-network:
+  bionicpro-network:
     driver: bridge
+
+volumes:
+  shared-auth-keys:

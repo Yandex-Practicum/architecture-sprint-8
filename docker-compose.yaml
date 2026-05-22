@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+  # ─── Keycloak ───────────────────────────────────────────────
   keycloak_db:
     image: postgres:14
     environment:
@@ -8,9 +9,17 @@ services:
       POSTGRES_USER: keycloak_user
       POSTGRES_PASSWORD: keycloak_password
     volumes:
-      - ./postgres-keycloak-data:/var/lib/postgresql/data
+      - keycloak-db-data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak_user -d keycloak_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bionicpro-net
+
   keycloak:
     image: quay.io/keycloak/keycloak:21.1
     environment:
@@ -20,7 +29,7 @@ services:
       KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
       KC_DB_USERNAME: keycloak_user
       KC_DB_PASSWORD: keycloak_password
-    command: 
+    command:
       - start-dev
       - --import-realm
     volumes:
@@ -28,7 +37,12 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      - keycloak_db
+      keycloak_db:
+        condition: service_healthy
+    networks:
+      - bionicpro-net
+
+  # ─── Frontend ───────────────────────────────────────────────
   frontend:
     build:
       context: ./frontend
@@ -40,3 +54,193 @@ services:
       REACT_APP_KEYCLOAK_URL: http://localhost:8080
       REACT_APP_KEYCLOAK_REALM: reports-realm
       REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+    depends_on:
+      keycloak:
+        condition: service_started
+    networks:
+      - bionicpro-net
+
+  # ─── API (FastAPI backend) ──────────────────────────────────
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      BPRO_CLICKHOUSE_HOST: clickhouse
+      BPRO_CLICKHOUSE_PORT: 8123
+      BPRO_CLICKHOUSE_USER: olap_user
+      BPRO_CLICKHOUSE_PASSWORD: olap_password
+      BPRO_CLICKHOUSE_DATABASE: olap_db
+      BPRO_KEYCLOAK_URL: http://keycloak:8080
+      BPRO_KEYCLOAK_REALM: reports-realm
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+    networks:
+      - bionicpro-net
+
+  # ─── CRM DB (имитация Oracle) ──────────────────────────────
+  crm-db:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: crm_db
+      POSTGRES_USER: crm_user
+      POSTGRES_PASSWORD: crm_password
+    volumes:
+      - ./airflow/scripts/init_crm.sql:/docker-entrypoint-initdb.d/01_init_crm.sql
+      - crm-data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crm_user -d crm_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bionicpro-net
+
+  # ─── Telemetry DB ──────────────────────────────────────────
+  telemetry-db:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: telemetry_db
+      POSTGRES_USER: telemetry_user
+      POSTGRES_PASSWORD: telemetry_password
+    volumes:
+      - ./airflow/scripts/init_telemetry.sql:/docker-entrypoint-initdb.d/01_init_telemetry.sql
+      - telemetry-data:/var/lib/postgresql/data
+    ports:
+      - "5435:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U telemetry_user -d telemetry_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bionicpro-net
+
+  # ─── ClickHouse (OLAP) ─────────────────────────────────────
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.8
+    environment:
+      CLICKHOUSE_DB: olap_db
+      CLICKHOUSE_USER: olap_user
+      CLICKHOUSE_PASSWORD: olap_password
+    volumes:
+      - ./airflow/scripts/init_olap.sql:/docker-entrypoint-initdb.d/01_init_olap.sql
+      - clickhouse-data:/var/lib/clickhouse
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8123 && echo OK"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bionicpro-net
+
+  # ─── Airflow ────────────────────────────────────────────────
+  airflow-postgres:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: airflow_db
+      POSTGRES_USER: airflow_user
+      POSTGRES_PASSWORD: airflow_password
+    volumes:
+      - airflow-db-data:/var/lib/postgresql/data
+    ports:
+      - "5436:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow_user -d airflow_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bionicpro-net
+
+  airflow-webserver:
+    image: apache/airflow:2.8.1-python3.11
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow_user:airflow_password@airflow-postgres:5432/airflow_db
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__CORE__FERNET_KEY: ""
+      AIRFLOW_CONN_CRM_DB: postgresql://crm_user:crm_password@crm-db:5432/crm_db?connect_timeout=10
+      AIRFLOW_CONN_TELEMETRY_DB: postgresql://telemetry_user:telemetry_password@telemetry-db:5432/telemetry_db?connect_timeout=10
+      AIRFLOW_CONN_CLICKHOUSE_HTTP: http://olap_user:olap_password@clickhouse:8123/?database=olap_db
+      _AIRFLOW_DB_MIGRATE: "true"
+      _AIRFLOW_WWW_USER_CREATE: "true"
+      _AIRFLOW_WWW_USER_USERNAME: admin
+      _AIRFLOW_WWW_USER_PASSWORD: admin
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/requirements.txt:/opt/airflow/requirements.txt
+      - airflow-logs:/opt/airflow/logs
+    ports:
+      - "8081:8080"
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      crm-db:
+        condition: service_healthy
+      telemetry-db:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    command: >
+      bash -c "
+        pip install -r /opt/airflow/requirements.txt &&
+        airflow webserver
+      "
+    networks:
+      - bionicpro-net
+
+  airflow-scheduler:
+    image: apache/airflow:2.8.1-python3.11
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow_user:airflow_password@airflow-postgres:5432/airflow_db
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__CORE__FERNET_KEY: ""
+      AIRFLOW_CONN_CRM_DB: postgresql://crm_user:crm_password@crm-db:5432/crm_db?connect_timeout=10
+      AIRFLOW_CONN_TELEMETRY_DB: postgresql://telemetry_user:telemetry_password@telemetry-db:5432/telemetry_db?connect_timeout=10
+      AIRFLOW_CONN_CLICKHOUSE_HTTP: http://olap_user:olap_password@clickhouse:8123/?database=olap_db
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/requirements.txt:/opt/airflow/requirements.txt
+      - airflow-logs:/opt/airflow/logs
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      crm-db:
+        condition: service_healthy
+      telemetry-db:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    command: >
+      bash -c "
+        pip install -r /opt/airflow/requirements.txt &&
+        airflow scheduler
+      "
+    networks:
+      - bionicpro-net
+
+  # ─── Volumes ──────────────────────────────────────────────
+volumes:
+  keycloak-db-data:
+  crm-data:
+  telemetry-data:
+  clickhouse-data:
+  airflow-db-data:
+  airflow-logs:
+
+  # ─── Network ──────────────────────────────────────────────
+networks:
+  bionicpro-net:
+    driver: bridge

@@ -1,0 +1,5 @@
+apache-airflow==2.8.1
+apache-airflow-providers-postgres
+requests==2.31.0
+psycopg2-binary==2.9.9
+clickhouse-driver==0.2.6

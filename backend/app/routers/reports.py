@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.auth import UserInfo, get_current_user
-from app.database import get_all_reports, get_report_by_customer
+from app.database import get_all_reports, get_report_by_customer, get_report_by_username
 from app.models import ProstheticsReport, ReportListResponse, row_to_report
 
 router = APIRouter(prefix="/reports", tags=["reports"])
@@ -13,18 +13,13 @@ _ADMIN_ROLES = {"administrator"}
 async def get_report(
     customer_id: str | None = Query(
         default=None,
-        description="Фильтр по ID клиента. Для обычных пользователей — только свой customer_id.",
+        description="Фильтр по ID клиента (только для администраторов).",
     ),
     user: UserInfo = Depends(get_current_user),
 ):
     is_admin = bool(_ADMIN_ROLES & set(user.roles))
 
-    if customer_id:
-        if not is_admin and user.customer_id and customer_id != user.customer_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Доступ запрещён: можно запрашивать только свой отчёт",
-            )
+    if is_admin and customer_id:
         row = await get_report_by_customer(customer_id)
         if row is None:
             raise HTTPException(
@@ -33,16 +28,15 @@ async def get_report(
             )
         return row_to_report(row)
 
-    if not is_admin:
-        effective_cid = user.customer_id or user.username
-        row = await get_report_by_customer(effective_cid)
-        if row is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Отчёт для пользователя {user.username} не найден",
-            )
-        return row_to_report(row)
+    if is_admin:
+        rows = await get_all_reports()
+        reports = [row_to_report(r) for r in rows]
+        return ReportListResponse(count=len(reports), reports=reports)
 
-    rows = await get_all_reports()
-    reports = [row_to_report(r) for r in rows]
-    return ReportListResponse(count=len(reports), reports=reports)
+    row = await get_report_by_username(user.username)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Отчёт для пользователя {user.username} не найден",
+        )
+    return row_to_report(row)

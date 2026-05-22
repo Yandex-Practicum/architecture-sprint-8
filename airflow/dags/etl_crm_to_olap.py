@@ -35,6 +35,15 @@ def _clickhouse_execute(sql: str, data_payload: bytes = None) -> requests.Respon
     return resp
 
 
+KEYCLOAK_USERNAME_MAP: Dict[str, str] = {
+    "CUST-001": "user1",
+    "CUST-002": "user2",
+    "CUST-003": "prothetic1",
+    "CUST-004": "prothetic2",
+    "CUST-005": "prothetic3",
+}
+
+
 def _clickhouse_insert_rows(table: str, columns: List[str], rows: List[List[Any]]) -> None:
     if not rows:
         return
@@ -145,6 +154,7 @@ def build_data_mart(
             "customer_id": cid,
             "customer_name": c["full_name"],
             "customer_email": c["email"],
+            "keycloak_username": KEYCLOAK_USERNAME_MAP.get(cid, ""),
             "prosthesis_model": c["prosthesis_model"],
             "region": c["region"],
             "purchase_date": str(p_date_obj),
@@ -178,8 +188,8 @@ def load_data_mart(rows: List[Dict[str, Any]]) -> None:
         return
 
     columns = [
-        "customer_id", "customer_name", "customer_email", "prosthesis_model",
-        "region", "purchase_date", "warranty_end_date", "warranty_status",
+        "customer_id", "customer_name", "customer_email", "keycloak_username",
+        "prosthesis_model", "region", "purchase_date", "warranty_end_date", "warranty_status",
         "total_usage_hours", "avg_daily_usage_minutes", "total_sessions",
         "total_movements", "avg_movements_per_session", "total_errors",
         "errors_per_session", "last_active_date", "battery_health_avg",
@@ -200,7 +210,7 @@ def load_data_mart(rows: List[Dict[str, Any]]) -> None:
 @task
 def verify_data_mart() -> None:
     resp = _clickhouse_execute("SELECT count(*) FROM olap_db.prosthetics_data_mart")
-    count = int(resp.text.strip().split("\n")[0])
+    count = int(resp.text.strip().split("\n")[-1])
     if count == 0:
         raise ValueError("Витрина данных пуста после загрузки!")
     print(f"Верификация пройдена: витрина содержит {count} записей")

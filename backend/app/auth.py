@@ -19,7 +19,6 @@ class UserInfo:
     username: str
     email: str = ""
     roles: List[str] = field(default_factory=list)
-    customer_id: str | None = None
 
 
 _jwks_cache: dict | None = None
@@ -85,7 +84,6 @@ async def get_current_user(
             username=payload.get("preferred_username", ""),
             email=payload.get("email", ""),
             roles=roles,
-            customer_id=payload.get("customer_id"),
         )
         return user
 

@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS olap_db.prosthetics_data_mart
     customer_id String,
     customer_name String,
     customer_email String,
+    keycloak_username String,
     prosthesis_model String,
     region String,
     purchase_date Date,

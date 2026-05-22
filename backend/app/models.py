@@ -8,6 +8,7 @@ class ProstheticsReport(BaseModel):
     customer_id: str
     customer_name: str
     customer_email: str | None = None
+    keycloak_username: str | None = None
     prosthesis_model: str
     region: str | None = None
     purchase_date: date | None = None
@@ -37,11 +38,6 @@ class ReportListResponse(BaseModel):
     reports: list[ProstheticsReport]
 
 
-class ReportQueryParams(BaseModel):
-    customer_id: str | None = None
-    format: str = "json"
-
-
 def row_to_report(row: Dict[str, Any]) -> ProstheticsReport:
     def _val(key: str) -> Any:
         v = row.get(key)
@@ -53,6 +49,7 @@ def row_to_report(row: Dict[str, Any]) -> ProstheticsReport:
         customer_id=_val("customer_id") or "",
         customer_name=_val("customer_name") or "",
         customer_email=_val("customer_email"),
+        keycloak_username=_val("keycloak_username"),
         prosthesis_model=_val("prosthesis_model") or "",
         region=_val("region"),
         purchase_date=_val("purchase_date"),

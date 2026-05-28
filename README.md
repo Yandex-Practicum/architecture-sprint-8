@@ -117,3 +117,91 @@
 - **keycloak-js v21.1** — PKCE поддерживается нативно, фронтенд менять не пришлось.
 
 **Проверка:** Keycloak запущен, realm `reports-realm` импортирован, PKCE S256 подтверждён через Admin API (`attributes.pkce.code.challenge.method: "S256"`).
+
+---
+
+## Задание 2. Разработка сервиса отчётов
+
+### Задача 2.1. Архитектура ETL + витрина отчётности
+
+**Цель:** Спроектировать ETL-процесс с Apache Airflow и витрину отчётности в ClickHouse.
+
+**Источники данных:**
+- **CRM (Битрикс24)** — данные о клиентах (ФИО, email, страна)
+- **PostgreSQL (телеметрия)** — показания датчиков протезов (миосигналы, тип движения, уровень батареи)
+
+**OLAP-база:** ClickHouse
+
+**Схема «Звезда»:**
+- `dim_customers` — пользователи (user_id, full_name, email, country)
+- `fact_telemetry` — агрегированная телеметрия по дням (total_readings, avg_signals, movements по типам)
+- `report_mart` — объединённая витрина для API
+
+**ETL-процесс (Airflow DAG `prosthetic_reports_etl`):**
+1. `extract_customers` — выгрузка клиентов из CRM
+2. `extract_telemetry` — агрегация телеметрии за день из PostgreSQL
+3. `load_to_clickhouse` — запись в ClickHouse (dim_customers, fact_telemetry, report_mart)
+
+**Диаграмма C4:** обновлена — добавлены контейнеры Apache Airflow, ClickHouse, Reports API.
+
+**Изменённые/созданные файлы:**
+- `BionicPRO_C4_model.drawio.xml` — ClickHouse, Airflow, Reports API + связи
+- `airflow/dags/prosthetic_reports_dag.py` — DAG с тремя задачами
+- `airflow/sql/create_report_mart.sql` — DDL для ClickHouse
+- `airflow/docker-compose-airflow.yaml` — инфраструктура Airflow
+- `telemetry/init.sql` — тестовые данные (3 пользователя, телеметрия за январь 2025)
+- `docker-compose.yaml` — добавлены telemetry_db, clickhouse, reports-api
+- `reports-api/main.py` — FastAPI с `/reports`
+- `reports-api/services/clickhouse_client.py` — клиент ClickHouse
+- `reports-api/config.py` — конфигурация
+- `reports-api/Dockerfile`
+- `reports-api/requirements.txt`
+- `frontend/src/components/ReportPage.tsx` — обработка ответа, скачивание JSON
+
+### Задача 2.2. Airflow DAG
+
+**Файл:** `airflow/dags/prosthetic_reports_dag.py`
+
+**Расписание:** `0 2 * * *` (ежедневно в 2:00)
+
+**Задачи:**
+1. `extract_customers` — загружает данные клиентов из CRM (PostgreSQL `customers`) через PostgresHook
+2. `extract_telemetry` — агрегирует телеметрию за дату выполнения по user_id, считает средние сигналы и количество движений по типам
+3. `load_to_clickhouse` — загружает клиентов в `dim_customers`, телеметрию в `fact_telemetry`, формирует `report_mart` через JOIN
+
+**Зависимости:** `[extract_customers, extract_telemetry] >> load_to_clickhouse`
+
+### Задача 2.3. API /reports
+
+**Файл:** `reports-api/main.py`
+
+**Стек:** FastAPI + uvicorn, clickhouse-driver, PyJWT, requests
+
+**Эндпоинт:** `GET /reports?period_from=YYYY-MM-DD&period_to=YYYY-MM-DD`
+
+**Аутентификация:** Bearer JWT (HTTPBearer)
+
+**Поток:**
+1. Получение public key из Keycloak (`/.well-known/openid-configuration` → jwks_uri)
+2. Верификация подписи токена (RS256)
+3. Извлечение `preferred_username` из payload
+4. Запрос в ClickHouse `report_mart` по user_id
+5. Возврат JSON-отчёта
+
+### Задача 2.4. Ограничение доступа
+
+- **JWT-валидация** — проверка подписи RS256, срока действия, audience
+- **user_id** извлекается из `preferred_username` (или `sub`) — не из query-параметра
+- Пользователь может запросить только свои данные. Чужой user_id подставить нельзя — он берётся из токена
+- **401** — токен отсутствует / истёк / невалидный
+- **403** — (в текущей реализации не требуется, т.к. user_id фиксирован из токена)
+
+### Задача 2.5. UI
+
+**Файл:** `frontend/src/components/ReportPage.tsx`
+
+**Изменения:**
+- Добавлена обработка ответа от API: 401 → "перелогиньтесь", 403 → "нет доступа"
+- Пустой отчёт → "данные ещё не готовы"
+- При успехе отображается сводка (имя, email, количество дней)
+- Кнопка «Save as JSON» — скачивание отчета в формате JSON

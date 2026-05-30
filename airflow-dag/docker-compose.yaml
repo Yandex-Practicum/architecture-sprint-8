@@ -1,0 +1,223 @@
+x-airflow-common: &airflow-common
+  build:
+    context: .
+    dockerfile: Dockerfile
+  environment: &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CORE__FERNET_KEY: ''
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
+    AIRFLOW__WEBSERVER__SECRET_KEY: 'your_airflow_webserver_sec_key'
+    _PIP_ADDITIONAL_REQUIREMENTS: ''
+    AIRFLOW_INPUT_DIR: '/opt/airflow/dag-inputs'
+
+    # Настройки подключений для Airflow
+    AIRFLOW_CONN_TELEMETRY_POSTGRES: postgresql://telemetry_user:telemetry_password@telemetry_db:5432/telemetry_db
+
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./dags/sql:/opt/airflow/dags/sql
+    - ./requirements.txt:/opt/airflow/requirements.txt
+    - ./data:/opt/airflow/sample_files
+    - ./dags/scripts:/opt/airflow/dags/scripts
+  user: "${AIRFLOW_UID:-50000}:0"
+  depends_on: &airflow-common-depends-on
+    postgres:
+      condition: service_healthy
+    telemetry_db:
+      condition: service_healthy
+    clickhouse:
+      condition: service_healthy
+  networks:
+    - dag_sample
+
+services:
+  # PostgreSQL для метаданных Airflow
+  postgres:
+    image: postgres:16.0
+    container_name: bionicpro-airflow-db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    logging:
+      options:
+        max-size: 10m
+        max-file: "3"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: always
+    networks:
+      - dag_sample
+
+  # База данных телеметрии (источник данных с протезов)
+  telemetry_db:
+    image: postgres:16.0
+    container_name: bionicpro-telemetry-db
+    environment:
+      POSTGRES_USER: telemetry_user
+      POSTGRES_PASSWORD: telemetry_password
+      POSTGRES_DB: telemetry_db
+    volumes:
+      - ./db/init_telemetry.sql:/docker-entrypoint-initdb.d/01_init.sql
+      - ./db/insert_telemetry.sql:/docker-entrypoint-initdb.d/02_insert.sql
+      - telemetry_data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    networks:
+      - dag_sample
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U telemetry_user -d telemetry_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  # ClickHouse OLAP база данных
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.12-alpine
+    container_name: bionicpro-clickhouse
+    privileged: true
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - ./clickhouse/data:/var/lib/clickhouse
+      - ./clickhouse/logs:/var/log/clickhouse-server
+      - ./clickhouse/config/config.xml:/etc/clickhouse-server/config.d/config.xml
+      - ./db/clickhouse/init.sql:/docker-entrypoint-initdb.d/01_init.sql
+    environment:
+      CLICKHOUSE_DB: reports_db
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ''
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    networks:
+      - dag_sample
+    healthcheck:
+      test: [ "CMD", "clickhouse-client", "--query", "SELECT 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  # Airflow веб-сервер
+  airflow-webserver:
+    <<: *airflow-common
+    container_name: bionicpro-airflow-webserver
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      telemetry_db:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    command: webserver
+    networks:
+      - dag_sample
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Airflow scheduler
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: bionicpro-airflow-scheduler
+    networks:
+      - dag_sample
+    command: scheduler
+    depends_on:
+      postgres:
+        condition: service_healthy
+      telemetry_db:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      airflow-webserver:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Airflow triggerer
+  airflow-triggerer:
+    <<: *airflow-common
+    container_name: bionicpro-airflow-triggerer
+    depends_on:
+      postgres:
+        condition: service_healthy
+      telemetry_db:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    networks:
+      - dag_sample
+    command: bash -c "airflow triggerer"
+    healthcheck:
+      test: ["CMD-SHELL", "airflow jobs check --job-type TriggererJob --hostname \"${HOSTNAME}\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+
+  # Airflow CLI для отладки
+  airflow-cli:
+    <<: *airflow-common
+    container_name: bionicpro-airflow-cli
+    depends_on:
+      postgres:
+        condition: service_healthy
+      telemetry_db:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    networks:
+      - dag_sample
+    profiles:
+      - debug
+    command: ["bash", "-c", "airflow"]
+
+  # Инициализация Airflow
+  airflow-init:
+    <<: *airflow-common
+    container_name: bionicpro-airflow-init
+    depends_on:
+      postgres:
+        condition: service_healthy
+      telemetry_db:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    command: bash -c "airflow db migrate && airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@bionicpro.com --password admin"
+    networks:
+      - dag_sample
+
+networks:
+  dag_sample:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  telemetry_data:

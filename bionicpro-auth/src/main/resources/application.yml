@@ -1,0 +1,65 @@
+spring:
+  main:
+    allow-circular-references: true
+    lazy-initialization: true
+  application:
+    name: bionicpro-auth
+
+  redis:
+    host: ${REDIS_HOST:redis}
+    port: ${REDIS_PORT:6379}
+    timeout: 5000ms
+    lettuce:
+      pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 0
+      shutdown-timeout: 100ms
+
+  session:
+    store-type: redis
+    timeout: 3600s
+
+  security:
+    filter:
+      order: 0
+
+server:
+  port: 8081
+  servlet:
+    session:
+      timeout: 3600s
+      cookie:
+        name: BIONICPRO_SESSION
+        http-only: true
+        secure: false
+        same-site: lax
+        max-age: 3600
+  error:
+    whitelabel:
+      enabled: false
+    path: /error
+
+bionicpro:
+  keycloak:
+    url: ${KEYCLOAK_URL:http://localhost:8080}
+    realm: ${KEYCLOAK_REALM:reports-realm}
+    client-id: ${KEYCLOAK_CLIENT_ID:reports-frontend}
+    client-secret: ${KEYCLOAK_CLIENT_SECRET:bionicpro-auth-secret}
+    token-uri: ${bionicpro.keycloak.url}/realms/${bionicpro.keycloak.realm}/protocol/openid-connect/token
+    userinfo-uri: ${bionicpro.keycloak.url}/realms/${bionicpro.keycloak.realm}/protocol/openid-connect/userinfo
+    logout-uri: ${bionicpro.keycloak.url}/realms/${bionicpro.keycloak.realm}/protocol/openid-connect/logout
+
+  auth:
+    access-token-ttl: 120
+    refresh-token-ttl: 3600
+    session-rotation-enabled: true
+
+  encryption:
+    secret-key: ${AUTH_ENCRYPTION_KEY:DefaultSecretKeyForDevelopment123!}
+
+logging:
+  level:
+    ru.bionicpro.auth: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.web: DEBUG

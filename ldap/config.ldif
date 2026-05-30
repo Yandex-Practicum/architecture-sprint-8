@@ -1,49 +1,99 @@
-# Организационные подразделения (OU)
-dn: ou=People,dc=example,dc=com
+dn: ou=People,dc=bionicpro,dc=com
 objectClass: top
 objectClass: organizationalUnit
 ou: People
 
-dn: ou=Groups,dc=example,dc=com
+dn: ou=Groups,dc=bionicpro,dc=com
 objectClass: top
 objectClass: organizationalUnit
 ou: Groups
 
-# Пользователи
-dn: uid=john.doe,ou=People,dc=example,dc=com
+dn: ou=Russia,ou=People,dc=bionicpro,dc=com
+objectClass: top
+objectClass: organizationalUnit
+ou: Russia
+
+dn: ou=Germany,ou=People,dc=bionicpro,dc=com
+objectClass: top
+objectClass: organizationalUnit
+ou: Germany
+
+dn: ou=USA,ou=People,dc=bionicpro,dc=com
+objectClass: top
+objectClass: organizationalUnit
+ou: USA
+
+dn: uid=ivan.ivanov,ou=Russia,ou=People,dc=bionicpro,dc=com
+objectClass: top
+objectClass: inetOrgPerson
+cn: Ivan
+sn: Ivanov
+uid: ivan.ivanov
+mail: ivan.ivanov@bionicpro.ru
+userPassword: password
+
+dn: uid=maria.petrova,ou=Russia,ou=People,dc=bionicpro,dc=com
+objectClass: top
+objectClass: inetOrgPerson
+cn: Maria
+sn: Petrova
+uid: maria.petrova
+mail: maria.petrova@bionicpro.ru
+userPassword: password
+
+dn: uid=hans.mueller,ou=Germany,ou=People,dc=bionicpro,dc=com
+objectClass: top
+objectClass: inetOrgPerson
+cn: Hans
+sn: Mueller
+uid: hans.mueller
+mail: hans.mueller@bionicpro.de
+userPassword: password
+
+dn: uid=anna.schmidt,ou=Germany,ou=People,dc=bionicpro,dc=com
+objectClass: top
+objectClass: inetOrgPerson
+cn: Anna
+sn: Schmidt
+uid: anna.schmidt
+mail: anna.schmidt@bionicpro.de
+userPassword: password
+
+dn: uid=john.smith,ou=USA,ou=People,dc=bionicpro,dc=com
 objectClass: top
 objectClass: inetOrgPerson
 cn: John
-sn: Doe
-uid: john.doe
-mail: john@example.com
+sn: Smith
+uid: john.smith
+mail: john.smith@bionicpro.com
 userPassword: password
 
-dn: uid=jane.smith,ou=People,dc=example,dc=com
+dn: uid=sarah.jones,ou=USA,ou=People,dc=bionicpro,dc=com
 objectClass: top
 objectClass: inetOrgPerson
-cn: Jane
-sn: Smith
-uid: jane.smith
-mail: jane@example.com
+cn: Sarah
+sn: Jones
+uid: sarah.jones
+mail: sarah.jones@bionicpro.com
 userPassword: password
 
-dn: uid=alex,ou=People,dc=example,dc=com
-objectClass: inetOrgPerson
-cn: Alex
-sn: Johnson
-uid: alex.johnson
-mail: alex@example.com
-userPassword: password
-
-# Роли
-dn: cn=user,ou=Groups,dc=example,dc=com
+dn: cn=user,ou=Groups,dc=bionicpro,dc=com
 objectClass: groupOfNames
 cn: user
-member: uid=jane.smith,ou=People,dc=example,dc=com
+member: uid=ivan.ivanov,ou=Russia,ou=People,dc=bionicpro,dc=com
+member: uid=maria.petrova,ou=Russia,ou=People,dc=bionicpro,dc=com
+member: uid=hans.mueller,ou=Germany,ou=People,dc=bionicpro,dc=com
+member: uid=anna.schmidt,ou=Germany,ou=People,dc=bionicpro,dc=com
+member: uid=john.smith,ou=USA,ou=People,dc=bionicpro,dc=com
+member: uid=sarah.jones,ou=USA,ou=People,dc=bionicpro,dc=com
 
-dn: cn=prothetic_user,ou=Groups,dc=example,dc=com
+dn: cn=manager,ou=Groups,dc=bionicpro,dc=com
 objectClass: groupOfNames
-cn: prothetic_user
-member: uid=alex.johnson,ou=People,dc=example,dc=com
-member: uid=john.doe,ou=People,dc=example,dc=com
+cn: manager
+member: uid=hans.mueller,ou=Germany,ou=People,dc=bionicpro,dc=com
+member: uid=john.smith,ou=USA,ou=People,dc=bionicpro,dc=com
+
+dn: cn=adminrole,ou=Groups,dc=bionicpro,dc=com
+objectClass: groupOfNames
+cn: adminrole
+member: uid=sarah.jones,ou=USA,ou=People,dc=bionicpro,dc=com

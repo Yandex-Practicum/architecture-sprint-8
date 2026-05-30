@@ -1,0 +1,54 @@
+
+minio:
+  endpoint: ${MINIO_ENDPOINT:http://localhost:9005}
+  access-key: ${MINIO_ACCESS_KEY:minioadmin}
+  secret-key: ${MINIO_SECRET_KEY:minioadmin123}
+  bucket: ${MINIO_BUCKET:reports-bucket}
+
+cdn:
+  base-url: ${CDN_BASE_URL:http://localhost:8083/reports}
+
+report:
+  cache:
+    enabled: true
+    ttl-seconds: 3600  # 1 час
+    expiration-seconds: 86400  # 24 часа
+
+clickhouse:
+  host: ${CLICKHOUSE_HOST:localhost}
+  port: ${CLICKHOUSE_PORT:8123}
+  database: ${CLICKHOUSE_DB:reports_db}
+  user: ${CLICKHOUSE_USER:reports_user}
+  password: ${CLICKHOUSE_PASSWORD:reports_password_123}
+
+spring:
+  application:
+    name: bionicpro-reports
+  datasource:
+    driver-class-name: com.clickhouse.jdbc.ClickHouseDriver
+    url: jdbc:clickhouse://localhost:8123/reports_db
+    username: reports_user
+    password: reports_password_123
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8080/realms/reports-realm
+          jwk-set-uri: http://localhost:8080/realms/reports-realm/protocol/openid-connect/certs
+
+logging:
+  level:
+    ru.bionicpro.reports: DEBUG
+    org.springframework.jdbc: DEBUG
+
+server:
+#  port: 8081
+  port: 8082
+#  servlet:
+#    context-path: /api
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: mappings

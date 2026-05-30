@@ -1,8 +1,55 @@
-version: '3.8'
-
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: bionicpro-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    networks:
+      - bionicpro-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+
+  bionicpro-auth:
+    build: ./bionicpro-auth
+    container_name: bionicpro-auth
+    ports:
+      - "8081:8081"
+      - "5005:5005"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SERVER_SERVLET_SESSION_COOKIE_SAME_SITE: lax
+      SERVER_SERVLET_SESSION_COOKIE_SECURE: false
+      SERVER_SERVLET_SESSION_COOKIE_HTTP_ONLY: true
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+#      KEYCLOAK_URL: http://localhost:8080
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: reports-realm
+      KEYCLOAK_CLIENT_ID: reports-frontend
+      KEYCLOAK_CLIENT_SECRET: bionicpro-auth-secret
+      AUTH_ENCRYPTION_KEY: ${AUTH_ENCRYPTION_KEY:-ChangeMeInProduction123!}
+#    extra_hosts:
+#      - "host.docker.internal:host-gateway"
+    depends_on:
+      redis:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+    networks:
+      - bionicpro-network
+    restart: unless-stopped
+
   keycloak_db:
     image: postgres:14
+    container_name: keycloak-db
     environment:
       POSTGRES_DB: keycloak_db
       POSTGRES_USER: keycloak_user
@@ -11,8 +58,24 @@ services:
       - ./postgres-keycloak-data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+    command: >
+      postgres -c wal_level=logical
+    networks:
+      - bionicpro-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak_user -d keycloak_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
   keycloak:
-    image: quay.io/keycloak/keycloak:21.1
+#    build:
+#      context: ./keycloak
+#      dockerfile: Dockerfile
+    image: playaru/keycloak-russian:21.1.1
+#    image: quay.io/keycloak/keycloak:21.1
+    container_name: keycloak
     environment:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
@@ -20,23 +83,313 @@ services:
       KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
       KC_DB_USERNAME: keycloak_user
       KC_DB_PASSWORD: keycloak_password
-    command: 
+      KC_HOSTNAME: localhost
+      KC_HOSTNAME_PORT: 8080
+      KC_HOSTNAME_STRICT: false
+      KC_PROXY: edge
+      KC_HTTP_ENABLED: true
+      # Важно для Yandex OAuth callback из контейнера
+      KC_HOSTNAME_STRICT_HTTPS: false
+      KC_HTTP_RELATIVE_PATH: /
+    command:
       - start-dev
       - --import-realm
+      - --hostname=localhost
+      - --hostname-port=8080
+      - --hostname-strict=false
+      - --http-port=8080
     volumes:
       - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
+      # Опционально: папка для плагинов, если нужно добавить свои
+      - ./keycloak/providers:/opt/keycloak/providers
     ports:
       - "8080:8080"
     depends_on:
-      - keycloak_db
+      keycloak_db:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # Для Windows/Mac
+    networks:
+      - bionicpro-network
+#    extra_hosts:
+#      - "host.docker.internal:host-gateway"
+    restart: unless-stopped  # ← Добавьте для стабильности
+
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    container_name: bionicpro-frontend
     ports:
       - "3000:3000"
     environment:
+      REACT_APP_AUTH_URL: http://localhost:8081
       REACT_APP_API_URL: http://localhost:8000
-      REACT_APP_KEYCLOAK_URL: http://localhost:8080
-      REACT_APP_KEYCLOAK_REALM: reports-realm
-      REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+    networks:
+      - bionicpro-network
+
+  openldap:
+    build: ./ldap
+    container_name: bionicpro-ldap
+    environment:
+      LDAP_ORGANISATION: BionicPro
+      LDAP_DOMAIN: bionicpro.com
+      LDAP_ADMIN_PASSWORD: admin
+      LDAP_CONFIG_PASSWORD: admin
+      LDAP_READONLY_USER: "false"
+      LDAP_TLS: "false"
+    ports:
+      - "389:389"
+      - "636:636"
+    volumes:
+      - ldap-data:/var/lib/ldap
+      - ldap-config:/etc/ldap/slapd.d
+    networks:
+      - bionicpro-network
+    healthcheck:
+      test: [ "CMD", "ldapsearch", "-x", "-H", "ldap://localhost:389", "-D", "cn=admin,dc=bionicpro,dc=com", "-w", "admin", "-b", "dc=bionicpro,dc=com" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.12-alpine
+    container_name: bionicpro-clickhouse
+    privileged: true
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - ./airflow-dag/clickhouse/data:/var/lib/clickhouse
+      - ./airflow-dag/clickhouse/logs:/var/log/clickhouse-server
+      - ./airflow-dag/clickhouse/config/config.xml:/etc/clickhouse-server/config.d/config.xml
+      - ./airflow-dag/db/clickhouse/init.sql:/docker-entrypoint-initdb.d/01_init.sql
+    environment:
+#      CLICKHOUSE_DB: reports_db
+#      CLICKHOUSE_USER: default
+#      CLICKHOUSE_PASSWORD: ''
+#      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+      CLICKHOUSE_DB: reports_db
+      CLICKHOUSE_USER: reports_user
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-reports_password_123}
+    networks:
+      - bionicpro-network
+    healthcheck:
+      test: [ "CMD", "clickhouse-client", "--query", "SELECT 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  # Основной сервис отчётов
+  bionicpro-reports:
+    build:
+      context: ./bionicpro-reports
+      dockerfile: Dockerfile
+    container_name: bionicpro-reports
+    ports:
+      - "8082:8082"  # API сервиса отчётов
+      - "5006:5006"  # Debug порт для разработки
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: 8082
+      SERVER_SERVLET_CONTEXT_PATH: /api
+
+      # ClickHouse подключение
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: 8123
+      CLICKHOUSE_DB: reports_db
+      CLICKHOUSE_USER: reports_user
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-reports_password_123}
+
+      # Redis для кэширования
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+
+      # Keycloak для аутентификации
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://keycloak:8080/realms/reports-realm
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/reports-realm/protocol/openid-connect/certs
+
+      # Настройки отчётов
+      REPORT_CACHE_TTL_SECONDS: 300
+      REPORT_MAX_USERS_PER_REQUEST: 100
+
+      # Логирование
+      LOGGING_LEVEL_COM_EXAMPLE_REPORTSERVICE: DEBUG
+    volumes:
+      - ./reports-temp:/tmp/reports
+      - ./reports-logs:/var/log/reports-service
+    depends_on:
+#      clickhouse:
+#        condition: service_healthy
+#      redis:
+#        condition: service_healthy
+      keycloak:
+        condition: service_started
+    networks:
+      - bionicpro-network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8082/api/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # MinIO S3 совместимое хранилище
+  minio:
+    image: minio/minio:latest
+    container_name: bionicpro-minio
+    ports:
+      - "9005:9000"   # API порт
+      - "9006:9001"   # Web Console
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    volumes:
+      - ./minio/data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - bionicpro-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    restart: unless-stopped
+
+  # Nginx CDN с кешированием
+  nginx:
+    image: nginx:alpine
+    container_name: bionicpro-cdn
+    ports:
+      - "8083:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/cache:/var/cache/nginx
+    networks:
+      - bionicpro-network
+    depends_on:
+      - minio
+    restart: unless-stopped
+
+  # MinIO Client для создания bucket'ов
+  minio-init:
+    image: minio/mc:latest
+    container_name: bionicpro-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 minioadmin minioadmin123;
+      mc mb local/reports-bucket --ignore-existing;
+      mc anonymous set download local/reports-bucket;
+      mc policy set public local/reports-bucket;
+      echo 'MinIO bucket created successfully';
+      exit 0;
+      "
+    networks:
+      - bionicpro-network
+#      mc policy set download local/reports-bucket;
+
+  # Zookeeper (необходим для Kafka)
+  zookeeper:
+    image: wurstmeister/zookeeper:latest
+    container_name: bionicpro-zookeeper
+    ports:
+      - "2181:2181"
+    networks:
+      - bionicpro-network
+    restart: unless-stopped
+
+  kafka:
+    image: wurstmeister/kafka:latest
+    container_name: bionicpro-kafka
+    depends_on:
+      - zookeeper
+    environment:
+      # Имя хоста для объявления внутри сети Docker
+      KAFKA_ADVERTISED_HOST_NAME: kafka
+      # Адрес Zookeeper
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      # Автоматическое создание топика для CDC (опционально)
+      KAFKA_CREATE_TOPICS: "crm.users:1:1"
+    ports:
+      - "9092:9092"
+    networks:
+      - bionicpro-network
+    restart: unless-stopped
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: bionicpro-kafka-ui
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_CLUSTERS_0_NAME: bionicpro
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+    ports:
+      - "8085:8080"
+    networks:
+      - bionicpro-network
+    restart: unless-stopped
+
+  # Настройка Debezium коннектора
+  debezium-setup:
+    image: curlimages/curl:latest
+    container_name: bionicpro-debezium-setup
+    depends_on:
+      debezium:
+        condition: service_started
+      kafka:
+        condition: service_started
+    volumes:
+      - ./debezium/register-postgres-connector.json:/tmp/connector.json
+    command: >
+      sh -c "
+        echo 'Waiting for Debezium to be ready...';
+        until curl -s -f http://debezium:8083/connectors > /dev/null; do
+          echo 'Debezium not ready yet, waiting...';
+          sleep 5;
+        done;
+        echo 'Debezium is ready! Registering connector...';
+        curl -X POST http://debezium:8083/connectors -H 'Content-Type: application/json' -d @/tmp/connector.json;
+        echo '';
+        echo 'Connector registration attempted. Checking status...';
+        sleep 3;
+        curl -X GET http://debezium:8083/connectors/postgres-crm-connector/status;
+        echo '';
+      "
+    networks:
+      - bionicpro-network
+
+  # Debezium Connect
+  debezium:
+    image: quay.io/debezium/connect:latest
+    container_name: bionicpro-debezium
+    depends_on:
+      - kafka
+      - keycloak_db
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: 1
+      CONFIG_STORAGE_TOPIC: connect_configs
+      OFFSET_STORAGE_TOPIC: connect_offsets
+      STATUS_STORAGE_TOPIC: connect_statuses
+    ports:
+      - "8084:8083"
+    networks:
+      - bionicpro-network
+    restart: unless-stopped
+
+volumes:
+  redis-data:
+  ldap-data:
+  ldap-config:
+
+networks:
+  bionicpro-network:
+    driver: bridge

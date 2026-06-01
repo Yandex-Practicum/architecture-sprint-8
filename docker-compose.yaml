@@ -58,6 +58,7 @@ services:
       - "9000:9000"
     volumes:
       - ./clickhouse-data:/var/lib/clickhouse
+      - ./airflow/sql/create_report_mart.sql:/docker-entrypoint-initdb.d/create_report_mart.sql
   reports-api:
     build:
       context: ./reports-api

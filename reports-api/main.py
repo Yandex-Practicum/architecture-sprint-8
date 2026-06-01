@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, Depends, Query
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import jwt
 import requests
@@ -7,6 +8,15 @@ from config import KEYCLOAK_URL, KEYCLOAK_REALM
 from services.clickhouse_client import get_report
 
 app = FastAPI(title="BionicPRO Reports API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 security = HTTPBearer()
 
 def get_public_key():

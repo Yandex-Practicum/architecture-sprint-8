@@ -2,9 +2,7 @@ version: '3.8'
 
 x-airflow-common:
   &airflow-common
-  build:
-    context: .
-    dockerfile: Dockerfile
+  image: apache/airflow:2.8.0-python3.9
   environment:
     &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: LocalExecutor

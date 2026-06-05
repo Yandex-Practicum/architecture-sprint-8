@@ -108,12 +108,12 @@
 
 - `keycloak/realm-export.json`:
   - Добавлен `"attributes": { "pkce.code.challenge.method": "S256" }` для клиента `reports-frontend`
-  - Отключён `directAccessGrantsEnabled` (`true` → `false`)
+  - `directAccessGrantsEnabled` оставлен `true` для dev-тестирования API через curl; в production отключается
 
 **Обоснование:**
 
 - **PKCE (S256)** — обязателен для публичных клиентов (SPA). Без него authorization code можно перехватить. В Keycloak 21.1 настраивается через `attributes` в JSON-экспорте.
-- **Direct Access Grants отключён** — ROPC-flow небезопасен для SPA, заменён на PKCE + Authorization Code.
+- **Direct Access Grants** — оставлен для dev-режима, чтобы можно было тестировать API через curl с парольным grant_type. В production заменяется на PKCE + Authorization Code через BFF.
 - **keycloak-js v21.1** — PKCE поддерживается нативно, фронтенд менять не пришлось.
 
 **Проверка:** Keycloak запущен, realm `reports-realm` импортирован, PKCE S256 подтверждён через Admin API (`attributes.pkce.code.challenge.method: "S256"`).
@@ -190,11 +190,12 @@
 
 ### Задача 2.4. Ограничение доступа
 
-- **JWT-валидация** — проверка подписи RS256, срока действия, audience
-- **user_id** извлекается из `preferred_username` (или `sub`) — не из query-параметра
+- **JWT-валидация** — проверка подписи RS256, срока действия, realm_access roles
+- **RBAC** — проверяется наличие роли `prothetic_user` в `realm_access.roles` токена
+- **user_id** извлекается из `preferred_username` — не из query-параметра
 - Пользователь может запросить только свои данные. Чужой user_id подставить нельзя — он берётся из токена
 - **401** — токен отсутствует / истёк / невалидный
-- **403** — (в текущей реализации не требуется, т.к. user_id фиксирован из токена)
+- **403** — роль пользователя не `prothetic_user` (например, `user1` с ролью `user`)
 
 ### Задача 2.5. UI
 

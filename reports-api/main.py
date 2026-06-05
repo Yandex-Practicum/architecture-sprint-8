@@ -48,6 +48,13 @@ def get_user_report(
     period_to: str = Query(None, description="End date YYYY-MM-DD"),
     token_data: dict = Depends(verify_token),
 ):
+    roles = token_data.get("realm_access", {}).get("roles", [])
+    if "prothetic_user" not in roles:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied. Only prothetic users can access reports."
+        )
+
     preferred_username = token_data.get("preferred_username", "")
     import re
     match = re.search(r'\d+$', preferred_username)

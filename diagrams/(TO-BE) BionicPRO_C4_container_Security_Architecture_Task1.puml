@@ -1,0 +1,102 @@
+@startuml BionicPRO Container diagram (TO-BE, Security Architecture)
+!includeurl https://raw.githubusercontent.com/RicardoNiepel/C4-PlantUML/master/C4_Container.puml
+
+title BionicPRO Container diagram (TO-BE, Security Architecture)
+
+top to bottom direction
+
+' ==================== ACTORS ====================
+Person(user, "Пользователь протеза", "Пользователь бионического протеза, использует мобильное приложение")
+Person(buyer, "Покупатель протеза", "Заказывает и оплачивает протез через интернет-магазин")
+Person_Ext(operator, "Оператор производства", "Внутренний сотрудник, работает с CRM")
+Person_Ext(ml_engineer, "ML-инженер", "Работает с данными телеметрии для улучшения моделей")
+
+' ==================== EXTERNAL SYSTEMS ====================
+System_Ext(prosthesis_chip, "Программа в чипе протеза", "Чтение миосигналов, управление актуаторами, передача телеметрии [C++, ESP32]")
+System_Ext(ldap_russia, "LDAP Russia", "Учётные записи сотрудников и клиентов РФ представительства")
+System_Ext(ldap_europe, "LDAP Europe", "Учётные записи европейского представительства")
+System_Ext(yandex_id, "Яндекс ID", "OAuth 2.0 провайдер для российских пользователей")
+System_Ext(other_idp, "Other IdP", "Другие внешние IdP (Google, Apple и др.)")
+
+' ==================== BIONICPRO SYSTEM BOUNDARY ====================
+System_Boundary(bionicpro, "BionicPRO") {
+
+    ' ---------- Frontend Applications ----------
+    Container(web_shop, "Интернет-магазин", "Битрикс24, React", "Выбор и заказ протезов")
+    Container(mobile_app, "Мобильное приложение", "iOS, Android", "Донастройка протеза, просмотр отчётов. Работает через сессионные cookie")
+
+    ' ---------- Security & Identity Management Subsystem ----------
+    Container(keycloak, "Keycloak", "Identity Broker", "Центральный IdP с поддержкой MFA/OTP. User Federation с LDAP, Identity Brokering с внешними IdP")
+    Container(auth_service, "bionicpro-auth", "Java / Spring Security", "BFF для аутентификации. Хранит токены серверно, выдаёт HTTP-only session cookie. Реализует PKCE flow")
+    ContainerDb(session_store, "Session Store", "Redis", "Хранение сессий, access и refresh токенов в зашифрованном виде")
+
+    ' ---------- Backend Services ----------
+    Container(api_gateway, "API Gateway", "Spring Boot", "Основной API. Проверяет сессии через bionicpro-auth")
+    Container(crm, "CRM", "Битрикс24", "Управление заказами и клиентами")
+    Container(cli_tool, "CLI Tool", "Python", "Инструмент для ML-инженеров")
+
+    ' ---------- Databases ----------
+    ContainerDb(crm_db, "CRM DB", "PostgreSQL", "Данные клиентов и заказов")
+    ContainerDb(telemetry_db, "Telemetry DB", "PostgreSQL", "Данные телеметрии протезов")
+}
+
+' ==================== RELATIONSHIPS ====================
+
+' --- User interactions ---
+Rel(user, mobile_app, "Донастройка протеза", "HTTPS")
+Rel(user, prosthesis_chip, "Миосигналы", "Биоэлектрические сигналы")
+Rel(buyer, web_shop, "Заказ протеза", "HTTPS")
+Rel(operator, crm, "Управление заказами", "HTTPS")
+Rel(ml_engineer, cli_tool, "Анализ данных", "CLI")
+
+' --- Frontend to Backend ---
+Rel(web_shop, crm, "Заказы", "REST / JSON")
+Rel(mobile_app, auth_service, "Session Cookie (HTTP-only, Secure)", "HTTPS")
+Rel(mobile_app, api_gateway, "REST API + Session Cookie", "HTTPS")
+
+' --- Security flow (BFF pattern) ---
+Rel(auth_service, keycloak, "OAuth 2.0 PKCE Code Grant", "HTTPS")
+Rel(auth_service, session_store, "Хранение токенов (зашифрованы)", "TLS")
+Rel(api_gateway, auth_service, "Валидация сессии", "REST")
+
+' --- Keycloak to External IdPs ---
+Rel(keycloak, ldap_russia, "User Federation", "LDAPS")
+Rel(keycloak, ldap_europe, "User Federation", "LDAPS")
+Rel(keycloak, yandex_id, "Identity Brokering", "OAuth 2.0")
+Rel(keycloak, other_idp, "Identity Brokering", "OIDC / OAuth 2.0")
+
+' --- Data flows ---
+Rel(prosthesis_chip, api_gateway, "Телеметрия", "HTTPS / 4G")
+Rel(api_gateway, telemetry_db, "Чтение/запись телеметрии", "SQL")
+Rel(crm, crm_db, "Чтение/запись данных клиентов", "SQL")
+Rel(cli_tool, telemetry_db, "Чтение данных для ML", "SQL")
+
+' ==================== NOTES ====================
+
+Note right of auth_service
+  **BFF-паттерн (Backend for Frontend):**
+  * Фронтенд не имеет доступа к access/refresh токенам от IdP
+  * Токены хранятся в Redis в зашифрованном виде
+  * Фронтенд работает только с session cookie (HTTP-only, Secure)
+  * Автоматическое обновление access_token через refresh_token
+  * Ротация session ID для защиты от session fixation attack
+end note
+
+Note right of keycloak
+  **Keycloak как Identity Broker:**
+  * User Federation: синхронизация с LDAP серверами
+    представительств (только аутентификационные данные)
+  * Identity Brokering: внешние IdP (Яндекс ID, Google, Apple)
+  * MFA/OTP: обязательная двухфакторная аутентификация
+  * Маппинг ролей между представительствами
+end note
+
+Note left of ldap_russia
+  **Принципы локализации данных:**
+  * Персональные и медицинские данные
+    остаются в локальных БД страны
+  * Keycloak синхронизирует только
+    аутентификационные атрибуты
+end note
+
+@enduml

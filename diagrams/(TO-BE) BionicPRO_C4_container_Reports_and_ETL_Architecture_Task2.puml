@@ -1,0 +1,150 @@
+@startuml BionicPRO Container diagram (TO-BE, Reports Architecture)
+!includeurl https://raw.githubusercontent.com/RicardoNiepel/C4-PlantUML/master/C4_Container.puml
+
+title BionicPRO Container diagram (TO-BE, Reports & ETL Architecture)
+
+top to bottom direction
+
+' ==================== ACTORS ====================
+Person(user, "Пользователь протеза", "Использует мобильное приложение для просмотра отчётов о работе протеза")
+Person(buyer, "Покупатель протеза", "Заказывает и оплачивает протез через интернет-магазин")
+Person_Ext(operator, "Оператор производства", "Внутренний сотрудник, работает с CRM")
+Person_Ext(ml_engineer, "ML-инженер", "Работает с данными телеметрии для улучшения моделей")
+
+' ==================== EXTERNAL SYSTEMS ====================
+System_Ext(prosthesis_chip, "Программа в чипе протеза", "Чтение миосигналов, управление актуаторами, передача телеметрии [C++, ESP32]")
+System_Ext(ldap_russia, "LDAP Russia", "Учётные записи сотрудников и клиентов РФ представительства")
+System_Ext(yandex_id, "Яндекс ID", "OAuth 2.0 провайдер для российских пользователей")
+
+' ==================== BIONICPRO SYSTEM BOUNDARY ====================
+System_Boundary(bionicpro, "BionicPRO") {
+
+    ' ---------- Frontend Applications ----------
+    Container(web_shop, "Интернет-магазин", "Битрикс24, React", "Выбор и заказ протезов")
+    Container(mobile_app, "Мобильное приложение", "iOS, Android", "Донастройка протеза, просмотр отчётов о работе протеза")
+
+    ' ---------- Security & Identity Management ----------
+    Container(keycloak, "Keycloak", "Identity Broker", "Центральный IdP с MFA/OTP, User Federation, Identity Brokering")
+    Container(auth_service, "bionicpro-auth", "Java / Spring Security", "BFF для аутентификации. PKCE flow, серверное хранение токенов")
+    ContainerDb(session_store, "Session Store", "Redis", "Хранение сессий и токенов")
+
+    ' ---------- Backend Services ----------
+    Container(api_gateway, "API Gateway", "Spring Boot", "Основной API, маршрутизация запросов, проверка сессий")
+    Container(crm, "CRM", "Битрикс24", "Управление заказами и клиентами")
+    Container(cli_tool, "CLI Tool", "Python", "Инструмент для ML-инженеров")
+
+    ' ---------- NEW: Reports Service ----------
+    Container(reports_service, "Reports Service", "Python / FastAPI", "Сервис отчётов. Генерация и выдача отчётов по пользователю из OLAP витрины")
+
+    ' ---------- NEW: ETL / Data Pipeline ----------
+    Container(airflow, "Apache Airflow", "Python / Airflow", "Оркестратор ETL-процессов. Расписание и мониторинг DAG")
+    Container(etl_jobs, "ETL Jobs", "Python / PySpark", "Задачи извлечения, трансформации и загрузки данных в витрину")
+
+    ' ---------- OLTP Databases (Sources) ----------
+    ContainerDb(crm_db, "CRM DB", "PostgreSQL", "Данные клиентов, заказов, протезов")
+    ContainerDb(telemetry_db, "Telemetry DB", "PostgreSQL", "Данные телеметрии с протезов (миосигналы, движения)")
+
+    ' ---------- NEW: OLAP Database (Target) ----------
+    ContainerDb(clickhouse, "ClickHouse", "OLAP DB", "Витрина отчётности: агрегированные данные телеметрии + данные клиентов")
+}
+
+' ==================== RELATIONSHIPS ====================
+
+' --- User interactions ---
+Rel(user, mobile_app, "Просмотр отчётов", "HTTPS")
+Rel(user, prosthesis_chip, "Миосигналы", "Биоэлектрические сигналы")
+Rel(buyer, web_shop, "Заказ протеза", "HTTPS")
+Rel(operator, crm, "Управление заказами", "HTTPS")
+Rel(ml_engineer, cli_tool, "Анализ данных", "CLI")
+
+' --- Frontend to Backend ---
+Rel(web_shop, crm, "Заказы", "REST / JSON")
+Rel(mobile_app, auth_service, "Аутентификация", "HTTPS + Session Cookie")
+Rel(mobile_app, api_gateway, "REST API + Session Cookie", "HTTPS")
+
+' --- API Gateway routing ---
+Rel(api_gateway, auth_service, "Валидация сессии", "REST")
+Rel(api_gateway, reports_service, "GET /reports/{userId}", "REST / JSON")
+Rel(api_gateway, telemetry_db, "Запись телеметрии", "SQL")
+
+' --- Security flow ---
+Rel(auth_service, keycloak, "OAuth 2.0 PKCE", "HTTPS")
+Rel(auth_service, session_store, "Хранение токенов", "TLS")
+Rel(keycloak, ldap_russia, "User Federation", "LDAPS")
+Rel(keycloak, yandex_id, "Identity Brokering", "OAuth 2.0")
+
+' --- Data ingestion ---
+Rel(prosthesis_chip, api_gateway, "Телеметрия (real-time)", "HTTPS / 4G")
+Rel(crm, crm_db, "CRUD операции", "SQL")
+Rel(cli_tool, telemetry_db, "Чтение для ML", "SQL")
+
+' --- ETL Pipeline (NEW) ---
+Rel(airflow, etl_jobs, "Запуск DAG по расписанию", "Airflow Executor")
+Rel(etl_jobs, crm_db, "Extract: данные клиентов и протезов", "SQL / Read")
+Rel(etl_jobs, telemetry_db, "Extract: данные телеметрии", "SQL / Read")
+Rel(etl_jobs, clickhouse, "Load: витрина отчётности", "HTTP / Native")
+
+' --- Reports Service (NEW) ---
+Rel(reports_service, clickhouse, "SELECT из витрины по user_id", "HTTP / Native")
+Rel(reports_service, auth_service, "Проверка прав доступа", "REST")
+
+' ==================== NOTES ====================
+
+Note right of airflow
+  **Apache Airflow - ETL Orchestrator:**
+  * DAG: bionicpro_reports_etl
+  * Расписание: каждые 15 минут (*/15 * * * *)
+  * Задачи:
+    1. extract_crm_data
+    2. extract_telemetry_data
+    3. transform_and_join
+    4. load_to_clickhouse
+  * Мониторинг через Airflow UI
+end note
+
+Note right of clickhouse
+  **ClickHouse - OLAP Витрина:**
+  * Таблица: reports.user_prosthesis_stats
+  * Партиционирование: по user_id и дате
+  * Колонки:
+    - user_id, prosthesis_id
+    - date, hour
+    - movements_count, avg_response_time
+    - battery_level, error_count
+    - customer_name, prosthesis_model
+  * TTL: 365 дней
+end note
+
+Note left of reports_service
+  **Reports Service:**
+  * GET /api/reports - список отчётов
+  * GET /api/reports/{date} - отчёт за дату
+  * Авторизация: user_id из JWT
+  * Пользователь видит только свои отчёты
+  * Кэширование: Redis (5 мин)
+end note
+
+Note bottom of etl_jobs
+  **ETL Jobs - Трансформация:**
+  * JOIN телеметрии с данными CRM
+  * Агрегация по user_id, дате, часу
+  * Расчёт метрик:
+    - Среднее время отклика
+    - Количество движений
+    - Процент ошибок
+  * Инкрементальная загрузка (по updated_at)
+end note
+
+' ==================== LEGEND ====================
+legend right
+  |= Цвет |= Тип компонента |
+  | <#6C6477> | Внешний пользователь |
+  | <#438DD5> | Frontend / Существующие контейнеры |
+  | <#23A2D9> | Backend Services |
+  | <#D32F2F> | Security компоненты |
+  | <#FF9800> | ETL / Data Pipeline (новые) |
+  | <#4CAF50> | Reports Service (новый) |
+  | <#9C27B0> | OLAP Database (новая) |
+endlegend
+
+@enduml

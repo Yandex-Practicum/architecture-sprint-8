@@ -1,0 +1,152 @@
+@startuml BionicPRO Container diagram (TO-BE, CDC Architecture)
+!includeurl https://raw.githubusercontent.com/RicardoNiepel/C4-PlantUML/master/C4_Container.puml
+
+title BionicPRO Container diagram (TO-BE, CDC Architecture)
+
+top to bottom direction
+
+' ==================== ACTORS ====================
+Person(user, "Пользователь протеза", "Запрашивает отчёты о работе протеза")
+Person(crm_user, "Оператор CRM", "Работает с данными клиентов (OLTP)")
+
+' ==================== BIONICPRO SYSTEM BOUNDARY ====================
+System_Boundary(bionicpro, "BionicPRO Reports System with CDC") {
+
+    ' ---------- Frontend & BFF ----------
+    Container(frontend, "Frontend", "React 18, TypeScript", "SPA для просмотра отчётов")
+    Container(bff, "bionicpro-auth", "Python/Flask", "BFF для аутентификации и прокси")
+
+    ' ---------- Reports Service ----------
+    Container(reports_service, "Reports Service", "Python/FastAPI", "API для отчётов. Читает из OLAP витрины")
+
+    ' ---------- OLTP Layer (CRM) ----------
+    ContainerDb(crm_db, "CRM DB", "PostgreSQL 14", "OLTP база данных CRM.\nwal_level=logical для CDC.\nТаблицы: customers, prostheses")
+
+    ' ---------- CDC Layer ----------
+    Container(debezium, "Debezium Connect", "Kafka Connect + Debezium", "CDC коннектор.\nОтслеживает изменения в CRM DB.\nПубликует события в Kafka")
+    Container(kafka, "Kafka", "Apache Kafka 3.6", "Шина сообщений.\nТопики: crm.customers, crm.prostheses, crm.prosthesis_models")
+    Container(zookeeper, "Zookeeper", "Apache Zookeeper", "Координатор для Kafka")
+
+    ' ---------- OLAP Layer ----------
+    ContainerDb(clickhouse, "ClickHouse", "OLAP Database", "OLAP витрина отчётов.\nKafkaEngine для чтения из Kafka.\nMaterializedView для агрегации")
+
+    ' ---------- Telemetry (остаётся ETL) ----------
+    ContainerDb(telemetry_db, "Telemetry DB", "PostgreSQL 14", "Данные телеметрии.\nОбновляется через ETL")
+    Container(airflow, "Apache Airflow", "ETL Orchestrator", "ETL для телеметрии.\nОбъединяет данные с CRM")
+
+    ' ---------- Caching Layer ----------
+    Container(nginx_cdn, "Nginx CDN", "Nginx 1.25", "CDN с кэшированием")
+    ContainerDb(minio, "MinIO (S3)", "S3-compatible", "Хранение отчётов")
+    ContainerDb(redis, "Redis", "Redis 7", "Кэш сессий")
+}
+
+' ==================== RELATIONSHIPS ====================
+
+' --- User Report Flow ---
+Rel_D(user, frontend, "1. Запрос отчёта", "HTTPS")
+Rel_D(frontend, bff, "2. Proxy", "HTTPS")
+Rel_D(bff, reports_service, "3. GET /api/reports", "JWT")
+Rel_R(reports_service, clickhouse, "4. SELECT", "TCP/9000")
+Rel_L(reports_service, minio, "Кэш отчётов", "S3 API")
+Rel_D(nginx_cdn, minio, "CDN proxy", "HTTP")
+
+' --- CRM OLTP Operations ---
+Rel_D(crm_user, crm_db, "OLTP операции", "SQL")
+
+' --- CDC Pipeline (Real-time) ---
+Rel_R(crm_db, debezium, "1. WAL события", "Logical Replication")
+Rel_R(debezium, kafka, "2. Publish CDC events", "Kafka Protocol")
+Rel_D(kafka, clickhouse, "3. Consume events", "KafkaEngine")
+
+' --- ETL для телеметрии (остаётся) ---
+Rel_D(airflow, telemetry_db, "Extract telemetry", "SQL")
+Rel_D(airflow, clickhouse, "Load telemetry", "SQL")
+
+' --- Kafka координация ---
+Rel_D(zookeeper, kafka, "Координация", "ZK Protocol")
+
+' ==================== NOTES ====================
+
+note right of debezium
+  **Debezium PostgreSQL Connector:**
+  * Читает WAL (wal_level=logical)
+  * Отслеживает: crm.customers,
+    crm.prostheses, crm.prosthesis_models
+  * Публикует в топики Kafka
+  * Гарантирует exactly-once delivery
+end note
+
+note right of kafka
+  **Kafka Topics:**
+  * crm.crm.customers
+  * crm.crm.prostheses
+  * crm.crm.prosthesis_models
+
+  Формат: Debezium JSON
+  Retention: 7 days
+end note
+
+note bottom of clickhouse
+  **ClickHouse CDC Tables:**
+
+  1. **Kafka Tables** (KafkaEngine)
+     - kafka_crm_customers
+     - kafka_crm_prostheses
+     - kafka_crm_models
+
+  2. **Target Tables** (MergeTree)
+     - crm_customers
+     - crm_prostheses
+     - crm_prosthesis_models
+
+  3. **MaterializedView**
+     - mv_kafka_customers
+     - mv_kafka_prostheses
+     - mv_kafka_models
+
+  4. **Reports Mart** (соединение с telemetry)
+     - user_prosthesis_stats
+end note
+
+note left of crm_db
+  **PostgreSQL CDC Setup:**
+  * wal_level = logical
+  * max_wal_senders = 4
+  * max_replication_slots = 4
+  * Публикация для Debezium
+
+  **Преимущества CDC:**
+  * Нет нагрузки на CRM от выгрузок
+  * Real-time обновление OLAP
+  * OLTP операции не блокируются
+end note
+
+note right of airflow
+  **Hybrid Architecture:**
+
+  * CRM данные: CDC (real-time)
+  * Telemetry: ETL (batch, каждые 15 мин)
+
+  Airflow продолжает:
+  1. Извлекать телеметрию
+  2. Объединять с CRM в витрине
+  3. Инвалидировать CDN кэш
+end note
+
+' ==================== LEGEND ====================
+legend right
+  |= Компонент |= Назначение |
+  | Debezium | CDC коннектор для PostgreSQL |
+  | Kafka | Шина событий для CDC |
+  | KafkaEngine | ClickHouse движок для Kafka |
+  | MaterializedView | Автоматическая трансформация |
+
+  **Поток данных CDC:**
+  CRM DB → Debezium → Kafka → ClickHouse
+
+  **Разделение нагрузки:**
+  * OLTP: CRM операции (не блокируются)
+  * OLAP: Отчёты из ClickHouse
+endlegend
+
+@enduml

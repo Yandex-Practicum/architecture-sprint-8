@@ -1,0 +1,21 @@
+# ============================================================================
+# BionicPRO Airflow ETL Dependencies
+# ============================================================================
+
+# PostgreSQL провайдер для Airflow
+apache-airflow-providers-postgres==5.10.0
+
+# ClickHouse драйвер
+clickhouse-driver==0.2.6
+
+# Data processing
+pandas==2.0.0
+
+# Common SQL провайдер
+apache-airflow-providers-common-sql==1.11.0
+
+# Swagger UI for Airflow web interface
+connexion[swagger-ui]==2.14.2
+
+# HTTP клиент для вызова Reports Service API (Задание 3)
+requests==2.31.0

@@ -1,0 +1,113 @@
+@startuml BionicPRO Container diagram (TO-BE, S3/CDN Architecture)
+!includeurl https://raw.githubusercontent.com/RicardoNiepel/C4-PlantUML/master/C4_Container.puml
+
+title BionicPRO Container diagram (TO-BE, S3/CDN Caching Architecture)
+
+top to bottom direction
+
+' ==================== ACTORS ====================
+Person(user, "Пользователь протеза", "Запрашивает отчёты о работе протеза")
+Person_Ext(admin, "Администратор", "Управляет кэшем и инвалидацией")
+
+' ==================== BIONICPRO SYSTEM BOUNDARY ====================
+System_Boundary(bionicpro, "BionicPRO Reports System") {
+
+    ' ---------- Frontend & BFF ----------
+    Container(frontend, "Frontend", "React 18, TypeScript", "SPA для просмотра отчётов")
+    Container(bff, "bionicpro-auth", "Python/Flask", "BFF для аутентификации и прокси")
+
+    ' ---------- Reports Service ----------
+    Container(reports_service, "Reports Service", "Python/FastAPI", "API для отчётов. Генерирует отчёты, сохраняет в S3, возвращает CDN URL")
+
+    ' ---------- Caching Layer ----------
+    Container(nginx_cdn, "Nginx CDN", "Nginx 1.25", "Reverse proxy с кэшированием. TTL 5 минут. Кэширует статические JSON файлы")
+    ContainerDb(minio, "MinIO (S3)", "S3-compatible", "Объектное хранилище для JSON отчётов. Bucket: reports-bucket")
+    ContainerDb(redis, "Redis", "Redis 7", "Кэш сессий и метаданных. TTL 5 минут")
+
+    ' ---------- Data Sources ----------
+    ContainerDb(clickhouse, "ClickHouse", "OLAP", "Витрина отчётов. Данные обновляются ETL каждые 15 минут")
+
+    ' ---------- ETL ----------
+    Container(airflow, "Apache Airflow", "ETL Orchestrator", "Обновляет данные в ClickHouse. После ETL вызывает инвалидацию кэша")
+}
+
+' ==================== EXTERNAL DATA SOURCES ====================
+System_Ext(crm_db, "CRM DB", "PostgreSQL - данные клиентов")
+System_Ext(telemetry_db, "Telemetry DB", "PostgreSQL - телеметрия")
+
+' ==================== RELATIONSHIPS ====================
+
+' --- User Flow (Happy Path - Cache HIT) ---
+Rel_D(user, frontend, "1. Запрос отчёта", "HTTPS")
+Rel_D(frontend, bff, "2. Proxy запрос", "HTTPS + Session Cookie")
+Rel_D(bff, reports_service, "3. GET /api/reports/cdn/*", "HTTPS + JWT")
+Rel_R(reports_service, minio, "4. HEAD (проверка)", "S3 API")
+Rel_L(reports_service, frontend, "5. CDN URL", "JSON Response")
+Rel_D(frontend, nginx_cdn, "6. Fetch report", "GET CDN URL")
+Rel_D(nginx_cdn, minio, "7. Proxy (если нет в кэше)", "HTTP")
+
+' --- Cache MISS Flow ---
+Rel_R(reports_service, clickhouse, "4a. SELECT (cache miss)", "TCP/9000")
+Rel_R(reports_service, minio, "4b. PUT (сохранение)", "S3 API")
+
+' --- ETL & Cache Invalidation ---
+Rel_D(airflow, crm_db, "Extract", "SQL")
+Rel_D(airflow, telemetry_db, "Extract", "SQL")
+Rel_D(airflow, clickhouse, "Load", "TCP/9000")
+Rel_U(airflow, reports_service, "POST /invalidate", "HTTP")
+Rel_R(reports_service, minio, "DELETE (инвалидация)", "S3 API")
+Rel_R(reports_service, redis, "DEL (инвалидация)", "Redis Protocol")
+
+' --- Admin ---
+Rel_D(admin, reports_service, "Ручная инвалидация", "REST API")
+
+' ==================== NOTES ====================
+
+note right of nginx_cdn
+  **Nginx CDN Configuration:**
+  * proxy_cache_valid 200 5m
+  * proxy_cache_use_stale on
+  * proxy_cache_lock on
+  * X-Cache-Status header
+  * CORS headers для фронтенда
+end note
+
+note right of minio
+  **S3 Storage Structure:**
+  reports-bucket/
+  ├── {user_id}/
+  │   ├── list/reports.json
+  │   ├── summary/summary.json
+  │   └── daily/{date}/report.json
+end note
+
+note bottom of reports_service
+  **Request Flow:**
+  1. Check S3 for cached report
+  2. If EXISTS: Return CDN URL (fast path)
+  3. If NOT EXISTS:
+     a. Query ClickHouse
+     b. Store in S3
+     c. Return CDN URL
+end note
+
+note left of airflow
+  **Cache Invalidation:**
+  После завершения ETL:
+  1. Получить список user_ids
+  2. POST /api/reports/invalidate
+  3. Удалить объекты из S3
+  4. Очистить Redis кэш
+  5. CDN кэш истечёт по TTL
+end note
+
+' ==================== LEGEND ====================
+legend right
+  |= Компонент |= Назначение |
+  | Nginx CDN | Кэширование на уровне HTTP |
+  | MinIO (S3) | Персистентное хранение отчётов |
+  | Redis | Кэш метаданных и сессий |
+  | ClickHouse | OLAP для генерации отчётов |
+endlegend
+
+@enduml

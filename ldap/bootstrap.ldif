@@ -1,0 +1,109 @@
+# Organizational Units
+dn: ou=People,dc=bionicpro,dc=com
+objectClass: top
+objectClass: organizationalUnit
+ou: People
+
+dn: ou=Groups,dc=bionicpro,dc=com
+objectClass: top
+objectClass: organizationalUnit
+ou: Groups
+
+# Users - Russia Branch
+dn: uid=ivan.petrov,ou=People,dc=bionicpro,dc=com
+objectClass: top
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+cn: Ivan Petrov
+sn: Petrov
+uid: ivan.petrov
+mail: ivan.petrov@bionicpro.ru
+userPassword: password123
+employeeType: russia
+
+dn: uid=maria.sidorova,ou=People,dc=bionicpro,dc=com
+objectClass: top
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+cn: Maria Sidorova
+sn: Sidorova
+uid: maria.sidorova
+mail: maria.sidorova@bionicpro.ru
+userPassword: password123
+employeeType: russia
+
+dn: uid=alexey.kozlov,ou=People,dc=bionicpro,dc=com
+objectClass: top
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+cn: Alexey Kozlov
+sn: Kozlov
+uid: alexey.kozlov
+mail: alexey.kozlov@bionicpro.ru
+userPassword: password123
+employeeType: russia
+
+# Users - Europe Branch
+dn: uid=john.mueller,ou=People,dc=bionicpro,dc=com
+objectClass: top
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+cn: John Mueller
+sn: Mueller
+uid: john.mueller
+mail: john.mueller@bionicpro.eu
+userPassword: password123
+employeeType: europe
+
+dn: uid=anna.schmidt,ou=People,dc=bionicpro,dc=com
+objectClass: top
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+cn: Anna Schmidt
+sn: Schmidt
+uid: anna.schmidt
+mail: anna.schmidt@bionicpro.eu
+userPassword: password123
+employeeType: europe
+
+# Role Groups
+dn: cn=user,ou=Groups,dc=bionicpro,dc=com
+objectClass: top
+objectClass: groupOfNames
+cn: user
+member: uid=maria.sidorova,ou=People,dc=bionicpro,dc=com
+member: uid=anna.schmidt,ou=People,dc=bionicpro,dc=com
+
+dn: cn=prothetic_user,ou=Groups,dc=bionicpro,dc=com
+objectClass: top
+objectClass: groupOfNames
+cn: prothetic_user
+member: uid=ivan.petrov,ou=People,dc=bionicpro,dc=com
+member: uid=john.mueller,ou=People,dc=bionicpro,dc=com
+
+dn: cn=administrator,ou=Groups,dc=bionicpro,dc=com
+objectClass: top
+objectClass: groupOfNames
+cn: administrator
+member: uid=alexey.kozlov,ou=People,dc=bionicpro,dc=com
+
+# Branch-specific groups for role mapping
+dn: cn=russia_staff,ou=Groups,dc=bionicpro,dc=com
+objectClass: top
+objectClass: groupOfNames
+cn: russia_staff
+member: uid=ivan.petrov,ou=People,dc=bionicpro,dc=com
+member: uid=maria.sidorova,ou=People,dc=bionicpro,dc=com
+member: uid=alexey.kozlov,ou=People,dc=bionicpro,dc=com
+
+dn: cn=europe_staff,ou=Groups,dc=bionicpro,dc=com
+objectClass: top
+objectClass: groupOfNames
+cn: europe_staff
+member: uid=john.mueller,ou=People,dc=bionicpro,dc=com
+member: uid=anna.schmidt,ou=People,dc=bionicpro,dc=com

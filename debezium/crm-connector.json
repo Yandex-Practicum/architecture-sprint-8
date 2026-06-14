@@ -1,0 +1,52 @@
+{
+  "name": "crm-connector",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "tasks.max": "1",
+
+    "database.hostname": "crm_db",
+    "database.port": "5432",
+    "database.user": "crm_user",
+    "database.password": "crm_password",
+    "database.dbname": "crm_db",
+    "database.server.name": "crm",
+
+    "topic.prefix": "crm",
+
+    "schema.include.list": "crm",
+    "table.include.list": "crm.customers,crm.prostheses,crm.prosthesis_models",
+
+    "plugin.name": "pgoutput",
+    "publication.name": "dbz_publication",
+    "publication.autocreate.mode": "filtered",
+
+    "slot.name": "debezium_crm_slot",
+    "slot.drop.on.stop": "false",
+
+    "snapshot.mode": "initial",
+    "snapshot.locking.mode": "none",
+
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter.schemas.enable": "false",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter.schemas.enable": "false",
+
+    "transforms": "unwrap",
+    "transforms.unwrap.type": "io.debezium.transforms.ExtractNewRecordState",
+    "transforms.unwrap.drop.tombstones": "true",
+    "transforms.unwrap.delete.handling.mode": "rewrite",
+    "transforms.unwrap.add.fields": "op,table,source.ts_ms",
+
+    "decimal.handling.mode": "double",
+    "time.precision.mode": "connect",
+
+    "heartbeat.interval.ms": "10000",
+    "heartbeat.action.query": "SELECT 1",
+
+    "errors.log.enable": "true",
+    "errors.log.include.messages": "true",
+    "errors.tolerance": "all",
+    "errors.deadletterqueue.topic.name": "crm.dlq",
+    "errors.deadletterqueue.topic.replication.factor": "1"
+  }
+}

@@ -11,8 +11,37 @@ services:
       - ./postgres-keycloak-data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U keycloak_user -d keycloak_db" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ldap:
+    image: osixia/openldap:1.5.0
+    environment:
+      LDAP_ORGANISATION: "BionicPRO"
+      LDAP_DOMAIN: "bionicpro.com"
+      LDAP_BASE_DN: "dc=bionicpro,dc=com"
+      LDAP_SKIP_DEFAULT_TREE: "true"
+      LDAP_ADMIN_PASSWORD: "admin"
+      LDAP_CONFIG_PASSWORD: "config"
+      LDAP_READONLY_USER: "true"
+      LDAP_READONLY_USER_USERNAME: "readonly"
+      LDAP_READONLY_USER_PASSWORD: "readonly"
+    volumes:
+      - ./ldap/bootstrap.ldif:/opt/ldap-bootstrap/bootstrap.ldif
+      - ./ldap/entrypoint.sh:/opt/ldap-bootstrap/entrypoint.sh
+      - ./ldap-data:/var/lib/ldap
+      - ./ldap-config:/etc/ldap/slapd.d
+    ports:
+      - "389:389"
+      - "636:636"
+    entrypoint: /opt/ldap-bootstrap/entrypoint.sh
+    command: --copy-service --loglevel debug
+
   keycloak:
-    image: quay.io/keycloak/keycloak:21.1
+    image: quay.io/keycloak/keycloak:26.5.2
     environment:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
@@ -20,7 +49,10 @@ services:
       KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
       KC_DB_USERNAME: keycloak_user
       KC_DB_PASSWORD: keycloak_password
-    command: 
+      # Yandex ID OAuth credentials (получите на https://oauth.yandex.ru/)
+      YANDEX_CLIENT_ID: ${YANDEX_CLIENT_ID:-}
+      YANDEX_CLIENT_SECRET: ${YANDEX_CLIENT_SECRET:-}
+    command:
       - start-dev
       - --import-realm
     volumes:
@@ -28,7 +60,72 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      - keycloak_db
+      keycloak_db:
+        condition: service_healthy
+      ldap:
+        condition: service_started
+
+  # Init service to configure master realm SSL settings
+  # Disables HTTPS requirement for local development
+  keycloak-init:
+    image: quay.io/keycloak/keycloak:26.5.2
+    volumes:
+      - ./keycloak/configure-master-realm.sh:/opt/configure-master-realm.sh
+    entrypoint: ["/bin/bash", "/opt/configure-master-realm.sh"]
+    depends_on:
+      - keycloak
+    restart: on-failure
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./redis-data:/data
+    command: redis-server --appendonly yes
+
+  bionicpro_db:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: bionicpro_db
+      POSTGRES_USER: bionicpro_user
+      POSTGRES_PASSWORD: bionicpro_password
+    volumes:
+      - ./postgres-bionicpro-data:/var/lib/postgresql/data
+      - ./bionicpro-auth/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5434:5432"
+
+  bionicpro-auth:
+    build:
+      context: ./bionicpro-auth
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_PUBLIC_URL: http://localhost:8080
+      KEYCLOAK_REALM: reports-realm
+      CLIENT_ID: bionicpro-auth
+      REDIRECT_URI: http://localhost:8000/auth/callback
+      FRONTEND_URL: http://localhost:3000
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      SECURE_COOKIES: "false"
+      DEBUG: "false"
+      # PostgreSQL for user profiles
+      DATABASE_URL: postgresql://bionicpro_user:bionicpro_password@bionicpro_db:5432/bionicpro_db
+      # Yandex ID credentials (for fetching additional profile data)
+      YANDEX_CLIENT_ID: ${YANDEX_CLIENT_ID:-}
+      YANDEX_CLIENT_SECRET: ${YANDEX_CLIENT_SECRET:-}
+      # Reports Service URL for proxy
+      REPORTS_SERVICE_URL: http://reports-service:8001
+    depends_on:
+      - keycloak
+      - redis
+      - bionicpro_db
+
   frontend:
     build:
       context: ./frontend
@@ -36,7 +133,525 @@ services:
     ports:
       - "3000:3000"
     environment:
-      REACT_APP_API_URL: http://localhost:8000
-      REACT_APP_KEYCLOAK_URL: http://localhost:8080
-      REACT_APP_KEYCLOAK_REALM: reports-realm
-      REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+      REACT_APP_AUTH_URL: http://localhost:8000
+    depends_on:
+      - bionicpro-auth
+
+  # ============================================================================
+  # ETL & Reports Infrastructure (Задание 2)
+  # ============================================================================
+
+  # CRM Database - источник данных о клиентах и протезах
+  # Настроен для CDC (Change Data Capture) с Debezium
+  crm_db:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: crm_db
+      POSTGRES_USER: crm_user
+      POSTGRES_PASSWORD: crm_password
+    volumes:
+      - ./postgres-crm-data:/var/lib/postgresql/data
+      - ./databases/crm_db_init.sql:/docker-entrypoint-initdb.d/01_init.sql
+      - ./databases/crm_db_cdc_setup.sql:/docker-entrypoint-initdb.d/02_cdc_setup.sql
+    ports:
+      - "5435:5432"
+    command:
+      - "postgres"
+      - "-c"
+      - "wal_level=logical"
+      - "-c"
+      - "max_wal_senders=4"
+      - "-c"
+      - "max_replication_slots=4"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crm_user -d crm_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Telemetry Database - источник данных телеметрии с протезов
+  telemetry_db:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: telemetry_db
+      POSTGRES_USER: telemetry_user
+      POSTGRES_PASSWORD: telemetry_password
+    volumes:
+      - ./postgres-telemetry-data:/var/lib/postgresql/data
+      - ./databases/telemetry_db_init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5436:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U telemetry_user -d telemetry_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ClickHouse - OLAP база для витрины отчётов
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.1
+    environment:
+      CLICKHOUSE_DB: reports
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    volumes:
+      - ./clickhouse-data:/var/lib/clickhouse
+      - ./clickhouse/config.xml:/etc/clickhouse-server/config.d/custom-config.xml
+      - ./clickhouse/users.xml:/etc/clickhouse-server/users.d/custom-users.xml
+      - ./clickhouse/init:/docker-entrypoint-initdb.d
+    ports:
+      - "8123:8123"   # HTTP интерфейс
+      - "9000:9000"   # Native TCP интерфейс
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ClickHouse Init - инициализация схемы и демо-данных
+  clickhouse-init:
+    image: clickhouse/clickhouse-server:24.1
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    volumes:
+      - ./clickhouse/init:/docker-entrypoint-initdb.d:ro
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        echo "Checking if ClickHouse database 'reports' exists..."
+        DB_EXISTS=$$(clickhouse-client --host clickhouse --query "SELECT count() FROM system.databases WHERE name = 'reports'" 2>/dev/null || echo "0")
+
+        if [ "$$DB_EXISTS" = "0" ]; then
+          echo "Database 'reports' does not exist. Initializing..."
+          clickhouse-client --host clickhouse --queries-file /docker-entrypoint-initdb.d/01_init_schema.sql
+          clickhouse-client --host clickhouse --queries-file /docker-entrypoint-initdb.d/02_cdc_kafka_tables.sql
+          echo "ClickHouse initialization complete!"
+        else
+          echo "Database 'reports' already exists. Skipping initialization."
+        fi
+
+  # Airflow PostgreSQL - база метаданных Airflow
+  airflow_db:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: airflow
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+    volumes:
+      - ./postgres-airflow-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Airflow Init - инициализация БД и создание пользователя
+  airflow-init:
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    user: "50000:0"
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow_db:5432/airflow
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:-}
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      _AIRFLOW_DB_MIGRATE: 'true'
+      _AIRFLOW_WWW_USER_CREATE: 'true'
+      _AIRFLOW_WWW_USER_USERNAME: admin
+      _AIRFLOW_WWW_USER_PASSWORD: admin
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        /home/airflow/.local/bin/airflow db migrate
+        /home/airflow/.local/bin/airflow users create \
+          --username admin \
+          --password admin \
+          --firstname Admin \
+          --lastname User \
+          --role Admin \
+          --email admin@bionicpro.com || true
+        echo "Airflow initialization complete!"
+    depends_on:
+      airflow_db:
+        condition: service_healthy
+
+  # Airflow Webserver - веб-интерфейс
+  airflow-webserver:
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow_db:5432/airflow
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:-}
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
+    command: webserver
+    ports:
+      - "8081:8080"   # Airflow UI на порту 8081 (8080 занят Keycloak)
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+      crm_db:
+        condition: service_healthy
+      telemetry_db:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      clickhouse-init:
+        condition: service_completed_successfully
+
+  # Airflow Scheduler - планировщик DAG
+  airflow-scheduler:
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow_db:5432/airflow
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:-}
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    command: scheduler
+    healthcheck:
+      test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob --hostname $(hostname)"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+      crm_db:
+        condition: service_healthy
+      telemetry_db:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      clickhouse-init:
+        condition: service_completed_successfully
+
+  # Airflow Connections Init - создание connections после запуска
+  airflow-connections:
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    user: "50000:0"
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow_db:5432/airflow
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:-}
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        sleep 30
+        airflow connections add 'bionicpro_crm_db' \
+          --conn-type 'postgres' \
+          --conn-host 'crm_db' \
+          --conn-schema 'crm_db' \
+          --conn-login 'crm_user' \
+          --conn-password 'crm_password' \
+          --conn-port '5432' || true
+        airflow connections add 'bionicpro_telemetry_db' \
+          --conn-type 'postgres' \
+          --conn-host 'telemetry_db' \
+          --conn-schema 'telemetry_db' \
+          --conn-login 'telemetry_user' \
+          --conn-password 'telemetry_password' \
+          --conn-port '5432' || true
+        airflow connections add 'bionicpro_clickhouse' \
+          --conn-type 'generic' \
+          --conn-host 'clickhouse' \
+          --conn-login 'default' \
+          --conn-password '' \
+          --conn-port '9000' || true
+        airflow dags unpause bionicpro_reports_etl || true
+        echo "Airflow connections initialized!"
+    depends_on:
+      airflow-webserver:
+        condition: service_healthy
+
+  # Airflow ETL Trigger - автоматический запуск ETL для демонстрационных данных
+  airflow-etl-trigger:
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    entrypoint: /bin/bash
+    command:
+      - /opt/airflow/scripts/trigger-initial-etl.sh
+    environment:
+      AIRFLOW_URL: http://airflow-webserver:8080
+      AIRFLOW_USERNAME: admin
+      AIRFLOW_PASSWORD: admin
+      DAG_ID: bionicpro_reports_etl
+    volumes:
+      - ./airflow/scripts:/opt/airflow/scripts:ro
+    depends_on:
+      airflow-connections:
+        condition: service_completed_successfully
+      airflow-webserver:
+        condition: service_healthy
+
+  # ============================================================================
+  # Reports Service (Задание 2, Задача 3)
+  # ============================================================================
+
+  # Reports Service - API для получения отчётов из ClickHouse
+  reports-service:
+    build:
+      context: ./reports-service
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      # ClickHouse connection
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: 9000
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+      CLICKHOUSE_DATABASE: reports
+      # Redis cache
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 1
+      CACHE_TTL_SECONDS: 300
+      # Auth
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: reports-realm
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-}
+      AUTH_SERVICE_URL: http://bionicpro-auth:8000
+      # CORS
+      ALLOWED_ORIGINS: '["http://localhost:3000", "http://localhost:8000"]'
+      # S3 (MinIO) configuration
+      S3_ENDPOINT_URL: http://minio:9000
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin123
+      S3_BUCKET_NAME: reports-bucket
+      S3_REGION: us-east-1
+      # CDN configuration
+      CDN_BASE_URL: http://localhost:8002
+      CDN_ENABLED: "true"
+      # Kafka/CDC configuration (Задание 4)
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_CDC_TOPIC_PREFIX: crm
+      CDC_ENABLED: "true"
+      # Debug
+      DEBUG: "false"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8001/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      clickhouse-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+      minio:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+
+  # ============================================================================
+  # S3 & CDN Infrastructure (Задание 3)
+  # ============================================================================
+
+  # MinIO - S3-совместимое объектное хранилище
+  minio:
+    image: minio/minio:RELEASE.2024-01-18T22-51-28Z
+    container_name: minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    volumes:
+      - ./minio-data:/data
+    ports:
+      - "9001:9001"   # MinIO Console UI
+      - "9002:9000"   # MinIO S3 API
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # MinIO Init - создание bucket для отчётов
+  minio-init:
+    image: minio/mc:RELEASE.2024-01-18T07-03-39Z
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        mc alias set myminio http://minio:9000 minioadmin minioadmin123
+        mc mb myminio/reports-bucket --ignore-existing
+        mc anonymous set download myminio/reports-bucket
+        echo "MinIO bucket 'reports-bucket' created and configured!"
+
+  # Nginx CDN - reverse proxy с кэшированием
+  nginx-cdn:
+    image: nginx:1.25-alpine
+    container_name: nginx-cdn
+    ports:
+      - "8002:80"   # CDN endpoint
+    volumes:
+      - ./nginx-cdn/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx-cdn/cache:/var/cache/nginx
+    depends_on:
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ============================================================================
+  # CDC Infrastructure (Задание 4)
+  # Debezium + Kafka для Change Data Capture из CRM DB
+  # ============================================================================
+
+  # Zookeeper - координатор для Kafka
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
+      - zookeeper-log:/var/lib/zookeeper/log
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Kafka - шина сообщений для CDC событий
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  # Debezium Connect - CDC коннектор для PostgreSQL
+  debezium:
+    build:
+      context: ./debezium
+      dockerfile: Dockerfile
+    container_name: debezium
+    depends_on:
+      kafka:
+        condition: service_healthy
+      crm_db:
+        condition: service_healthy
+    ports:
+      - "8083:8083"
+    environment:
+      BOOTSTRAP_SERVERS: kafka:29092
+      GROUP_ID: debezium-connect
+      CONFIG_STORAGE_TOPIC: debezium_connect_configs
+      OFFSET_STORAGE_TOPIC: debezium_connect_offsets
+      STATUS_STORAGE_TOPIC: debezium_connect_statuses
+      CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      STATUS_STORAGE_REPLICATION_FACTOR: 1
+      KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      KEY_CONVERTER_SCHEMAS_ENABLE: "false"
+      VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+    volumes:
+      - ./debezium/connectors:/kafka/connect/connectors
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/connectors"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  # Debezium Connector Init - регистрация коннектора после запуска
+  debezium-init:
+    image: curlimages/curl:8.5.0
+    container_name: debezium-init
+    depends_on:
+      debezium:
+        condition: service_healthy
+    volumes:
+      - ./debezium/register-connector.sh:/register-connector.sh:ro
+      - ./debezium/crm-connector.json:/crm-connector.json:ro
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        echo "Waiting for Debezium Connect to be ready..."
+        sleep 10
+        echo "Registering CRM PostgreSQL Connector..."
+        curl -i -X POST -H "Accept:application/json" -H "Content-Type:application/json" \
+          http://debezium:8083/connectors/ -d @/crm-connector.json || true
+        echo "Connector registration complete!"
+        sleep 5
+        curl http://debezium:8083/connectors/crm-connector/status || true
+
+  # Kafka UI - веб-интерфейс для мониторинга Kafka (опционально)
+  kafka-ui:
+    image: provectuslabs/kafka-ui:v0.7.1
+    container_name: kafka-ui
+    ports:
+      - "8084:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: bionicpro-cdc
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_NAME: debezium
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_ADDRESS: http://debezium:8083
+      DYNAMIC_CONFIG_ENABLED: "true"
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+volumes:
+  debezium-plugins:
+    driver: local
+  zookeeper-data:
+  zookeeper-log:
+  kafka-data:

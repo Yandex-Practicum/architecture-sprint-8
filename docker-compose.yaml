@@ -11,6 +11,29 @@ services:
       - ./postgres-keycloak-data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+
+  openldap:
+    build:
+      context: ./ldap
+      dockerfile: Dockerfile
+    environment:
+      LDAP_ORGANISATION: BionicPRO
+      LDAP_DOMAIN: bionicpro.com
+      LDAP_ADMIN_PASSWORD: ldap_admin_password
+      LDAP_TLS: "false"
+    ports:
+      - "389:389"
+
+  ldap-seed:
+    build:
+      context: ./ldap
+      dockerfile: seed.Dockerfile
+    environment:
+      LDAP_ADMIN_PASSWORD: ldap_admin_password
+    depends_on:
+      - openldap
+    restart: "no"
+
   keycloak:
     image: quay.io/keycloak/keycloak:21.1
     environment:
@@ -20,7 +43,7 @@ services:
       KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
       KC_DB_USERNAME: keycloak_user
       KC_DB_PASSWORD: keycloak_password
-    command: 
+    command:
       - start-dev
       - --import-realm
     volumes:
@@ -29,6 +52,29 @@ services:
       - "8080:8080"
     depends_on:
       - keycloak_db
+      - openldap
+      - ldap-seed
+
+  bionicpro-auth:
+    build:
+      context: ./bionicpro-auth
+      dockerfile: Dockerfile
+    environment:
+      APP_ENV: dev
+      LISTEN: ":8443"
+      FRONT_URL: http://localhost:3000
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_PUBLIC_URL: http://localhost:8080
+      KEYCLOAK_REALM: reports-realm
+      KEYCLOAK_CLIENT_ID: reports-frontend
+      AUTH_CALLBACK_URL: http://localhost:8443/auth/callback
+      SESSION_ENC_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      API_URL: http://reports-api:8000
+    ports:
+      - "8443:8443"
+    depends_on:
+      - keycloak
+
   frontend:
     build:
       context: ./frontend
@@ -36,7 +82,4 @@ services:
     ports:
       - "3000:3000"
     environment:
-      REACT_APP_API_URL: http://localhost:8000
-      REACT_APP_KEYCLOAK_URL: http://localhost:8080
-      REACT_APP_KEYCLOAK_REALM: reports-realm
-      REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+      REACT_APP_AUTH_URL: http://localhost:8443

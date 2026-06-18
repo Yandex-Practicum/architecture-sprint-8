@@ -1,6 +1,29 @@
 {
     "realm": "reports-realm",
     "enabled": true,
+    "accessTokenLifespan": 120,
+    "ssoSessionIdleTimeout": 1800,
+    "ssoSessionMaxLifespan": 36000,
+    "refreshTokenMaxReuse": 0,
+    "otpPolicyType": "totp",
+    "otpPolicyAlgorithm": "HmacSHA1",
+    "otpPolicyInitialCounter": 0,
+    "otpPolicyDigits": 6,
+    "otpPolicyLookAheadWindow": 1,
+    "otpPolicyPeriod": 30,
+    "otpPolicyCodeReusable": false,
+    "requiredActions": [
+      {
+        "alias": "CONFIGURE_OTP",
+        "name": "Configure OTP",
+        "providerId": "CONFIGURE_OTP",
+        "enabled": true,
+        "defaultAction": true,
+        "priority": 10
+      }
+    ],
+    "browserFlow": "browser-with-otp",
+    "registrationFlow": "registration-with-otp",
     "roles": {
       "realm": [
         {
@@ -24,6 +47,7 @@
         "email": "user1@example.com",
         "firstName": "User",
         "lastName": "One",
+        "requiredActions": ["CONFIGURE_OTP"],
         "credentials": [
           {
             "type": "password",
@@ -39,6 +63,7 @@
         "email": "user2@example.com",
         "firstName": "User",
         "lastName": "Two",
+        "requiredActions": ["CONFIGURE_OTP"],
         "credentials": [
           {
             "type": "password",
@@ -54,6 +79,7 @@
         "email": "admin1@example.com",
         "firstName": "Admin",
         "lastName": "One",
+        "requiredActions": ["CONFIGURE_OTP"],
         "credentials": [
           {
             "type": "password",
@@ -69,6 +95,7 @@
         "email": "prothetic1@example.com",
         "firstName": "Prothetic",
         "lastName": "One",
+        "requiredActions": ["CONFIGURE_OTP"],
         "credentials": [
           {
             "type": "password",
@@ -84,6 +111,7 @@
         "email": "prothetic2@example.com",
         "firstName": "Prothetic",
         "lastName": "Two",
+        "requiredActions": ["CONFIGURE_OTP"],
         "credentials": [
           {
             "type": "password",
@@ -99,6 +127,7 @@
         "email": "prothetic3@example.com",
         "firstName": "Prothetic",
         "lastName": "Three",
+        "requiredActions": ["CONFIGURE_OTP"],
         "credentials": [
           {
             "type": "password",
@@ -114,16 +143,208 @@
         "clientId": "reports-frontend",
         "enabled": true,
         "publicClient": true,
-        "redirectUris": ["http://localhost:3000/*"],
-        "webOrigins": ["http://localhost:3000"],
-        "directAccessGrantsEnabled": true
+        "redirectUris": [
+          "http://localhost:3000/*",
+          "http://localhost:8443/auth/callback"
+        ],
+        "webOrigins": [
+          "http://localhost:3000",
+          "http://localhost:8443"
+        ],
+        "standardFlowEnabled": true,
+        "directAccessGrantsEnabled": false,
+        "attributes": {
+          "pkce.code.challenge.method": "S256"
+        }
       },
       {
         "clientId": "reports-api",
         "enabled": true,
         "clientAuthenticatorType": "client-secret",
-        "secret": "oNwoLQdvJAvRcL89SydqCWCe5ry1jMgq", 
+        "secret": "oNwoLQdvJAvRcL89SydqCWCe5ry1jMgq",
         "bearerOnly": true
       }
-    ]
+    ],
+    "authenticationFlows": [
+      {
+        "alias": "browser-with-otp",
+        "description": "Browser flow with mandatory OTP (TOTP) for all users",
+        "providerId": "basic-flow",
+        "topLevel": true,
+        "builtIn": false,
+        "authenticationExecutions": [
+          {
+            "authenticator": "auth-cookie",
+            "authenticatorFlow": false,
+            "requirement": "ALTERNATIVE",
+            "priority": 10,
+            "userSetupAllowed": false
+          },
+          {
+            "authenticator": "auth-spnego",
+            "authenticatorFlow": false,
+            "requirement": "DISABLED",
+            "priority": 20,
+            "userSetupAllowed": false
+          },
+          {
+            "authenticator": "identity-provider-redirector",
+            "authenticatorFlow": false,
+            "requirement": "DISABLED",
+            "priority": 25,
+            "userSetupAllowed": false
+          },
+          {
+            "authenticator": "auth-username-password-form",
+            "authenticatorFlow": false,
+            "requirement": "REQUIRED",
+            "priority": 30,
+            "userSetupAllowed": false
+          },
+          {
+            "authenticator": "auth-otp-form",
+            "authenticatorFlow": false,
+            "requirement": "REQUIRED",
+            "priority": 40,
+            "userSetupAllowed": false
+          }
+        ]
+      },
+      {
+        "alias": "registration-with-otp",
+        "description": "Registration flow; default required action CONFIGURE_OTP forces new users to configure TOTP after registration",
+        "providerId": "basic-flow",
+        "topLevel": true,
+        "builtIn": false,
+        "authenticationExecutions": [
+          {
+            "authenticator": "registration-page-form",
+            "authenticatorFlow": false,
+            "requirement": "REQUIRED",
+            "priority": 10,
+            "userSetupAllowed": false
+          },
+          {
+            "authenticator": "registration-user-creation",
+            "authenticatorFlow": false,
+            "requirement": "REQUIRED",
+            "priority": 20,
+            "userSetupAllowed": false
+          },
+          {
+            "authenticator": "registration-profile-action",
+            "authenticatorFlow": false,
+            "requirement": "REQUIRED",
+            "priority": 40,
+            "userSetupAllowed": false
+          },
+          {
+            "authenticator": "registration-password-action",
+            "authenticatorFlow": false,
+            "requirement": "REQUIRED",
+            "priority": 50,
+            "userSetupAllowed": false
+          }
+        ]
+      }
+    ],
+    "components": {
+      "org.keycloak.storage.UserStorageProvider": [
+        {
+          "name": "bionicpro-ldap",
+          "providerId": "ldap",
+          "subComponents": {
+            "org.keycloak.storage.ldap.mappers.LDAPStorageMapper": [
+              {
+                "name": "username-mapper",
+                "providerId": "user-attribute-ldap-mapper",
+                "subComponents": {},
+                "config": {
+                  "ldap.attribute": ["uid"],
+                  "user.model.attribute": ["username"],
+                  "read.only": ["true"],
+                  "always.read.value.from.ldap": ["false"]
+                }
+              },
+              {
+                "name": "email-mapper",
+                "providerId": "user-attribute-ldap-mapper",
+                "subComponents": {},
+                "config": {
+                  "ldap.attribute": ["mail"],
+                  "user.model.attribute": ["email"],
+                  "read.only": ["true"],
+                  "always.read.value.from.ldap": ["false"]
+                }
+              },
+              {
+                "name": "firstName-mapper",
+                "providerId": "user-attribute-ldap-mapper",
+                "subComponents": {},
+                "config": {
+                  "ldap.attribute": ["cn"],
+                  "user.model.attribute": ["firstName"],
+                  "read.only": ["true"],
+                  "always.read.value.from.ldap": ["false"]
+                }
+              },
+              {
+                "name": "lastName-mapper",
+                "providerId": "user-attribute-ldap-mapper",
+                "subComponents": {},
+                "config": {
+                  "ldap.attribute": ["sn"],
+                  "user.model.attribute": ["lastName"],
+                  "read.only": ["true"],
+                  "always.read.value.from.ldap": ["false"]
+                }
+              },
+              {
+                "name": "prothetic-user-role-mapper",
+                "providerId": "role-ldap-mapper",
+                "subComponents": {},
+                "config": {
+                  "roles.dn": ["ou=Groups,dc=bionicpro,dc=com"],
+                  "role.name.ldap.attribute": ["cn"],
+                  "role.object.classes": ["groupOfNames"],
+                  "membership.ldap.attribute": ["member"],
+                  "membership.attribute.type": ["DN"],
+                  "use.realm.roles.mappings": ["true"],
+                  "drop.non.existing.roles.during.sync": ["true"],
+                  "client.id": ["realm"],
+                  "mode": ["READ_ONLY"]
+                }
+              }
+            ]
+          },
+          "config": {
+            "priority": ["0"],
+            "fullSyncPeriod": ["-1"],
+            "changedSyncPeriod": ["-1"],
+            "cachePolicy": ["DEFAULT"],
+            "evictionDay": ["-1"],
+            "evictionHour": ["-1"],
+            "evictionMinute": ["-1"],
+            "maxLifespan": ["-1"],
+            "batchSizeForSync": ["1000"],
+            "editMode": ["READ_ONLY"],
+            "syncRegistrations": ["false"],
+            "vendor": ["other"],
+            "usernameLDAPAttribute": ["uid"],
+            "rdnLDAPAttribute": ["uid"],
+            "uuidLDAPAttribute": ["entryUUID"],
+            "userObjectClasses": ["inetOrgPerson"],
+            "connectionUrl": ["ldap://openldap:389"],
+            "usersDn": ["dc=bionicpro,dc=com"],
+            "searchScope": ["2"],
+            "validatePasswordPolicy": ["false"],
+            "authType": ["simple"],
+            "bindDn": ["cn=admin,dc=bionicpro,dc=com"],
+            "bindCredential": ["ldap_admin_password"],
+            "startTls": ["false"],
+            "enableLDAPEmailVerification": ["false"]
+          }
+        }
+      ]
+    }
   }

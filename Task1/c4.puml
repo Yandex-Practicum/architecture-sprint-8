@@ -1,0 +1,66 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title Контейнеры BionicPRO (обновлённая версия)
+
+Person(user, "Пользователь", "Пилот протеза")
+
+System_Boundary(bionic, "BionicPRO") {
+    Container(mobile_app, "Мобильное приложение", "Android/iOS", "Управление протезом, настройка, запрос отчётов")
+    Container(web_store, "Интернет-магазин", "React", "Заказ протезов, оплата")
+
+    Container(auth_gateway, "Auth Gateway (BFF)", "Spring Boot", "Единая точка входа для аутентификации. Приём auth-кода от фронтенда. Обмен на токены в IdP. Хранение refresh-токена в HttpOnly cookie. Выдача access-токена. Маршрутизация к внешним IdP.")
+
+    Container(keycloak, "Keycloak (IdP)", "Keycloak", "Центральный сервер аутентификации. Управление пользователями. Federation с внешними IdP. Выдача JWT-токенов.")
+
+    Container(external_idp, "Внешний IdP", "LDAP / Azure AD / Okta", "Внешний провайдер для конкретной страны. Примеры: LDAP (РФ), Azure AD (ЕС), Okta (США)")
+
+    Container(api_gateway, "API Gateway", "Kong / Spring Cloud Gateway", "Маршрутизация запросов к микросервисам. Проверка JWT. Передача user_id в заголовках.")
+
+    Container(crm, "CRM", "Java / PostgreSQL", "Управление заказами, пациентами, протезами")
+
+    Container(crm_db, "CRM DB", "PostgreSQL", "Оперативные данные: пользователи, заказы, сессии")
+
+    Container(report_service, "Сервис отчётов", "Python / FastAPI", "Генерация отчётов о работе протеза. Приём запроса с user_id. Фильтрация данных по user_id. Выгрузка в ClickHouse.")
+
+    Container(clickhouse, "ClickHouse", "ClickHouse", "Хранилище для аналитики и отчётов")
+
+    Container(airflow, "Airflow", "Apache Airflow", "ETL: CRM -> ClickHouse")
+
+    Container(kafka, "Kafka", "Apache Kafka", "Стриминг данных с чипов протезов")
+
+    Container(prosthesis_chip, "Программа в чипе", "C++ / ESP32", "Сбор миосигналов, управление актуаторами")
+
+    Container(ml_service, "ML-сервис", "Python / TensorFlow", "Обучение моделей распознавания движений")
+}
+
+Rel(user, mobile_app, "Управляет протезом, запрашивает отчёты", "HTTPS")
+Rel(user, web_store, "Заказывает протез", "HTTPS")
+
+Rel(mobile_app, auth_gateway, "Аутентификация (Auth Code)", "HTTPS")
+Rel(web_store, auth_gateway, "Аутентификация (Auth Code)", "HTTPS")
+
+Rel(auth_gateway, keycloak, "Обмен кода на токены (внутренний OIDC)", "HTTPS")
+Rel(keycloak, external_idp, "Federation (LDAP/OIDC/SAML)", "HTTPS")
+
+Rel(mobile_app, api_gateway, "Запросы к API (с access-токеном)", "HTTPS")
+Rel(web_store, api_gateway, "Запросы к API (с access-токеном)", "HTTPS")
+
+Rel(api_gateway, crm, "Запросы данных", "gRPC/REST")
+Rel(api_gateway, report_service, "Запрос отчётов", "gRPC/REST")
+
+Rel(report_service, crm, "Получение metadata пользователя", "REST")
+Rel(report_service, clickhouse, "Чтение данных для отчёта", "SQL")
+
+Rel(airflow, crm_db, "Извлечение данных", "SQL")
+Rel(airflow, clickhouse, "Загрузка данных", "SQL")
+
+Rel(kafka, clickhouse, "Стриминг данных с чипов", "Kafka Connect")
+Rel(prosthesis_chip, kafka, "Отправка данных (4G)", "MQTT/Kafka")
+
+Rel(ml_service, clickhouse, "Чтение данных для обучения", "SQL")
+
+Rel(auth_gateway, api_gateway, "Передача user_id и ролей", "Internal")
+Rel(auth_gateway, crm, "Обновление пользователя (при регистрации)", "REST")
+
+@enduml

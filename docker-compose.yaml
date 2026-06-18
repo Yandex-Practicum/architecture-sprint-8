@@ -83,3 +83,55 @@ services:
       - "3000:3000"
     environment:
       REACT_APP_AUTH_URL: http://localhost:8443
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3
+    environment:
+      CLICKHOUSE_DB: bionicpro_dm
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - ./clickhouse/initdb:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+
+  cassandra:
+    image: cassandra:5.0
+    environment:
+      MAX_HEAP_SIZE: 1G
+      HEAP_NEWSIZE: 256M
+      CASSANDRA_ENDPOINT_SNITCH: GossipingPropertyFileSnitch
+    volumes:
+      - cassandra-data:/var/lib/cassandra
+    ports:
+      - "9042:9042"
+
+  reports-api:
+    build:
+      context: ./reports-api
+      dockerfile: Dockerfile
+    environment:
+      APP_ENV: dev
+      LISTEN: ":8000"
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: 9000
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+      CLICKHOUSE_DB: bionicpro_dm
+      QUERY_TIMEOUT: 10s
+    ports:
+      - "8000:8000"
+    depends_on:
+      clickhouse:
+        condition: service_started
+
+volumes:
+  clickhouse-data:
+  cassandra-data:

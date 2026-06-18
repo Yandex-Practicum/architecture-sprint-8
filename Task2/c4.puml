@@ -1,7 +1,7 @@
 @startuml
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
 
-title Контейнеры BionicPRO (обновлённая версия)
+title Контейнеры BionicPRO с ETL и витриной отчётности
 
 Person(user, "Пользователь", "Пилот протеза")
 
@@ -9,7 +9,7 @@ System_Boundary(bionic, "BionicPRO") {
     Container(mobile_app, "Мобильное приложение", "Android/iOS", "Управление протезом, настройка, запрос отчётов")
     Container(web_store, "Интернет-магазин", "React", "Заказ протезов, оплата")
 
-    Container(auth_gateway, "Auth Gateway (BFF)", "Go", "Единая точка входа для аутентификации. Приём auth-кода от фронтенда. Обмен на токены в IdP. Хранение refresh-токена в HttpOnly cookie. Выдача access-токена. Маршрутизация к внешним IdP.")
+    Container(auth_gateway, "Auth Gateway (BFF)", "Spring Boot", "Единая точка входа для аутентификации. Приём auth-кода от фронтенда. Обмен на токены в IdP. Хранение refresh-токена в HttpOnly cookie. Выдача access-токена. Маршрутизация к внешним IdP.")
 
     Container(keycloak, "Keycloak (IdP)", "Keycloak", "Центральный сервер аутентификации. Управление пользователями. Federation с внешними IdP. Выдача JWT-токенов.")
 
@@ -21,13 +21,17 @@ System_Boundary(bionic, "BionicPRO") {
 
     Container(crm_db, "CRM DB", "PostgreSQL", "Оперативные данные: пользователи, заказы, сессии")
 
-    Container(report_service, "Сервис отчётов", "Go", "Генерация отчётов о работе протеза. Приём запроса с user_id. Фильтрация данных по user_id. Выгрузка в ClickHouse.")
+    Container(report_api, "API отчётов", "Go", "Backend-сервис отчётности. Принимает запросы от API Gateway по user_id. Возвращает готовый отчёт из витрины ClickHouse.")
 
-    Container(clickhouse, "ClickHouse", "ClickHouse", "Хранилище для аналитики и отчётов")
+    Container(clickhouse, "ClickHouse (OLAP)", "ClickHouse", "Витрина отчётности. Агрегированные таблицы по пользователю, протезу и периоду. Денормализованные витрины для отчётов.")
 
-    Container(airflow, "Airflow", "Apache Airflow", "ETL: CRM -> ClickHouse")
+    Container(airflow, "Apache Airflow", "Airflow", "Оркестратор ETL. DAG extract_crm, extract_sensors, join_crm_sensors, build_report_datamart. Запускается по расписанию.")
 
-    Container(kafka, "Kafka", "Apache Kafka", "Стриминг данных с чипов протезов")
+    Container(airflow_metadata, "Airflow Metadata DB", "PostgreSQL", "Хранение состояния DAG, расписаний, логов запусков")
+
+    Container(sensor_bronze, "Сырой слой датчиков", "Cassandra", "Хранение сырых сообщений с чипов протезов. Партиционирование по user_id и дате. Источник для ETL.")
+
+    Container(kafka, "Kafka", "Apache Kafka", "Стриминг данных с чипов протезов. Топики sensor.raw, sensor.events.")
 
     Container(prosthesis_chip, "Программа в чипе", "C++ / ESP32", "Сбор миосигналов, управление актуаторами")
 
@@ -47,15 +51,16 @@ Rel(mobile_app, api_gateway, "Запросы к API (с access-токеном)",
 Rel(web_store, api_gateway, "Запросы к API (с access-токеном)", "HTTPS")
 
 Rel(api_gateway, crm, "Запросы данных", "gRPC/REST")
-Rel(api_gateway, report_service, "Запрос отчётов", "gRPC/REST")
+Rel(api_gateway, report_api, "Запрос отчётов", "REST")
 
-Rel(report_service, crm, "Получение metadata пользователя", "REST")
-Rel(report_service, clickhouse, "Чтение данных для отчёта", "SQL")
+Rel(report_api, clickhouse, "Чтение витрины отчётности", "SQL")
 
-Rel(airflow, crm_db, "Извлечение данных", "SQL")
-Rel(airflow, clickhouse, "Загрузка данных", "SQL")
+Rel(airflow, crm_db, "Извлечение данных CRM", "SQL")
+Rel(airflow, sensor_bronze, "Чтение сырых данных датчиков", "CQL")
+Rel(airflow, clickhouse, "Загрузка витрины отчётности", "SQL")
+Rel(airflow, airflow_metadata, "Хранение состояния DAG", "SQL")
 
-Rel(kafka, clickhouse, "Стриминг данных с чипов", "Kafka Connect")
+Rel(kafka, sensor_bronze, "Слив сырых данных датчиков", "Kafka Connect / Cassandra Sink")
 Rel(prosthesis_chip, kafka, "Отправка данных (4G)", "MQTT/Kafka")
 
 Rel(ml_service, clickhouse, "Чтение данных для обучения", "SQL")

@@ -1,31 +1,39 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 )
 
 type handlers struct {
-	cfg config
-	ch  *clickhouseClient
+	cfg     config
+	ch      *clickhouseClient
+	storage *storage
 }
 
-func newHandlers(cfg config, ch *clickhouseClient) *handlers {
-	return &handlers{cfg: cfg, ch: ch}
+func newHandlers(cfg config, ch *clickhouseClient, st *storage) *handlers {
+	return &handlers{cfg: cfg, ch: ch, storage: st}
 }
 
 func (h *handlers) health(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
-
 	if err := h.ch.ping(ctx); err != nil {
 		jsonError(w, http.StatusServiceUnavailable, "clickhouse_unavailable", err.Error())
 		return
 	}
 	jsonOK(w, http.StatusOK, map[string]any{"status": "ok"})
+}
+
+type reportPayload struct {
+	UserID      uint64           `json:"user_id"`
+	GeneratedAt time.Time        `json:"generated_at"`
+	Rows        []map[string]any `json:"rows"`
 }
 
 func (h *handlers) reports(w http.ResponseWriter, r *http.Request) {
@@ -46,58 +54,79 @@ func (h *handlers) reports(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	from, err := parseDate(q.Get("from"), time.Now().AddDate(0, 0, -30))
-	if err != nil {
-		jsonError(w, http.StatusBadRequest, "bad_from", err.Error())
-		return
-	}
-	to, err := parseDate(q.Get("to"), time.Now())
-	if err != nil {
-		jsonError(w, http.StatusBadRequest, "bad_to", err.Error())
-		return
-	}
-	if to.Before(from) {
-		jsonError(w, http.StatusBadRequest, "bad_range", "to before from")
-		return
-	}
+	key := buildReportKey(userID)
+	cdnURL := h.cfg.CDNBaseURL + "/" + key
 
 	ctx, cancel := context.WithTimeout(r.Context(), h.cfg.QueryTimeout)
 	defer cancel()
 
-	rows, err := h.ch.userReport(ctx, userID, from, to)
+	hit, err := h.storage.has(ctx, key)
+	if err != nil {
+		logStorageWarn("head", key, err)
+	} else if hit {
+		jsonOK(w, http.StatusOK, map[string]any{
+			"user_id": userID,
+			"cache":   "hit",
+			"key":     key,
+			"cdn_url": cdnURL,
+		})
+		return
+	}
+
+	rows, err := h.ch.userReport(ctx, userID, time.Time{}, time.Time{})
 	if err != nil {
 		jsonError(w, http.StatusBadGateway, "clickhouse_error", err.Error())
 		return
 	}
 
-	out := make([]map[string]any, 0, len(rows))
-	for _, r := range rows {
-		out = append(out, map[string]any{
-			"user_id":               r.UserID,
-			"user_email":            r.UserEmail,
-			"user_first_name":       r.UserFirstName,
-			"user_last_name":        r.UserLastName,
-			"user_country":          r.UserCountry,
-			"prosthesis_id":         r.ProsthesisID,
-			"prosthesis_model":      r.ProsthesisModel,
-			"prosthesis_serial":     r.ProsthesisSerial,
-			"report_date":           r.ReportDate.Format("2006-01-02"),
-			"sessions_count":        r.SessionsCount,
-			"total_active_minutes":  r.TotalActiveMinutes,
-			"avg_signal_strength":   r.AvgSignalStrength,
-			"max_signal_strength":   r.MaxSignalStrength,
-			"error_events_count":    r.ErrorEventsCount,
-			"battery_avg_percent":   r.BatteryAvgPercent,
-			"actuator_cycles_total": r.ActuatorCyclesTotal,
-		})
+	payload := reportPayload{
+		UserID:      userID,
+		GeneratedAt: time.Now().UTC(),
+		Rows:        buildRows(rows),
+	}
+	body, err := json.MarshalIndent(payload, "", "  ")
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, "marshal_error", err.Error())
+		return
+	}
+
+	if err := h.storage.put(ctx, key, body, "application/json"); err != nil {
+		logStorageWarn("put", key, err)
+		jsonError(w, http.StatusBadGateway, "storage_error", err.Error())
+		return
 	}
 
 	jsonOK(w, http.StatusOK, map[string]any{
 		"user_id": userID,
-		"from":    from.Format("2006-01-02"),
-		"to":      to.Format("2006-01-02"),
-		"rows":    out,
+		"cache":   "miss",
+		"key":     key,
+		"cdn_url": cdnURL,
+		"rows":    payload.Rows,
 	})
+}
+
+func buildReportKey(userID uint64) string {
+	return fmt.Sprintf("reports/crm/%d.json", userID)
+}
+
+func buildRows(rows []reportRow) []map[string]any {
+	out := make([]map[string]any, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, map[string]any{
+			"user_id":           r.UserID,
+			"email":             r.Email,
+			"first_name":        r.FirstName,
+			"last_name":         r.LastName,
+			"country":           r.Country,
+			"prostheses_count":  r.ProsthesesCount,
+			"updated_at":        r.UpdatedAt.Format(time.RFC3339),
+		})
+	}
+	return out
+}
+
+func logStorageWarn(op, key string, err error) {
+	fmt.Printf("storage %s warning for %s: %v\n", op, key, err)
 }
 
 func parseDate(s string, def time.Time) (time.Time, error) {
@@ -108,9 +137,11 @@ func parseDate(s string, def time.Time) (time.Time, error) {
 }
 
 func jsonOK(w http.ResponseWriter, status int, body any) {
+	buf := &bytes.Buffer{}
+	_ = json.NewEncoder(buf).Encode(body)
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(body)
+	_, _ = w.Write(buf.Bytes())
 }
 
 func jsonError(w http.ResponseWriter, status int, code, msg string) {

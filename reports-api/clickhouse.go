@@ -16,22 +16,13 @@ type clickhouseClient struct {
 }
 
 type reportRow struct {
-	UserID              uint64    `ch:"user_id"`
-	UserEmail           string    `ch:"user_email"`
-	UserFirstName       string    `ch:"user_first_name"`
-	UserLastName        string    `ch:"user_last_name"`
-	UserCountry         string    `ch:"user_country"`
-	ProsthesisID        uint64    `ch:"prosthesis_id"`
-	ProsthesisModel     string    `ch:"prosthesis_model"`
-	ProsthesisSerial    string    `ch:"prosthesis_serial"`
-	ReportDate          time.Time `ch:"report_date"`
-	SessionsCount       uint32    `ch:"sessions_count"`
-	TotalActiveMinutes  uint32    `ch:"total_active_minutes"`
-	AvgSignalStrength   float32   `ch:"avg_signal_strength"`
-	MaxSignalStrength   float32   `ch:"max_signal_strength"`
-	ErrorEventsCount    uint32    `ch:"error_events_count"`
-	BatteryAvgPercent   float32   `ch:"battery_avg_percent"`
-	ActuatorCyclesTotal uint64    `ch:"actuator_cycles_total"`
+	UserID           uint64  `ch:"user_id"`
+	Email            string  `ch:"email"`
+	FirstName        string  `ch:"first_name"`
+	LastName         string  `ch:"last_name"`
+	Country          string  `ch:"country"`
+	ProsthesesCount  uint32  `ch:"prostheses_count"`
+	UpdatedAt        time.Time `ch:"updated_at"`
 }
 
 func newClickhouseClient(cfg config) (*clickhouseClient, error) {
@@ -80,21 +71,15 @@ func waitForClickhouse(ch *clickhouseClient) error {
 func (c *clickhouseClient) userReport(
 	ctx context.Context,
 	userID uint64,
-	from, to time.Time,
+	_ /*from*/, _ /*to*/ time.Time,
 ) ([]reportRow, error) {
 	const q = `
-		SELECT user_id, user_email, user_first_name, user_last_name, user_country,
-		       prosthesis_id, prosthesis_model, prosthesis_serial, report_date,
-		       sessions_count, total_active_minutes,
-		       avg_signal_strength, max_signal_strength, error_events_count,
-		       battery_avg_percent, actuator_cycles_total
-		FROM prosthesis_user_report
+		SELECT user_id, email, first_name, last_name, country,
+		       prostheses_count, updated_at
+		FROM crm_user_report FINAL
 		WHERE user_id = ?
-		  AND report_date >= ?
-		  AND report_date <= ?
-		ORDER BY report_date, prosthesis_id
 	`
-	rows, err := c.conn.Query(ctx, q, userID, from, to)
+	rows, err := c.conn.Query(ctx, q, userID)
 	if err != nil {
 		return nil, fmt.Errorf("clickhouse query: %w", err)
 	}

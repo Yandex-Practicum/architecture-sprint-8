@@ -1,0 +1,23 @@
+{
+  "name": "crm-postgres-cdc",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "database.hostname": "crm_db",
+    "database.port": "5432",
+    "database.user": "crm_user",
+    "database.password": "crm_password",
+    "database.dbname": "crm",
+    "plugin.name": "pgoutput",
+    "slot.name": "debezium_crm",
+    "publication.name": "dbz_publication",
+    "publication.autocreate.mode": "disabled",
+    "table.include.list": "public.users,public.prostheses",
+    "topic.prefix": "crm",
+    "snapshot.mode": "initial",
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter.schemas.enable": "false",
+    "value.converter.schemas.enable": "false",
+    "tombstones.on.delete": "false"
+  }
+}

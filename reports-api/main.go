@@ -18,13 +18,27 @@ func main() {
 		log.Fatalf("clickhouse: %v", err)
 	}
 	defer ch.close()
-
 	if err := waitForClickhouse(ch); err != nil {
 		log.Fatalf("clickhouse not reachable: %v", err)
 	}
 	log.Println("clickhouse connected")
 
-	h := newHandlers(cfg, ch)
+	st, err := newStorage(cfg)
+	if err != nil {
+		log.Fatalf("storage: %v", err)
+	}
+	if err := waitForStorage(st); err != nil {
+		log.Fatalf("minio not reachable: %v", err)
+	}
+	bucketCtx, bucketCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	if err := st.ensureBucket(bucketCtx); err != nil {
+		bucketCancel()
+		log.Fatalf("ensure bucket: %v", err)
+	}
+	bucketCancel()
+	log.Printf("minio connected, bucket=%s ready", cfg.S3Bucket)
+
+	h := newHandlers(cfg, ch, st)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", h.health)

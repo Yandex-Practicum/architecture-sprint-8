@@ -1,0 +1,23 @@
+server:
+  port: 8000
+spring:
+  application:
+    name: reports-api
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8080/realms/reports-realm
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    oauth:
+      client-id: reports-swagger
+      use-pkce-with-authorization-code-grant: true
+
+clickhouse:
+  url: jdbc:clickhouse://localhost:8123/reports?compress=0
+  username: default
+  password: clickhouse
+  driver-class-name: com.clickhouse.jdbc.ClickHouseDriver

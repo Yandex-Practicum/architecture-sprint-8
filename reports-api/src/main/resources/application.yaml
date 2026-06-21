@@ -3,11 +3,11 @@ server:
 spring:
   application:
     name: reports-api
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: http://localhost:8080/realms/reports-realm
+
+
+keycloak:
+  issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8080/realms/reports-realm}
+  jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8080/realms/reports-realm/protocol/openid-connect/certs}
 
 springdoc:
   swagger-ui:

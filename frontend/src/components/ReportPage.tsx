@@ -59,12 +59,6 @@ const ReportPage: React.FC = () => {
                     Accept: 'application/json',
                 },
             });
-
-            if (response.status === 422) {
-                const body = await response.json();
-                throw new Error(body.message || 'Данные за выбранный период ещё не обработаны Airflow');
-            }
-
             if (!response.ok) {
                 throw new Error(`Ошибка получения отчёта: ${response.status}`);
             }

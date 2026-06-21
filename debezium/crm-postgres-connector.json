@@ -1,0 +1,25 @@
+{
+  "name": "crm-postgres-connector",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "plugin.name": "pgoutput",
+    "database.hostname": "crm-db",
+    "database.port": "5432",
+    "database.user": "crm_user",
+    "database.password": "crm_password",
+    "database.dbname": "crm",
+    "topic.prefix": "crm",
+    "table.include.list": "public.crm_customers",
+    "slot.name": "bionicpro_crm_slot",
+    "publication.name": "bionicpro_crm_publication",
+    "publication.autocreate.mode": "filtered",
+    "snapshot.mode": "initial",
+    "include.schema.changes": "false",
+    "tombstones.on.delete": "false",
+    "decimal.handling.mode": "string",
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter.schemas.enable": "false",
+    "value.converter.schemas.enable": "false"
+  }
+}

@@ -1,0 +1,67 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/29.5.2 Chrome/142.0.7444.265 Electron/39.6.1 Safari/537.36" version="29.5.2">
+  <diagram id="bionicpro-sso-c4" name="BionicPRO SSO C4">
+    <mxGraphModel dx="1371" dy="1056" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="ru" parent="1" style="rounded=0;whiteSpace=wrap;html=1;dashed=1;strokeColor=#666666;fillColor=none;fontColor=#333333;align=left;verticalAlign=top;spacing=10;" value="&lt;font style=&quot;color: rgb(255, 255, 255);&quot;&gt;Russia representation&lt;br&gt;Personal and medical data stay local&lt;/font&gt;" vertex="1">
+          <mxGeometry height="740" width="860" x="40" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="foreign" parent="1" style="rounded=0;whiteSpace=wrap;html=1;dashed=1;strokeColor=#666666;fillColor=none;fontColor=light-dark(#FFFFFF,#6B6B6B);align=left;verticalAlign=top;spacing=10;" value="&lt;font style=&quot;color: light-dark(rgb(255, 255, 255), rgb(255, 255, 255));&quot;&gt;Foreign representation&lt;br&gt;Local identity source&lt;/font&gt;" vertex="1">
+          <mxGeometry height="320" width="285" x="1000" y="240" as="geometry" />
+        </mxCell>
+        <mxCell id="user" parent="1" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;" value="Prosthesis user" vertex="1">
+          <mxGeometry height="90" width="50" x="70" y="160" as="geometry" />
+        </mxCell>
+        <mxCell id="mobile" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=#000000;" value="&lt;font style=&quot;color: rgb(0, 0, 0);&quot; face=&quot;Helvetica&quot;&gt;&lt;span style=&quot;text-align: start; background-color: color(srgb 1 1 1 / 0.107059);&quot;&gt;Frontend / mobile app&lt;/span&gt;&lt;br&gt;No IdP tokens in browser or mobile client&lt;/font&gt;" vertex="1">
+          <mxGeometry height="90" width="210" x="160" y="160" as="geometry" />
+        </mxCell>
+        <mxCell id="auth" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#000000;" value="bionicpro-auth&#xa;Backend for Frontend&#xa;PKCE, server-side tokens, session rotation" vertex="1">
+          <mxGeometry height="120" width="260" x="135" y="320" as="geometry" />
+        </mxCell>
+        <mxCell id="keycloak" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#000000;" value="Keycloak IAM&#xa;SSO broker, MFA OTP, role mapping" vertex="1">
+          <mxGeometry height="100" width="260" x="580" y="330" as="geometry" />
+        </mxCell>
+        <mxCell id="ldap" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontColor=#000000;" value="OpenLDAP&#xa;Foreign office users and roles" vertex="1">
+          <mxGeometry height="90" width="210" x="1045" y="290" as="geometry" />
+        </mxCell>
+        <mxCell id="yandex" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontColor=#000000;" value="Yandex ID&#xa;External OAuth 2.0 / OIDC IdP&#xa;Consent before profile import" vertex="1">
+          <mxGeometry height="100" width="210" x="1045" y="440" as="geometry" />
+        </mxCell>
+        <mxCell id="crm" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=#000000;" value="Reports API&lt;br&gt;Accepts session only, checks report owner" vertex="1">
+          <mxGeometry height="100" width="240" x="145" y="490" as="geometry" />
+        </mxCell>
+        <mxCell id="db" parent="1" style="shape=cylinder3d;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#000000;" value="&lt;font face=&quot;Helvetica&quot; style=&quot;color: rgb(0, 0, 0);&quot;&gt;&lt;span style=&quot;text-align: start; background-color: color(srgb 1 1 1 / 0.107059);&quot;&gt;ClickHouse report mart / S3 reports&lt;/span&gt;&lt;br&gt;Patient data remains in country storage&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="190" x="170" y="670" as="geometry" />
+        </mxCell>
+        <mxCell id="cookie" parent="1" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=#000000;" value="&lt;font style=&quot;color: rgb(0, 0, 0);&quot; face=&quot;Helvetica&quot;&gt;HttpOnly session cookie;&amp;nbsp;&lt;span style=&quot;font-size: 12.88px; text-align: start; background-color: color(srgb 1 1 1 / 0.107059);&quot;&gt;Secure in production&lt;/span&gt;&lt;br&gt;No access_token / refresh_token leaves backend&lt;/font&gt;" vertex="1">
+          <mxGeometry height="90" width="240" x="580" y="470" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" edge="1" parent="1" source="user" style="endArrow=block;html=1;rounded=0;" target="mobile">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" edge="1" parent="1" source="mobile" style="endArrow=block;html=1;rounded=0;edgeLabelBackground=#ffffff;" target="auth" value="login / reports&#xa;credentials: include">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" edge="1" parent="1" source="auth" style="endArrow=block;html=1;rounded=0;edgeLabelBackground=#ffffff;" target="keycloak" value="Authorization Code + PKCE">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" edge="1" parent="1" source="keycloak" style="endArrow=block;html=1;rounded=0;edgeLabelBackground=#ffffff;" target="ldap" value="federated users / roles">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" edge="1" parent="1" source="keycloak" style="endArrow=block;html=1;rounded=0;edgeLabelBackground=#ffffff;" target="yandex" value="identity brokering">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" edge="1" parent="1" source="crm" style="endArrow=block;html=1;rounded=0;edgeLabelBackground=#ffffff;" target="auth" value="validate session">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" edge="1" parent="1" source="crm" style="endArrow=block;html=1;rounded=0;edgeLabelBackground=#ffffff;" target="db" value="own data only">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" edge="1" parent="1" source="auth" style="endArrow=block;html=1;rounded=0;dashed=1;" target="cookie">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

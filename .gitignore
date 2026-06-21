@@ -1,2 +1,11 @@
 /postgres-keycloak-data
+postgres-keycloak-data.bak-*
+nginx/cache/
+frontend/node_modules/
+frontend/build/
+.DS_Store
+__pycache__/
+*.pyc
+diagrams/.$*.bkp
+Screens/
 2024__yandex-architecture-sso.code-workspace

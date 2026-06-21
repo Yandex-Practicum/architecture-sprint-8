@@ -1,0 +1,4 @@
+user_id,user_name,email,prosthesis_id,country_code,updated_at
+prothetic1,Prothetic One,prothetic1@example.com,prosthesis-1001,RU,2026-06-18 10:00:00
+prothetic2,Prothetic Two,prothetic2@example.com,prosthesis-1002,RU,2026-06-18 10:10:00
+prothetic3,Prothetic Three,prothetic3@example.com,prosthesis-1003,RU,2026-06-18 10:20:00

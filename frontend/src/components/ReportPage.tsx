@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 const ReportPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [needsLogin, setNeedsLogin] = useState(true); // По умолчанию показываем кнопку Login
+  const [needsLogin, setNeedsLogin] = useState(false);
 
   const downloadReport = async () => {
     try {

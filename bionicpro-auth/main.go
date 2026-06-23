@@ -16,11 +16,12 @@ import (
 )
 
 var (
-	keycloakURL string
-	clientID    string
-	redirectURI string
-	frontendURL string
-	apiURL      string
+	keycloakBackendURL  string
+	keycloakFrontendURL string
+	clientID            string
+	redirectURI         string
+	frontendURL         string
+	apiURL              string
 )
 
 func getEnv(key, fallback string) string {
@@ -32,7 +33,8 @@ func getEnv(key, fallback string) string {
 
 // Инициализация переменных окружения при старте
 func init() {
-	keycloakURL = getEnv("KEYCLOAK_URL", "http://localhost:8080/auth/realms/reports-realm")
+	keycloakBackendURL = getEnv("KEYCLOAK_BACKEND_URL", "http://keycloak:8080/auth/realms/reports-realm")
+	keycloakFrontendURL = getEnv("KEYCLOAK_FRONTEND_URL", "http://localhost:8080/auth/realms/reports-realm")
 	clientID = getEnv("CLIENT_ID", "bionicpro-client")
 	redirectURI = getEnv("REDIRECT_URI", "http://localhost:8081/callback")
 	frontendURL = getEnv("FRONTEND_URL", "http://localhost:3000")
@@ -73,7 +75,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	storeMutex.Unlock()
 
 	authURL := fmt.Sprintf("%s/protocol/openid-connect/auth?client_id=%s&response_type=code&redirect_uri=%s&state=%s&code_challenge=%s&code_challenge_method=S256",
-		keycloakURL, clientID, redirectURI, state, codeChallenge)
+		keycloakFrontendURL, clientID, redirectURI, state, codeChallenge)
 
 	http.Redirect(w, r, authURL, http.StatusFound)
 }
@@ -103,7 +105,7 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 	data.Set("code", code)
 	data.Set("code_verifier", codeVerifier)
 
-	resp, err := http.PostForm(keycloakURL+"/protocol/openid-connect/token", data)
+	resp, err := http.PostForm(keycloakBackendURL+"/protocol/openid-connect/token", data)
 	if err != nil || resp.StatusCode != 200 {
 		http.Error(w, "Failed to exchange token", http.StatusInternalServerError)
 		return
@@ -163,7 +165,7 @@ func proxyMiddleware(next http.Handler) http.Handler {
 			data.Set("client_id", clientID)
 			data.Set("refresh_token", session.RefreshToken)
 
-			resp, err := http.PostForm(keycloakURL+"/protocol/openid-connect/token", data)
+			resp, err := http.PostForm(keycloakBackendURL+"/protocol/openid-connect/token", data)
 			if err != nil || resp.StatusCode != 200 {
 				http.Error(w, "Failed to refresh token", http.StatusUnauthorized)
 				return

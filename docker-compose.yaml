@@ -45,7 +45,8 @@ services:
     ports:
       - "8081:8081"
     environment:
-      - KEYCLOAK_URL=http://keycloak:8080/realms/reports-realm
+      - KEYCLOAK_BACKEND_URL=http://keycloak:8080/realms/reports-realm
+      - KEYCLOAK_FRONTEND_URL=http://localhost:8080/realms/reports-realm
       - CLIENT_ID=reports-frontend
       - REDIRECT_URI=http://localhost:8081/callback
       - FRONTEND_URL=http://localhost:3000

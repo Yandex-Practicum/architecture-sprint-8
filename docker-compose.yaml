@@ -50,7 +50,7 @@ services:
       - CLIENT_ID=reports-frontend
       - REDIRECT_URI=http://localhost:8081/callback
       - FRONTEND_URL=http://localhost:3000
-      - API_URL=http://localhost:8000
+      - API_URL=http://bionicpro-api:8000
     depends_on:
       - keycloak
     restart: unless-stopped
@@ -64,4 +64,14 @@ services:
       LDAP_DOMAIN: "example.com"
       LDAP_REMOVE_CONFIG_AFTER_SETUP: "false"
     volumes:
-      - ./ldap:/container/service/slapd/assets/config/bootstrap/ldif/custom
+      - ./ldap:/container/service/slapd/assets/config/bootstrap/ldif/custom  bionicpro-api:
+    build:
+      context: ./bionicpro-api
+      dockerfile: Dockerfile
+    container_name: bionicpro-api
+    ports:
+      - "8000:8000"
+    environment:
+      - KEYCLOAK_URL=http://keycloak:8080/realms/reports-realm
+    depends_on:
+      - keycloak

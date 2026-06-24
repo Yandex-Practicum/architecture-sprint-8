@@ -1,0 +1,19 @@
+{
+  "identityProviders": [
+    {
+      "alias": "yandex",
+      "displayName": "Yandex",
+      "providerId": "oauth2",
+      "enabled": true,
+      "firstBrokerLoginFlowAlias": "first broker login",
+      "config": {
+        "authorizationUrl": "https://oauth.yandex.ru/authorize",
+        "tokenUrl": "https://oauth.yandex.ru/token",
+        "userInfoUrl": "https://login.yandex.ru/info?format=json",
+        "clientId": "be38ba91fe394b2f9eaa4d35e687b194",
+        "clientSecret": "cc81d681ca694fa3a0084c743be5f0c6",
+        "defaultScope": "login:info login:email login:avatar"
+      }
+    }
+  ]
+}

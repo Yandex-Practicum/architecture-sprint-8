@@ -29,6 +29,7 @@ func init() {
 
 	oidcConfig := &oidc.Config{
 		SkipClientIDCheck: true,
+		SkipIssuerCheck:   true,
 	}
 	verifier = provider.Verifier(oidcConfig)
 }

@@ -64,11 +64,13 @@ services:
       LDAP_DOMAIN: "example.com"
       LDAP_REMOVE_CONFIG_AFTER_SETUP: "false"
     volumes:
-      - ./ldap:/container/service/slapd/assets/config/bootstrap/ldif/custom  bionicpro-api:
+      - ./ldap:/container/service/slapd/assets/config/bootstrap/ldif/custom
+  bionicpro-api:
     build:
       context: ./bionicpro-api
       dockerfile: Dockerfile
     container_name: bionicpro-api
+    restart: always
     ports:
       - "8000:8000"
     environment:

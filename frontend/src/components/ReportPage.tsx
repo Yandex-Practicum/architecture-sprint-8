@@ -10,7 +10,7 @@ const ReportPage: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/reports`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/report`, {
         credentials: 'include'
       });
 
@@ -23,6 +23,20 @@ const ReportPage: React.FC = () => {
       if (!response.ok) {
         throw new Error(`Server error: ${response.status}`);
       }
+
+      const blob = await response.blob();
+
+      const downloadUrl = window.URL.createObjectURL(blob);
+
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = 'bionic_report.pdf';
+
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      window.URL.revokeObjectURL(downloadUrl);
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
@@ -11,9 +12,12 @@ import (
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/jung-kurt/gofpdf"
+
+	_ "github.com/ClickHouse/clickhouse-go/v2"
 )
 
 var verifier *oidc.IDTokenVerifier
+var clickhouseDB *sql.DB
 
 func init() {
 	keycloakURL := os.Getenv("KEYCLOAK_URL")
@@ -32,6 +36,11 @@ func init() {
 		SkipIssuerCheck:   true,
 	}
 	verifier = provider.Verifier(oidcConfig)
+
+	clickhouseDB, err = sql.Open("clickhouse", "clickhouse://admin:admin@clickhouse:9000/bionicpro")
+	if err != nil {
+		log.Fatalf("Failed to connect to ClickHouse: %v", err)
+	}
 }
 
 func main() {
@@ -80,6 +89,30 @@ func reportHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Printf("User %s requested a report", claims.PreferredUsername)
+
+	row := clickhouseDB.QueryRow(`
+        SELECT latest_status, latest_battery_level, total_motor_cycles 
+        FROM user_reports_datamart 
+        WHERE username = ?
+        ORDER BY report_generated_at DESC LIMIT 1`,
+		claims.PreferredUsername,
+	)
+
+	var status string
+	var battery, cycles int
+	err = row.Scan(&status, &battery, &cycles)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			http.Error(w, "Данные для вашего отчета еще не сформированы", http.StatusNotFound)
+			return
+		}
+		log.Printf("DB error: %v", err)
+		http.Error(w, "Ошибка при получении данных", http.StatusInternalServerError)
+		return
+	}
+
 	pdf := gofpdf.New("P", "mm", "A4", "")
 	pdf.AddPage()
 
@@ -97,11 +130,12 @@ func reportHandler(w http.ResponseWriter, r *http.Request) {
 	pdf.Cell(40, 10, "Telemetry Data:")
 	pdf.Ln(10)
 	pdf.SetFont("Arial", "", 12)
-	pdf.Cell(40, 8, "- Status: Active")
+	pdf.Cell(40, 8, fmt.Sprintf("- Status: %s", status))
 	pdf.Ln(8)
-	pdf.Cell(40, 8, "- Battery Level: 87%")
+	pdf.Cell(40, 8, fmt.Sprintf("- Battery Level: %d%%", battery))
 	pdf.Ln(8)
-	pdf.Cell(40, 8, "- Motor Cycles: 12,450")
+	pdf.Cell(40, 8, fmt.Sprintf("- Motor Cycles: %d", cycles))
+	pdf.Ln(15)
 	pdf.Ln(8)
 	pdf.Cell(40, 8, "- Firmware Version: v2.4.1")
 

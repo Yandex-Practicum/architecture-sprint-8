@@ -30,7 +30,7 @@ const ReportPage: React.FC = () => {
 
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.download = 'bionic_report.pdf';
+      link.download = 'my_bionic_report.pdf';
 
       document.body.appendChild(link);
       link.click();

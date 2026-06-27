@@ -40,3 +40,32 @@ services:
       REACT_APP_KEYCLOAK_URL: http://localhost:8080
       REACT_APP_KEYCLOAK_REALM: reports-realm
       REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+    depends_on:
+      - reports_api
+  reports_api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      PORT: 8000
+      CORS_ORIGIN: http://localhost:3000
+      KEYCLOAK_ISSUER: http://localhost:8080/realms/reports-realm
+      KEYCLOAK_JWKS_URI: http://keycloak:8080/realms/reports-realm/protocol/openid-connect/certs
+      REPORT_USER_ID_CLAIM: preferred_username
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_USER: reports_api
+      CLICKHOUSE_PASSWORD: bionicpro_reports_password
+      CLICKHOUSE_DATABASE: bionicpro
+    depends_on:
+      - keycloak
+      - clickhouse
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - ./clickhouse-data:/var/lib/clickhouse
+      - ./clickhouse/users.d/reports-api-user.xml:/etc/clickhouse-server/users.d/reports-api-user.xml:ro

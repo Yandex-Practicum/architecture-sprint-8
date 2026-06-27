@@ -1,2 +1,5 @@
 /postgres-keycloak-data
 2024__yandex-architecture-sso.code-workspace
+.idea
+/backend/node_modules
+/clickhouse-data

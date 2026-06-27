@@ -5,6 +5,7 @@ const ReportPage: React.FC = () => {
   const { keycloak, initialized } = useKeycloak();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
   const downloadReport = async () => {
     if (!keycloak?.token) {
@@ -15,14 +16,35 @@ const ReportPage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
+      setMessage(null);
+
+      await keycloak.updateToken(30);
 
       const response = await fetch(`${process.env.REACT_APP_API_URL}/reports`, {
         headers: {
-          'Authorization': `Bearer ${keycloak.token}`
+          Authorization: `Bearer ${keycloak.token}`,
+          Accept: 'application/json',
         }
       });
 
-      
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error || `Report request failed with status ${response.status}`);
+      }
+
+      const report = await response.json();
+      const blob = new Blob([JSON.stringify(report, null, 2)], {
+        type: 'application/json',
+      });
+      const href = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = href;
+      link.download = `bionicpro-report-${report.userId}-${report.to}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(href);
+      setMessage(`Report for ${report.userId} downloaded`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -65,6 +87,12 @@ const ReportPage: React.FC = () => {
         {error && (
           <div className="mt-4 p-4 bg-red-100 text-red-700 rounded">
             {error}
+          </div>
+        )}
+
+        {message && (
+          <div className="mt-4 p-4 bg-green-100 text-green-700 rounded">
+            {message}
           </div>
         )}
       </div>

@@ -1,0 +1,12 @@
+<clickhouse>
+  <users>
+    <reports_api>
+      <password>bionicpro_reports_password</password>
+      <networks>
+        <ip>::/0</ip>
+      </networks>
+      <profile>default</profile>
+      <quota>default</quota>
+    </reports_api>
+  </users>
+</clickhouse>

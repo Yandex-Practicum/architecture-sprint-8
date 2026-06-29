@@ -42,7 +42,12 @@ func init() {
 	}
 	verifier = provider.Verifier(oidcConfig)
 
-	clickhouseDB, err = sql.Open("clickhouse", "clickhouse://admin:admin@clickhouse:9000/bionicpro")
+	// Allow overriding ClickHouse DSN via env; default points to new CDC-based schema
+	chDSN := os.Getenv("CLICKHOUSE_DSN")
+	if chDSN == "" {
+		chDSN = "clickhouse://admin:admin@clickhouse:9000/crm_dds"
+	}
+	clickhouseDB, err = sql.Open("clickhouse", chDSN)
 	if err != nil {
 		log.Fatalf("Failed to connect to ClickHouse: %v", err)
 	}
@@ -123,18 +128,19 @@ func reportHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("Report for %s not found in S3. Generating fresh report...", username)
 	row := clickhouseDB.QueryRow(`
-		SELECT latest_status, latest_battery_level, total_motor_cycles 
-		FROM user_reports_datamart 
-		WHERE username = ? 
-		ORDER BY report_generated_at DESC LIMIT 1`,
+		SELECT username, email, full_name
+		FROM crm_dds.crm_users FINAL
+		WHERE username = ?
+		ORDER BY user_id ASC
+		LIMIT 1`,
 		username,
 	)
 
-	var status string
-	var battery, cycles int
-	if err := row.Scan(&status, &battery, &cycles); err != nil {
+	var chUsername, chEmail string
+	var chFullName sql.NullString
+	if err := row.Scan(&chUsername, &chEmail, &chFullName); err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Данные для вашего отчета еще не подготовлены ETL-процессом", http.StatusNotFound)
+			http.Error(w, "Профиль пользователя не найден в витрине CRM", http.StatusNotFound)
 			return
 		}
 		log.Printf("DB error: %v", err)
@@ -142,11 +148,16 @@ func reportHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fullName := chFullName.String
+	if !chFullName.Valid || strings.TrimSpace(fullName) == "" {
+		fullName = "N/A"
+	}
+
 	pdf := gofpdf.New("P", "mm", "A4", "")
 	pdf.AddPage()
 
 	pdf.SetFont("Arial", "B", 18)
-	pdf.Cell(40, 10, "BionicPRO - Usage Report")
+	pdf.Cell(40, 10, "BionicPRO - CRM User Report")
 	pdf.Ln(15)
 
 	pdf.SetFont("Arial", "", 12)
@@ -156,17 +167,15 @@ func reportHandler(w http.ResponseWriter, r *http.Request) {
 	pdf.Ln(15)
 
 	pdf.SetFont("Arial", "B", 14)
-	pdf.Cell(40, 10, "Telemetry Data:")
+	pdf.Cell(40, 10, "CRM Profile:")
 	pdf.Ln(10)
 	pdf.SetFont("Arial", "", 12)
-	pdf.Cell(40, 8, fmt.Sprintf("- Status: %s", status))
+	pdf.Cell(40, 8, fmt.Sprintf("- Username: %s", chUsername))
 	pdf.Ln(8)
-	pdf.Cell(40, 8, fmt.Sprintf("- Battery Level: %d%%", battery))
+	pdf.Cell(40, 8, fmt.Sprintf("- Email: %s", chEmail))
 	pdf.Ln(8)
-	pdf.Cell(40, 8, fmt.Sprintf("- Motor Cycles: %d", cycles))
+	pdf.Cell(40, 8, fmt.Sprintf("- Full name: %s", fullName))
 	pdf.Ln(15)
-	pdf.Ln(8)
-	pdf.Cell(40, 8, "- Firmware Version: v2.4.1")
 
 	var pdfBuffer bytes.Buffer
 	if err := pdf.Output(&pdfBuffer); err != nil {

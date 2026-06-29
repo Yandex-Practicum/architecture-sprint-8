@@ -23,21 +23,22 @@ const ReportPage: React.FC = () => {
       if (!response.ok) {
         throw new Error(`Server error: ${response.status}`);
       }
+      
+      const data = await response.json();
+      const cdnUrl = data.url;
 
-      const blob = await response.blob();
+      const fileResponse = await fetch(cdnUrl);
+      const blob = await fileResponse.blob();
 
       const downloadUrl = window.URL.createObjectURL(blob);
-
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.download = 'my_bionic_report.pdf';
-
+      link.download = `my_bionic_report_${new Date().toISOString().slice(0,10)}.pdf`;
       document.body.appendChild(link);
       link.click();
+
       link.remove();
-
       window.URL.revokeObjectURL(downloadUrl);
-
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {

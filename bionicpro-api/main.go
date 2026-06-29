@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 	"log"
 	"net/http"
 	"os"
@@ -12,12 +15,14 @@ import (
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/jung-kurt/gofpdf"
+	"github.com/minio/minio-go/v7"
 
 	_ "github.com/ClickHouse/clickhouse-go/v2"
 )
 
 var verifier *oidc.IDTokenVerifier
 var clickhouseDB *sql.DB
+var minioClient *minio.Client
 
 func init() {
 	keycloakURL := os.Getenv("KEYCLOAK_URL")
@@ -40,6 +45,14 @@ func init() {
 	clickhouseDB, err = sql.Open("clickhouse", "clickhouse://admin:admin@clickhouse:9000/bionicpro")
 	if err != nil {
 		log.Fatalf("Failed to connect to ClickHouse: %v", err)
+	}
+
+	minioClient, err = minio.New("minio:9000", &minio.Options{
+		Creds:  credentials.NewStaticV4("minioadmin", "minioadmin", ""),
+		Secure: false,
+	})
+	if err != nil {
+		log.Fatalf("Failed to connect to MinIO S3: %v", err)
 	}
 }
 
@@ -91,21 +104,37 @@ func reportHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("User %s requested a report", claims.PreferredUsername)
 
+	username := claims.PreferredUsername
+
+	bucketName := "bionicpro-reports"
+	currentDate := time.Now().Format("20060102")
+	objectName := fmt.Sprintf("reports/%s/report_%s.pdf", username, currentDate)
+	cdnURL := fmt.Sprintf("http://localhost:8086/%s", objectName)
+
+	ctx := context.Background()
+
+	_, err = minioClient.StatObject(ctx, bucketName, objectName, minio.StatObjectOptions{})
+	if err == nil {
+		log.Printf("Report for %s found in S3 cache. Returning CDN link.", username)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"url": cdnURL})
+		return
+	}
+
+	log.Printf("Report for %s not found in S3. Generating fresh report...", username)
 	row := clickhouseDB.QueryRow(`
-        SELECT latest_status, latest_battery_level, total_motor_cycles 
-        FROM user_reports_datamart 
-        WHERE username = ?
-        ORDER BY report_generated_at DESC LIMIT 1`,
-		claims.PreferredUsername,
+		SELECT latest_status, latest_battery_level, total_motor_cycles 
+		FROM user_reports_datamart 
+		WHERE username = ? 
+		ORDER BY report_generated_at DESC LIMIT 1`,
+		username,
 	)
 
 	var status string
 	var battery, cycles int
-	err = row.Scan(&status, &battery, &cycles)
-
-	if err != nil {
+	if err := row.Scan(&status, &battery, &cycles); err != nil {
 		if err == sql.ErrNoRows {
-			http.Error(w, "Данные для вашего отчета еще не сформированы", http.StatusNotFound)
+			http.Error(w, "Данные для вашего отчета еще не подготовлены ETL-процессом", http.StatusNotFound)
 			return
 		}
 		log.Printf("DB error: %v", err)
@@ -139,11 +168,21 @@ func reportHandler(w http.ResponseWriter, r *http.Request) {
 	pdf.Ln(8)
 	pdf.Cell(40, 8, "- Firmware Version: v2.4.1")
 
-	w.Header().Set("Content-Type", "application/pdf")
-	w.Header().Set("Content-Disposition", `attachment; filename="bionic_report.pdf"`)
-
-	if err := pdf.Output(w); err != nil {
-		log.Printf("Failed to output PDF: %v", err)
-		http.Error(w, "Failed to generate report", http.StatusInternalServerError)
+	var pdfBuffer bytes.Buffer
+	if err := pdf.Output(&pdfBuffer); err != nil {
+		http.Error(w, "Failed to build PDF", http.StatusInternalServerError)
+		return
 	}
+
+	_, err = minioClient.PutObject(ctx, bucketName, objectName, &pdfBuffer, int64(pdfBuffer.Len()), minio.PutObjectOptions{
+		ContentType: "application/pdf",
+	})
+	if err != nil {
+		log.Printf("S3 Upload Error: %v", err)
+		http.Error(w, "Failed to save report to S3", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"url": cdnURL})
 }

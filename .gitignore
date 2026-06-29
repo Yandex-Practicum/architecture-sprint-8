@@ -9,3 +9,4 @@ clickhouse-data
 postgres-airflow-data
 
 .DS_Store
+minio-data

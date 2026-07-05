@@ -1,0 +1,6 @@
+<clickhouse>
+    <kafka>
+        <!-- earliest: Kafka Engine читает топик с начала, чтобы получить снапшот Debezium. -->
+        <auto_offset_reset>earliest</auto_offset_reset>
+    </kafka>
+</clickhouse>

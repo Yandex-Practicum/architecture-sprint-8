@@ -101,7 +101,14 @@ services:
 
   airflow:
     image: apache/airflow:2.9.2
-    command: standalone
+    command:
+      - bash
+      - -c
+      - |
+        airflow db migrate
+        airflow users create --username admin --password admin \
+          --firstname Admin --lastname User --role Admin --email admin@example.com || true
+        exec airflow standalone
     environment:
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       _PIP_ADDITIONAL_REQUIREMENTS: "psycopg2-binary clickhouse-connect"

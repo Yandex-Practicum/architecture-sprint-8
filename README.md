@@ -59,6 +59,16 @@ cp .env.example .env          # вписать YANDEX_CLIENT_ID / YANDEX_CLIENT_
 При первом входе Keycloak потребует привязать OTP (Google Authenticator/FreeOTP) —
 MFA обязателен для всех (задание 1).
 
+## Доступы к инфраструктуре
+
+| Сервис                        | URL / подключение              | Логин / пароль            |
+|-------------------------------|--------------------------------|---------------------------|
+| Keycloak admin console        | http://localhost:8080          | `admin` / `admin`         |
+| Airflow                       | http://localhost:8082          | `admin` / `admin`         |
+| Minio console                 | http://localhost:9001          | `minioadmin` / `minioadmin` |
+| CRM (PostgreSQL)              | localhost:5434, БД `crm`       | `crm_user` / `crm_password` |
+| ClickHouse (HTTP)             | http://localhost:8123          | `default` / (без пароля)  |
+
 ## Реализация по заданиям
 
 ### Задание 1. Безопасность

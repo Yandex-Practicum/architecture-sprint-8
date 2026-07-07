@@ -1,0 +1,55 @@
+<mxfile host="65bd71144e">
+    <diagram name="CDC (Debezium-Kafka-ClickHouse)" id="cdc">
+        <mxGraphModel dx="576" dy="624" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="819" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="BionicPRO — CDC: разделение OLTP и выгрузки. Изменения CRM в реальном времени в витрину ClickHouse" style="text;html=1;fontSize=15;fontStyle=1;align=left;fillColor=#ffffff;strokeColor=none;fontColor=#000000;" parent="1" vertex="1">
+                    <mxGeometry x="30" y="15" width="1100" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="crm" value="CRM PostgreSQL&#10;(OLTP)&#10;wal_level = logical&#10;таблицы telemetry, clients" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;align=left;spacingLeft=8;fontColor=#000000;" parent="1" vertex="1">
+                    <mxGeometry x="30" y="120" width="180" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="dbz" value="Debezium&#10;(Kafka Connect)&#10;PostgresConnector, pgoutput&#10;snapshot + streaming&#10;SMT unwrap → плоский JSON" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=8;fontColor=#000000;" parent="1" vertex="1">
+                    <mxGeometry x="290" y="115" width="200" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="kafka" value="Kafka&#10;топики:&#10;bionic.public.telemetry&#10;bionic.public.clients" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;align=left;spacingLeft=8;fontColor=#000000;" parent="1" vertex="1">
+                    <mxGeometry x="570" y="120" width="190" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="queue" value="ClickHouse: Kafka Engine&#10;telemetry_queue&#10;clients_queue&#10;(JSONEachRow, earliest)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;align=left;spacingLeft=8;fontColor=#000000;" parent="1" vertex="1">
+                    <mxGeometry x="840" y="120" width="200" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="raw" value="MergeTree&#10;telemetry_raw (сырьё)&#10;clients_dim (ReplacingMergeTree)&#10;&lt;- MATERIALIZED VIEW из очередей" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;align=left;spacingLeft=8;fontColor=#000000;" parent="1" vertex="1">
+                    <mxGeometry x="840" y="280" width="200" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="mart" value="AggregatingMergeTree&#10;user_report_rt (витрина)&#10;агрегаты client_id × день&#10;&lt;- MATERIALIZED VIEW из сырья" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;align=left;spacingLeft=8;fontColor=#000000;" parent="1" vertex="1">
+                    <mxGeometry x="840" y="440" width="200" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="api" value="reports-api&#10;REPORT_MART = realtime&#10;JOIN витрина + clients_dim&#10;-&gt; отчёт в S3 -&gt; ссылка на CDN" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=8;fontColor=#000000;" parent="1" vertex="1">
+                    <mxGeometry x="1110" y="440" width="220" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="e1" value="logical replication&#10;(slot + publication)" style="endArrow=classic;html=1;fontSize=10;fontColor=#000000;labelBackgroundColor=#ffffff;" parent="1" source="crm" target="dbz" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e2" style="endArrow=classic;html=1;" parent="1" source="dbz" target="kafka" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e3" value="consume" style="endArrow=classic;html=1;fontSize=10;fontColor=#000000;labelBackgroundColor=#ffffff;" parent="1" source="kafka" target="queue" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e4" value="MV" style="endArrow=classic;html=1;fontSize=10;fontColor=#000000;labelBackgroundColor=#ffffff;" parent="1" source="queue" target="raw" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e5" value="MV (агрегация)" style="endArrow=classic;html=1;fontSize=10;fontColor=#000000;labelBackgroundColor=#ffffff;" parent="1" source="raw" target="mart" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e6" value="...Merge при чтении" style="endArrow=classic;html=1;fontSize=10;fontColor=#000000;labelBackgroundColor=#ffffff;" parent="1" source="mart" target="api" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="note" value="Разделение потоков: тяжёлые аналитические выгрузки уходят из CRM (OLTP) в ClickHouse (OLAP) через CDC. Транзакционные запросы CRM больше не конкурируют с массовым чтением.&lt;br&gt;Витрина обновляется в реальном времени — отдельный ETL по расписанию не требуется." style="text;html=1;fontSize=11;align=left;verticalAlign=top;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#000000;" parent="1" vertex="1">
+                    <mxGeometry x="30" y="620" width="1300" height="55" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

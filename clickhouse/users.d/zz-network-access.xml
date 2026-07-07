@@ -1,0 +1,11 @@
+<clickhouse>
+    <users>
+        <default>
+            <!-- Образ ClickHouse при пустых CLICKHOUSE_USER/PASSWORD ограничивает default
+                 доступом только с localhost. Этот файл открывает доступ из соседних контейнеров. -->
+            <networks replace="replace">
+                <ip>::/0</ip>
+            </networks>
+        </default>
+    </users>
+</clickhouse>

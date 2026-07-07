@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" version="24.8.4">
+  <diagram name="Reporting-Architecture" id="report-arch-1">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="person" value="Пилот протеза&#10;[Person]" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#6C6477;strokeColor=#4D4D4D;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="40" y="380" width="150" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="frontend" value="Frontend (SPA)&#10;[React/TypeScript]&#10;Кнопка «Download Report»" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1061B0;strokeColor=#0D5091;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="250" y="370" width="200" height="100" as="geometry" />
+        </mxCell>
+
+        <mxCell id="reports" value="reports-api&#10;[Python/FastAPI]&#10;GET /reports — отчёт из витрины,&#10;только свои данные,&#10;только обработанные периоды." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1061B0;strokeColor=#0D5091;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="540" y="360" width="240" height="120" as="geometry" />
+        </mxCell>
+
+        <mxCell id="auth" value="bionicpro-auth&#10;[Python/FastAPI]&#10;/auth/validate — проверка&#10;сессии и ротация." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1061B0;strokeColor=#0D5091;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="540" y="170" width="240" height="110" as="geometry" />
+        </mxCell>
+
+        <mxCell id="clickhouse" value="ClickHouse&#10;[OLAP]&#10;Витрина reports.user_report&#10;(агрегаты по пользователь × день).&#10;ORDER BY (username, period_date)." style="shape=cylinder3;size=15;whiteSpace=wrap;html=1;boundedLbl=1;fillColor=#23A2D9;strokeColor=#0E7DAD;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="880" y="360" width="240" height="130" as="geometry" />
+        </mxCell>
+
+        <mxCell id="airflow" value="Airflow&#10;[ETL, по расписанию @hourly]&#10;DAG crm_to_clickhouse_report_mart:&#10;extract CRM → агрегация →&#10;запись витрины в ClickHouse." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1061B0;strokeColor=#0D5091;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="880" y="120" width="260" height="130" as="geometry" />
+        </mxCell>
+
+        <mxCell id="crm" value="CRM&#10;[Container]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1061B0;strokeColor=#0D5091;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="1240" y="120" width="150" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="crmdb" value="CRM DB&#10;[PostgreSQL]&#10;clients, telemetry" style="shape=cylinder3;size=15;whiteSpace=wrap;html=1;boundedLbl=1;fillColor=#23A2D9;strokeColor=#0E7DAD;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="1240" y="260" width="170" height="110" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e1" value="клик «Скачать отчёт» (cookie)" style="endArrow=block;html=1;" edge="1" parent="1" source="person" target="frontend">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="GET /reports + cookie" style="endArrow=block;html=1;" edge="1" parent="1" source="frontend" target="reports">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="валидация сессии" style="endArrow=block;html=1;" edge="1" parent="1" source="reports" target="auth">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="SELECT по username" style="endArrow=block;html=1;" edge="1" parent="1" source="reports" target="clickhouse">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="INSERT витрины" style="endArrow=block;html=1;" edge="1" parent="1" source="airflow" target="clickhouse">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="extract (SQL)" style="endArrow=block;html=1;" edge="1" parent="1" source="airflow" target="crmdb">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" style="endArrow=block;html=1;" edge="1" parent="1" source="crm" target="crmdb">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

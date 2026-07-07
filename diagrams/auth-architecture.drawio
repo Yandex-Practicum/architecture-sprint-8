@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" version="24.8.4">
+  <diagram name="Auth-Architecture" id="auth-arch-1">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Пилот протеза -->
+        <mxCell id="person" value="Пилот протеза&#10;[Person]&#10;Пользователь Android/Web" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#6C6477;strokeColor=#4D4D4D;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="40" y="360" width="160" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- Граница BionicPRO -->
+        <mxCell id="boundary" value="BionicPRO (страна представительства)" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;arcSize=4;fillColor=none;strokeColor=#666666;fontColor=#333333;verticalAlign=top;align=left;spacing=10;" vertex="1" parent="1">
+          <mxGeometry x="260" y="40" width="900" height="760" as="geometry" />
+        </mxCell>
+
+        <!-- Frontend SPA -->
+        <mxCell id="frontend" value="Frontend (SPA)&#10;[Container: React/TypeScript]&#10;Работает только с сессионной&#10;cookie (HttpOnly+Secure).&#10;Токены IdP недоступны." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1061B0;strokeColor=#0D5091;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="300" y="350" width="220" height="120" as="geometry" />
+        </mxCell>
+
+        <!-- bionicpro-auth -->
+        <mxCell id="auth" value="bionicpro-auth&#10;[Container: Python/FastAPI]&#10;BFF: Authorization Code + PKCE,&#10;обмен кода/токенов на бэкенде,&#10;ротация session_id,&#10;авто-refresh access_token." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1061B0;strokeColor=#0D5091;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="600" y="340" width="240" height="140" as="geometry" />
+        </mxCell>
+
+        <!-- Redis -->
+        <mxCell id="redis" value="Redis&#10;[Container: распределённый кеш]&#10;access_token в памяти,&#10;refresh_token зашифрован,&#10;привязка токенов к session_id." style="shape=cylinder3;size=15;whiteSpace=wrap;html=1;boundedLbl=1;fillColor=#23A2D9;strokeColor=#0E7DAD;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="640" y="560" width="180" height="120" as="geometry" />
+        </mxCell>
+
+        <!-- reports-api -->
+        <mxCell id="reports" value="reports-api&#10;[Container: Python/FastAPI]&#10;Защищённый ресурс /reports.&#10;Валидирует сессию через&#10;bionicpro-auth." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1061B0;strokeColor=#0D5091;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="300" y="560" width="220" height="120" as="geometry" />
+        </mxCell>
+
+        <!-- Keycloak -->
+        <mxCell id="keycloak" value="Keycloak&#10;[Container: IdP / SSO]&#10;OAuth 2.0, PKCE, MFA (OTP),&#10;User Federation (LDAP),&#10;Identity Brokering." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1061B0;strokeColor=#0D5091;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="920" y="340" width="200" height="140" as="geometry" />
+        </mxCell>
+
+        <!-- Keycloak DB -->
+        <mxCell id="kcdb" value="Keycloak DB&#10;[Container: PostgreSQL]" style="shape=cylinder3;size=15;whiteSpace=wrap;html=1;boundedLbl=1;fillColor=#23A2D9;strokeColor=#0E7DAD;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="940" y="560" width="160" height="100" as="geometry" />
+        </mxCell>
+
+        <!-- OpenLDAP (внешний источник представительства) -->
+        <mxCell id="ldap" value="OpenLDAP&#10;[External: каталог представительства]&#10;Учётные данные пользователей&#10;хранятся локально в стране.&#10;Роли: user, prothetic_user." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#8C8C8C;strokeColor=#666666;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="1220" y="200" width="220" height="120" as="geometry" />
+        </mxCell>
+
+        <!-- Yandex ID -->
+        <mxCell id="yandex" value="Яндекс ID&#10;[External IdP]&#10;Identity Brokering (OAuth 2.0).&#10;Сервис запрашивает профиль&#10;после согласия пользователя." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#8C8C8C;strokeColor=#666666;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="1220" y="480" width="220" height="120" as="geometry" />
+        </mxCell>
+
+        <!-- Связи -->
+        <mxCell id="e1" value="HTTPS, сессионная cookie" style="endArrow=block;html=1;" edge="1" parent="1" source="person" target="frontend">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="API + cookie (credentials: include)" style="endArrow=block;html=1;" edge="1" parent="1" source="frontend" target="auth">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="Authorization Code + PKCE,&#10;token / refresh (server-to-server)" style="endArrow=block;html=1;" edge="1" parent="1" source="auth" target="keycloak">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="session, токены" style="endArrow=block;html=1;" edge="1" parent="1" source="auth" target="redis">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="/auth/validate&#10;(проверка сессии + ротация)" style="endArrow=block;html=1;" edge="1" parent="1" source="reports" target="auth">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="API + cookie" style="endArrow=block;html=1;" edge="1" parent="1" source="frontend" target="reports">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" style="endArrow=block;html=1;" edge="1" parent="1" source="keycloak" target="kcdb">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" value="LDAP federation&#10;(role mapping)" style="endArrow=block;html=1;" edge="1" parent="1" source="keycloak" target="ldap">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" value="OAuth 2.0 (брокеринг)" style="endArrow=block;html=1;" edge="1" parent="1" source="keycloak" target="yandex">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

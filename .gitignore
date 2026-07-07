@@ -1,2 +1,11 @@
 /postgres-keycloak-data
+/minio-data
+/.env
 2024__yandex-architecture-sso.code-workspace
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Node
+node_modules/

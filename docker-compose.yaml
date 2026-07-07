@@ -20,7 +20,7 @@ services:
       KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
       KC_DB_USERNAME: keycloak_user
       KC_DB_PASSWORD: keycloak_password
-    command: 
+    command:
       - start-dev
       - --import-realm
     volumes:
@@ -29,6 +29,174 @@ services:
       - "8080:8080"
     depends_on:
       - keycloak_db
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  openldap:
+    image: osixia/openldap:1.5.0
+    command: ["--copy-service"]
+    environment:
+      LDAP_ORGANISATION: "BionicPRO"
+      LDAP_DOMAIN: "example.com"
+      LDAP_ADMIN_PASSWORD: "admin"
+    volumes:
+      - ./ldap/config.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/config.ldif
+    ports:
+      - "3389:389"
+      - "3636:636"
+
+  bionicpro-auth:
+    build:
+      context: ./bionicpro-auth
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_PUBLIC_URL: http://localhost:8080
+      KEYCLOAK_REALM: reports-realm
+      KEYCLOAK_CLIENT_ID: bionicpro-auth
+      KEYCLOAK_CLIENT_SECRET: bionicpro-auth-secret
+      AUTH_REDIRECT_URI: http://localhost:8000/auth/callback
+      FRONTEND_URL: http://localhost:3000
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - keycloak
+      - redis
+
+  crm_db:
+    image: postgres:14
+    command:
+      - postgres
+      - -c
+      - wal_level=logical
+      - -c
+      - max_wal_senders=10
+      - -c
+      - max_replication_slots=10
+    environment:
+      POSTGRES_DB: crm
+      POSTGRES_USER: crm_user
+      POSTGRES_PASSWORD: crm_password
+    volumes:
+      - ./crm/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5434:5432"
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3
+    volumes:
+      - ./clickhouse/init:/docker-entrypoint-initdb.d
+      - ./clickhouse/users.d/zz-network-access.xml:/etc/clickhouse-server/users.d/zz-network-access.xml
+      - ./clickhouse/config.d/kafka.xml:/etc/clickhouse-server/config.d/kafka.xml
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+
+  airflow:
+    image: apache/airflow:2.9.2
+    command:
+      - bash
+      - -c
+      - |
+        airflow db migrate
+        airflow users create --username admin --password admin \
+          --firstname Admin --lastname User --role Admin --email admin@example.com || true
+        exec airflow standalone
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      _PIP_ADDITIONAL_REQUIREMENTS: "psycopg2-binary clickhouse-connect"
+      CRM_DB_HOST: crm_db
+      CRM_DB_NAME: crm
+      CRM_DB_USER: crm_user
+      CRM_DB_PASSWORD: crm_password
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: "8123"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+    ports:
+      - "8082:8080"
+    depends_on:
+      - crm_db
+      - clickhouse
+
+  zookeeper:
+    image: quay.io/debezium/zookeeper:2.5
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: quay.io/debezium/kafka:2.5
+    environment:
+      ZOOKEEPER_CONNECT: zookeeper:2181
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper
+
+  connect:
+    image: quay.io/debezium/connect:2.5
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: "1"
+      CONFIG_STORAGE_TOPIC: connect_configs
+      OFFSET_STORAGE_TOPIC: connect_offsets
+      STATUS_STORAGE_TOPIC: connect_statuses
+    ports:
+      - "8083:8083"
+    depends_on:
+      - kafka
+      - crm_db
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - ./minio-data:/data
+    ports:
+      - "9002:9000"
+      - "9001:9001"
+
+  cdn:
+    image: nginx:alpine
+    volumes:
+      - ./nginx/cdn.conf:/etc/nginx/conf.d/default.conf
+    ports:
+      - "8090:80"
+    depends_on:
+      - minio
+
+  reports-api:
+    build:
+      context: ./reports-api
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      AUTH_SERVICE_URL: http://bionicpro-auth:8000
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: "8123"
+      CLICKHOUSE_DATABASE: reports
+      FRONTEND_URL: http://localhost:3000
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_BUCKET: reports
+      CDN_BASE_URL: http://localhost:8090
+    depends_on:
+      - clickhouse
+      - bionicpro-auth
+      - minio
+
   frontend:
     build:
       context: ./frontend
@@ -36,7 +204,8 @@ services:
     ports:
       - "3000:3000"
     environment:
-      REACT_APP_API_URL: http://localhost:8000
-      REACT_APP_KEYCLOAK_URL: http://localhost:8080
-      REACT_APP_KEYCLOAK_REALM: reports-realm
-      REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+      REACT_APP_AUTH_URL: http://localhost:8000
+      REACT_APP_REPORTS_URL: http://localhost:8001
+    depends_on:
+      - bionicpro-auth
+      - reports-api

@@ -1,13 +1,29 @@
-import React, { useState } from 'react';
-import { useKeycloak } from '@react-keycloak/web';
+import React, {useEffect, useState} from 'react';
 
 const ReportPage: React.FC = () => {
-  const { keycloak, initialized } = useKeycloak();
+  const [authState, setAuthState] = useState('loading');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+      async function checkAuthStatus() {
+          const response = await fetch(`${process.env.REACT_APP_API_URL}/status`, {
+              credentials: 'include'
+          });
+          const body = await response.json();
+
+          if (body.authenticated) {
+              setAuthState('authenticated');
+          } else {
+              setAuthState('guest');
+          }
+      }
+
+      checkAuthStatus();
+  }, [])
+
   const downloadReport = async () => {
-    if (!keycloak?.token) {
+    if (authState !== 'authenticated') {
       setError('Not authenticated');
       return;
     }
@@ -16,13 +32,29 @@ const ReportPage: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/reports`, {
-        headers: {
-          'Authorization': `Bearer ${keycloak.token}`
-        }
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/reports?date=${new Date().toISOString().split('T')[0]}`, {
+        credentials: 'include'
       });
+      if (response.status === 404) {
+        setError('No report available');
+        return;
+      } else if (!response.ok) {
+        setError('Failed to download report');
+        return;
+      }
 
-      
+      const reportUrl = await response.text();
+      const reportResponse = await fetch(reportUrl);
+      if (!reportResponse.ok) {
+        setError('Failed to download report from CDN');
+        return;
+      }
+
+      const reportBlob = await reportResponse.blob();
+      const reportA = document.createElement('a');
+      reportA.href = URL.createObjectURL(reportBlob);
+      reportA.download = 'report.json';
+      reportA.click();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -30,19 +62,19 @@ const ReportPage: React.FC = () => {
     }
   };
 
-  if (!initialized) {
+  if (authState === 'loading') {
     return <div>Loading...</div>;
   }
 
-  if (!keycloak.authenticated) {
+  if (authState === 'guest') {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
-        <button
-          onClick={() => keycloak.login()}
+        <a
+          href={`${process.env.REACT_APP_API_URL}/oauth2/authorization/reports`}
           className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
         >
           Login
-        </button>
+        </a>
       </div>
     );
   }
@@ -51,7 +83,7 @@ const ReportPage: React.FC = () => {
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
       <div className="p-8 bg-white rounded-lg shadow-md">
         <h1 className="text-2xl font-bold mb-6">Usage Reports</h1>
-        
+
         <button
           onClick={downloadReport}
           disabled={loading}

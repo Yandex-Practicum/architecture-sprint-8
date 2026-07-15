@@ -1,0 +1,13 @@
+spring:
+  application:
+    name: bionicpro-auth
+  security:
+    oauth2:
+      client:
+        registration:
+          reports:
+            provider: reports
+            client-id: reports-frontend
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            scope: openid

@@ -3,6 +3,7 @@ version: '3.8'
 services:
   keycloak_db:
     image: postgres:14
+    container_name: keycloak_db
     environment:
       POSTGRES_DB: keycloak_db
       POSTGRES_USER: keycloak_user
@@ -11,8 +12,28 @@ services:
       - ./postgres-keycloak-data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+
+  # OpenLDAP acts as the external directory of a country representative office.
+  # Keycloak federates users/roles from it (Assignment 1, task 4).
+  openldap:
+    image: osixia/openldap:1.5.0
+    container_name: openldap
+    command: ["--copy-service"]
+    environment:
+      LDAP_ORGANISATION: "BionicPRO"
+      LDAP_DOMAIN: "example.com"
+      LDAP_ADMIN_PASSWORD: "admin"
+    volumes:
+      # config.ldif adds ou=People / ou=Groups, users and role groups on top of
+      # the dc=example,dc=com base that the image bootstraps automatically.
+      - ./ldap/config.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/config.ldif:ro
+    ports:
+      - "389:389"
+      - "636:636"
+
   keycloak:
     image: quay.io/keycloak/keycloak:21.1
+    container_name: keycloak
     environment:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
@@ -20,7 +41,13 @@ services:
       KC_DB_URL: jdbc:postgresql://keycloak_db:5432/keycloak_db
       KC_DB_USERNAME: keycloak_user
       KC_DB_PASSWORD: keycloak_password
-    command: 
+      # Pin the public (browser-facing) URL so tokens are always issued with the
+      # localhost:8080 issuer, even when bionicpro-auth calls the token endpoint
+      # over the internal docker hostname keycloak:8080.
+      KC_HOSTNAME_URL: http://localhost:8080
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_STRICT_BACKCHANNEL: "false"
+    command:
       - start-dev
       - --import-realm
     volumes:
@@ -29,14 +56,264 @@ services:
       - "8080:8080"
     depends_on:
       - keycloak_db
+      - openldap
+
+  # Backend-for-Frontend: runs Authorization Code + PKCE, keeps access/refresh
+  # tokens server-side, issues an HttpOnly session cookie and rotates it on
+  # every request (Assignment 1, task 3).
+  bionicpro-auth:
+    build:
+      context: ./bionicpro-auth
+      dockerfile: Dockerfile
+    container_name: bionicpro-auth
+    environment:
+      LISTEN_ADDR: ":8000"
+      KC_EXTERNAL_URL: "http://localhost:8080"
+      KC_INTERNAL_URL: "http://keycloak:8080"
+      KC_REALM: "reports-realm"
+      KC_CLIENT_ID: "bionicpro-auth"
+      KC_CLIENT_SECRET: "bionicpro-auth-secret"
+      REDIRECT_URI: "http://localhost:8000/auth/callback"
+      FRONTEND_URL: "http://localhost:3000"
+      POST_LOGOUT_URL: "http://localhost:3000"
+      # Local dev is plain http://localhost, where browsers will not send a
+      # Secure cookie. Set COOKIE_SECURE=true in any TLS-terminated deployment.
+      COOKIE_SECURE: "false"
+      SESSION_TTL: "30m"
+      ACCESS_SKEW: "10s"
+      # Assignment 2: authenticated requests to /api/* are proxied to the
+      # reports API with the (server-side) access token injected as a Bearer.
+      DOWNSTREAM_API_URL: "http://reports-api:8081"
+    ports:
+      - "8000:8000"
+    depends_on:
+      - keycloak
+      - reports-api
+
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    container_name: frontend
     ports:
       - "3000:3000"
     environment:
-      REACT_APP_API_URL: http://localhost:8000
-      REACT_APP_KEYCLOAK_URL: http://localhost:8080
-      REACT_APP_KEYCLOAK_REALM: reports-realm
-      REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+      # Baked at build time from frontend/.env; kept here for documentation.
+      REACT_APP_AUTH_URL: http://localhost:8000
+    depends_on:
+      - bionicpro-auth
+
+  # ---------------------------------------------------------------------------
+  # Assignment 2 — reporting analytics contour
+  # ---------------------------------------------------------------------------
+
+  # Source OLTP store: CRM clients + prosthesis telemetry (seeded on first init).
+  crm-db:
+    image: postgres:14
+    container_name: crm-db
+    # Logical replication is required for Debezium CDC (Assignment 4).
+    command:
+      - "postgres"
+      - "-c"
+      - "wal_level=logical"
+      - "-c"
+      - "max_wal_senders=10"
+      - "-c"
+      - "max_replication_slots=10"
+    environment:
+      POSTGRES_DB: crm_db
+      POSTGRES_USER: crm_user
+      POSTGRES_PASSWORD: crm_password
+    volumes:
+      - ./analytics/crm/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5434:5432"
+
+  # OLAP store: holds the pre-aggregated reporting mart.
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3
+    container_name: clickhouse
+    environment:
+      CLICKHOUSE_DB: reports
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    volumes:
+      - ./analytics/clickhouse/init:/docker-entrypoint-initdb.d:ro
+      - ./analytics/clickhouse/users.d/reports-user.xml:/etc/clickhouse-server/users.d/reports-user.xml:ro
+      - ./analytics/clickhouse/config.d/kafka.xml:/etc/clickhouse-server/config.d/kafka.xml:ro
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+
+  # Reports API: reads the mart from ClickHouse, validates Keycloak tokens and
+  # serves each user only their own report (Assignment 2, tasks 3-4).
+  reports-api:
+    build:
+      context: ./reports-api
+      dockerfile: Dockerfile
+    container_name: reports-api
+    environment:
+      LISTEN_ADDR: ":8081"
+      KC_ISSUER: "http://localhost:8080/realms/reports-realm"
+      KC_JWKS_URL: "http://keycloak:8080/realms/reports-realm/protocol/openid-connect/certs"
+      CLICKHOUSE_URL: "http://clickhouse:8123"
+      CLICKHOUSE_DB: "reports"
+      CLICKHOUSE_USER: "bionic"
+      CLICKHOUSE_PASSWORD: "bionic"
+      # Assignment 4: serve reports from the CDC витрина (a VIEW → no FINAL).
+      CLICKHOUSE_TABLE: "user_report_mart_cdc"
+      CLICKHOUSE_USE_FINAL: "false"
+      REQUIRED_ROLE: "prothetic_user"
+      # Assignment 3: cache generated reports in S3 (MinIO) and hand back CDN links.
+      S3_ENDPOINT: "minio:9000"
+      S3_ACCESS_KEY: "minioadmin"
+      S3_SECRET_KEY: "minioadmin"
+      S3_BUCKET: "reports"
+      S3_USE_SSL: "false"
+      CDN_BASE_URL: "http://localhost:8090"
+      REPORT_URL_SECRET: "cdn-signing-secret"
+    ports:
+      - "8081:8081"
+    depends_on:
+      - clickhouse
+      - keycloak
+      - minio
+
+  # Airflow (standalone) runs the scheduled ETL DAG that builds the mart.
+  # Admin password is random — read it with:
+  #   docker exec airflow cat /opt/airflow/standalone_admin_password.txt
+  airflow:
+    image: apache/airflow:2.9.3
+    container_name: airflow
+    command: standalone
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
+      AIRFLOW_CONN_CRM_POSTGRES: "postgresql://crm_user:crm_password@crm-db:5432/crm_db"
+      CLICKHOUSE_HTTP_URL: "http://clickhouse:8123"
+      CLICKHOUSE_USER: "bionic"
+      CLICKHOUSE_PASSWORD: "bionic"
+      CLICKHOUSE_DB: "reports"
+      _PIP_ADDITIONAL_REQUIREMENTS: "apache-airflow-providers-postgres"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+    ports:
+      - "8088:8080"
+    depends_on:
+      - crm-db
+      - clickhouse
+
+  # ---------------------------------------------------------------------------
+  # Assignment 3 — report cache (S3) + CDN
+  # ---------------------------------------------------------------------------
+
+  # S3-compatible object store for generated reports.
+  minio:
+    image: minio/minio:RELEASE.2024-06-13T22-53-53Z
+    container_name: minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9002:9000"   # S3 API (9000 on host is used by ClickHouse native)
+      - "9001:9001"   # web console
+
+  # One-shot: create the `reports` bucket and make its objects publicly
+  # readable so the CDN can serve them without S3 credentials.
+  minio-init:
+    image: minio/mc:RELEASE.2024-06-12T14-34-03Z
+    container_name: minio-init
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set local http://minio:9000 minioadmin minioadmin; do sleep 1; done;
+      mc mb --ignore-existing local/reports;
+      mc anonymous set download local/reports;
+      echo 'minio bucket reports is ready';
+      "
+    restart: "no"
+
+  # Emulated CDN: Nginx reverse proxy in front of MinIO with response caching.
+  cdn:
+    image: nginx:1.27-alpine
+    container_name: cdn
+    volumes:
+      - ./nginx/cdn.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "8090:80"
+    depends_on:
+      - minio
+
+  # ---------------------------------------------------------------------------
+  # Assignment 4 — CDC pipeline (Debezium → Kafka → ClickHouse KafkaEngine)
+  # ---------------------------------------------------------------------------
+
+  # Kafka broker in KRaft mode (no ZooKeeper), single node.
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: kafka
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"
+      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      CLUSTER_ID: "q1Sh-ednQTSEiSVzGRppQg"
+
+  # Kafka Connect with the Debezium Postgres connector bundled.
+  kafka-connect:
+    image: quay.io/debezium/connect:2.7
+    container_name: kafka-connect
+    environment:
+      BOOTSTRAP_SERVERS: "kafka:9092"
+      GROUP_ID: "1"
+      CONFIG_STORAGE_TOPIC: "connect_configs"
+      OFFSET_STORAGE_TOPIC: "connect_offsets"
+      STATUS_STORAGE_TOPIC: "connect_statuses"
+      CONFIG_STORAGE_REPLICATION_FACTOR: "1"
+      OFFSET_STORAGE_REPLICATION_FACTOR: "1"
+      STATUS_STORAGE_REPLICATION_FACTOR: "1"
+      KEY_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      VALUE_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+    ports:
+      - "8083:8083"
+    depends_on:
+      - kafka
+      - crm-db
+
+  # One-shot: register the Debezium connector via the Connect REST API.
+  cdc-connector-init:
+    image: curlimages/curl:8.8.0
+    container_name: cdc-connector-init
+    entrypoint: ["sh", "/scripts/connector-init.sh"]
+    volumes:
+      - ./analytics/cdc/connector-init.sh:/scripts/connector-init.sh:ro
+      - ./debezium/register-postgres.json:/config/register-postgres.json:ro
+    depends_on:
+      - kafka-connect
+    restart: "no"
+
+  # One-shot: create the ClickHouse Kafka engine tables and MaterializedViews.
+  cdc-clickhouse-init:
+    image: clickhouse/clickhouse-server:24.3
+    container_name: cdc-clickhouse-init
+    entrypoint: ["bash", "/scripts/clickhouse-init.sh"]
+    volumes:
+      - ./analytics/cdc/clickhouse-init.sh:/scripts/clickhouse-init.sh:ro
+      - ./analytics/clickhouse/cdc/01_cdc.sql:/config/01_cdc.sql:ro
+    depends_on:
+      - clickhouse
+      - cdc-connector-init
+    restart: "no"

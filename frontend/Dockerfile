@@ -6,8 +6,9 @@ WORKDIR /app
 # Copy package files
 COPY package.json package-lock.json ./
 
-# Install dependencies
-RUN npm ci
+# Install dependencies (npm install reconciles the lockfile after the
+# Keycloak client libraries were removed in favour of the BFF session flow)
+RUN npm install --no-audit --no-fund
 
 # Copy source code
 COPY . .

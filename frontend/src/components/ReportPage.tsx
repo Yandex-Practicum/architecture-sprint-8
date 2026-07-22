@@ -1,10 +1,43 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useKeycloak } from '@react-keycloak/web';
 
 const ReportPage: React.FC = () => {
   const { keycloak, initialized } = useKeycloak();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const handleYandexLogin = () => {
+    window.location.href = 'http://localhost:8081/auth/yandex/login';
+  };
+  const [isYandexAuth, setIsYandexAuth] = useState(false);
+  const [isCheckingYandex, setIsCheckingYandex] = useState(true);
+
+  useEffect(() => {
+    const checkYandexSession = async () => {
+      try {
+        const response = await fetch('http://localhost:8081/auth/session', {
+          credentials: 'include' 
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.authenticated === true) {
+            setIsYandexAuth(true);
+          } else {
+            setIsYandexAuth(false);
+          }
+        } else {
+          setIsYandexAuth(false);
+        }
+      } catch (error) {
+        console.error('Yandex session check failed:', error);
+        setIsYandexAuth(false);
+      } finally {
+        setIsCheckingYandex(false);
+      }
+  };
+
+  checkYandexSession();
+}, []);
 
   const downloadReport = async () => {
     if (!keycloak?.token) {
@@ -30,11 +63,11 @@ const ReportPage: React.FC = () => {
     }
   };
 
-  if (!initialized) {
+  if (!initialized || isCheckingYandex) {
     return <div>Loading...</div>;
   }
 
-  if (!keycloak.authenticated) {
+  if (!keycloak.authenticated && !isYandexAuth) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
         <button
@@ -42,6 +75,12 @@ const ReportPage: React.FC = () => {
           className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
         >
           Login
+        </button>
+        <button
+          onClick={() => handleYandexLogin()}
+          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-red-600"
+        >
+          Яндекс ID
         </button>
       </div>
     );

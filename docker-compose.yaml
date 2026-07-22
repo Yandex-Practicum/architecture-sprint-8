@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   keycloak_db:
     image: postgres:14
@@ -11,6 +9,9 @@ services:
       - ./postgres-keycloak-data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+    networks:
+      - bionic-network
+
   keycloak:
     image: quay.io/keycloak/keycloak:21.1
     environment:
@@ -29,6 +30,26 @@ services:
       - "8080:8080"
     depends_on:
       - keycloak_db
+      - openldap
+    networks:
+      - bionic-network
+
+  openldap:
+    image: osixia/openldap:1.5.0
+    container_name: bionicpro-ldap
+    ports:
+      - "389:389"
+    environment:
+      LDAP_ORGANISATION: "Example Company"
+      LDAP_DOMAIN: "example.com"
+      LDAP_ADMIN_PASSWORD: "admin123"
+      LDAP_TLS: "false"
+    # volumes:
+    #   - ./ldap/config.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/01-bootstrap.ldif
+    networks:
+      - bionic-network
+    restart: unless-stopped
+
   frontend:
     build:
       context: ./frontend
@@ -36,7 +57,50 @@ services:
     ports:
       - "3000:3000"
     environment:
-      REACT_APP_API_URL: http://localhost:8000
-      REACT_APP_KEYCLOAK_URL: http://localhost:8080
+      REACT_APP_API_URL: http://bionicpro-auth:80
+      REACT_APP_KEYCLOAK_URL: http://keycloak:8080
       REACT_APP_KEYCLOAK_REALM: reports-realm
       REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+    depends_on:
+      - keycloak
+      - bionicpro-auth
+    networks:
+      - bionic-network
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - bionic-network
+    restart: unless-stopped
+
+  bionicpro-auth:
+    build:
+      context: ./microservices/bionicpro-auth-api
+      dockerfile: Dockerfile
+    ports:
+      - "8081:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - Redis__ConnectionString=redis:6379
+      - Keycloak__AuthServerUrl=http://keycloak:8080
+      - Keycloak__Realm=reports-realm
+      - Keycloak__ClientId=reports-frontend
+    depends_on:
+      - redis
+      - keycloak
+    networks:
+      - bionic-network
+    restart: "no"
+
+volumes:
+  redis-data:
+  postgres-keycloak-data:
+
+networks:
+  bionic-network:
+    driver: bridge

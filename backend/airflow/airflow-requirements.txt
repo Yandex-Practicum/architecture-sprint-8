@@ -1,0 +1,2 @@
+psycopg2-binary==2.9.11
+apache-airflow-providers-common-sql==2.0.2

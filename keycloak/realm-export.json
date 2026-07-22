@@ -116,14 +116,258 @@
         "publicClient": true,
         "redirectUris": ["http://localhost:3000/*"],
         "webOrigins": ["http://localhost:3000"],
-        "directAccessGrantsEnabled": true
+        "directAccessGrantsEnabled": false,
+        "standardFlowEnabled": true,
+        "implicitFlowEnabled": true,
+        "attributes": {
+          "pkce.code.challenge.method": "S256"
+        }
       },
       {
         "clientId": "reports-api",
         "enabled": true,
         "clientAuthenticatorType": "client-secret",
-        "secret": "oNwoLQdvJAvRcL89SydqCWCe5ry1jMgq", 
+        "secret": "oNwoLQdvJAvRcL89SydqCWCe5ry1jMgq",
         "bearerOnly": true
       }
-    ]
+    ],
+    "components": {
+      "org.keycloak.storage.UserStorageProvider":
+      [
+        {
+          "id": "b3971de0-a368-4a9f-ba36-75f1c02ef834",
+          "name": "ldap",
+          "providerId": "ldap",
+          "subComponents": {
+            "org.keycloak.storage.ldap.mappers.LDAPStorageMapper": [
+              {
+                "id": "cc053bc1-62ab-4eb2-99ba-75e27186b672",
+                "name": "email",
+                "providerId": "user-attribute-ldap-mapper",
+                "subComponents": {},
+                "config": {
+                  "ldap.attribute": [
+                    "mail"
+                  ],
+                  "is.mandatory.in.ldap": [
+                    "false"
+                  ],
+                  "read.only": [
+                    "true"
+                  ],
+                  "always.read.value.from.ldap": [
+                    "false"
+                  ],
+                  "user.model.attribute": [
+                    "email"
+                  ]
+                }
+              },
+              {
+                "id": "14e9c291-7dce-4386-b694-22a8f80e1504",
+                "name": "modify date",
+                "providerId": "user-attribute-ldap-mapper",
+                "subComponents": {},
+                "config": {
+                  "ldap.attribute": [
+                    "whenChanged"
+                  ],
+                  "is.mandatory.in.ldap": [
+                    "false"
+                  ],
+                  "read.only": [
+                    "true"
+                  ],
+                  "always.read.value.from.ldap": [
+                    "true"
+                  ],
+                  "user.model.attribute": [
+                    "modifyTimestamp"
+                  ]
+                }
+              },
+              {
+                "id": "900f1794-cf54-47ee-a766-ddf10dc8ec64",
+                "name": "last name",
+                "providerId": "user-attribute-ldap-mapper",
+                "subComponents": {},
+                "config": {
+                  "ldap.attribute": [
+                    "sn"
+                  ],
+                  "is.mandatory.in.ldap": [
+                    "true"
+                  ],
+                  "read.only": [
+                    "true"
+                  ],
+                  "always.read.value.from.ldap": [
+                    "true"
+                  ],
+                  "user.model.attribute": [
+                    "lastName"
+                  ]
+                }
+              },
+              {
+                "id": "11ecbd08-0ccf-43d5-a3fa-065a787663a1",
+                "name": "MSAD account controls",
+                "providerId": "msad-user-account-control-mapper",
+                "subComponents": {},
+                "config": {}
+              },
+              {
+                "id": "92b6de4f-ebb0-4e65-a2da-b9b54576fa7b",
+                "name": "first name",
+                "providerId": "user-attribute-ldap-mapper",
+                "subComponents": {},
+                "config": {
+                  "ldap.attribute": [
+                    "cn"
+                  ],
+                  "is.mandatory.in.ldap": [
+                    "true"
+                  ],
+                  "always.read.value.from.ldap": [
+                    "true"
+                  ],
+                  "read.only": [
+                    "true"
+                  ],
+                  "user.model.attribute": [
+                    "firstName"
+                  ]
+                }
+              },
+              {
+                "id": "0e2e5643-5150-4d76-a87c-86c8191e7bb3",
+                "name": "username",
+                "providerId": "user-attribute-ldap-mapper",
+                "subComponents": {},
+                "config": {
+                  "ldap.attribute": [
+                    "cn"
+                  ],
+                  "is.mandatory.in.ldap": [
+                    "true"
+                  ],
+                  "always.read.value.from.ldap": [
+                    "false"
+                  ],
+                  "read.only": [
+                    "true"
+                  ],
+                  "user.model.attribute": [
+                    "username"
+                  ]
+                }
+              },
+              {
+                "id": "433ac61a-a306-479f-bbeb-42f21b5178ac",
+                "name": "creation date",
+                "providerId": "user-attribute-ldap-mapper",
+                "subComponents": {},
+                "config": {
+                  "ldap.attribute": [
+                    "whenCreated"
+                  ],
+                  "is.mandatory.in.ldap": [
+                    "false"
+                  ],
+                  "read.only": [
+                    "true"
+                  ],
+                  "always.read.value.from.ldap": [
+                    "true"
+                  ],
+                  "user.model.attribute": [
+                    "createTimestamp"
+                  ]
+                }
+              }
+            ]
+          },
+          "config": {
+            "pagination": [
+              "false"
+            ],
+            "fullSyncPeriod": [
+              "-1"
+            ],
+            "startTls": [
+              "false"
+            ],
+            "usersDn": [
+              "ou=People,dc=example,dc=com"
+            ],
+            "connectionPooling": [
+              "false"
+            ],
+            "cachePolicy": [
+              "DEFAULT"
+            ],
+            "useKerberosForPasswordAuthentication": [
+              "false"
+            ],
+            "importEnabled": [
+              "true"
+            ],
+            "enabled": [
+              "true"
+            ],
+            "bindDn": [
+              "cn=admin,dc=example,dc=com"
+            ],
+            "bindCredential": [
+              "admin"
+            ],
+            "usernameLDAPAttribute": [
+              "cn"
+            ],
+            "changedSyncPeriod": [
+              "-1"
+            ],
+            "vendor": [
+              "ad"
+            ],
+            "uuidLDAPAttribute": [
+              "uid"
+            ],
+            "connectionUrl": [
+              "ldap://ldap-server:389"
+            ],
+            "allowKerberosAuthentication": [
+              "false"
+            ],
+            "syncRegistrations": [
+              "true"
+            ],
+            "authType": [
+              "simple"
+            ],
+            "useTruststoreSpi": [
+              "ldapsOnly"
+            ],
+            "usePasswordModifyExtendedOp": [
+              "false"
+            ],
+            "trustEmail": [
+              "false"
+            ],
+            "userObjectClasses": [
+              "inetOrgPerson"
+            ],
+            "rdnLDAPAttribute": [
+              "cn"
+            ],
+            "editMode": [
+              "READ_ONLY"
+            ],
+            "validatePasswordPolicy": [
+              "false"
+            ]
+          }
+        }
+      ]
+    }
   }

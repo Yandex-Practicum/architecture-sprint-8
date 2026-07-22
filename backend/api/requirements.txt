@@ -1,0 +1,6 @@
+fastapi==0.128.8
+python-multipart==0.0.26
+uvicorn[standard]==0.24.0
+python-keycloak==7.1.1
+fpdf2==2.8.7
+psycopg2-binary==2.9.11

@@ -22,7 +22,29 @@ const ReportPage: React.FC = () => {
         }
       });
 
-      
+        const data = await response.blob();
+
+        const urlObject = URL.createObjectURL(data);
+        try {
+          const anchorElement = document.createElement('a');
+          anchorElement.href = urlObject;
+          var fileName = "report.pdf";
+          const header = response.headers.get("Content-disposition")
+          if (header) {
+            const filenameRegex = /filename="([^"]+)"/;
+            const matches = filenameRegex.exec(header);
+            if (matches) {
+              fileName = matches[0]
+            }
+          } else {
+            fileName = "report.pdf"
+          }
+          anchorElement.download = fileName;
+          anchorElement.click();
+        } finally {
+            URL.revokeObjectURL(urlObject);
+        }
+
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {

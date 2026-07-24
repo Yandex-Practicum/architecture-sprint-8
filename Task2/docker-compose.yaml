@@ -1,0 +1,38 @@
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: clickhouse
+    volumes:
+    - ../db/init-clickhouse-db.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    environment:
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+    networks:
+      - reports-network
+    restart: unless-stopped
+
+  report-service:
+    build:
+      context: ../microservices/report-service
+      dockerfile: Dockerfile
+    container_name: report-service
+    ports:
+      - "8086:8080"
+    environment:
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__ClickHouse=Host=clickhouse;Port=9000;Database=bionicpro;User=report;Password=report;
+    depends_on:
+      - clickhouse
+    networks:
+      - reports-network
+    restart: unless-stopped
+
+networks:
+  reports-network:
+    driver: bridge
+
+volumes:
+  clickhouse_data:

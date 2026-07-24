@@ -82,7 +82,7 @@ docker compose down
 docker compose up -d
 ```
 
-2. Открыть админ-панель: http://localhost:8080/admin/ и выбрать reports-realm
+2. Открыть админ-панель: http://localhost:8089/admin/ и выбрать reports-realm
 
 Вкладка **User federation**->**Add Ldap providers**
 Настройки провайдера:
@@ -126,7 +126,7 @@ User Federation -> Synchronize all users
 
 1. Настройте в Keycloak механизм OTP-аутентификации
 
-Открыть админ-панель: http://localhost:8080/admin/ и выбрать reports-realm.
+Открыть админ-панель: http://localhost:8089/admin/ и выбрать reports-realm.
 Вкладка **Authentication**->**Required Actions**->**Configure OTP**: Set as default action = On
 
 2. Для пользователей настроить:
@@ -141,7 +141,7 @@ Details -> Required User Actions -> Add action  -> Configure OTP
 
 1. Создать приложение для аутентификации на https://oauth.yandex.ru/
 
-Redirect URI http://localhost:8080/realms/reports-realm/broker/yandex/endpoint
+Redirect URI http://localhost:8089/realms/reports-realm/broker/yandex/endpoint
 После создания получены Client ID и Client secret.
 
 Интеграция с Яндексом невозможна стандартными средствами Keycloak, поэтому добавлены 2 эндпоинта в bionicpro-auth и кнопка для входа во frontend.

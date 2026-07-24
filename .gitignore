@@ -1,11 +1,33 @@
 /postgres-keycloak-data
 2024__yandex-architecture-sso.code-workspace
 /node_modules
-**/.project
-**/.settings
-**/.vs
-**/.vscode
-**/*.*proj.user
-**/bin
-**/obj
-**/properties
+## Core
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.log
+*.sln
+*.slnx
+
+## IDE
+.vscode/
+.idea/
+
+## Build artifacts
+/publish/
+out/
+
+## Data (ClickHouse)
+/clickhouse_data/
+/clickhouse_tmp/
+
+## Logs
+logs/
+*.log
+
+## Configuration with secrets
+appsettings.Development.json
+appsettings.Production.json
+secrets.json

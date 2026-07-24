@@ -1,31 +1,36 @@
-import React from "react";
-import { ReactKeycloakProvider } from '@react-keycloak/web';
-import Keycloak, { KeycloakConfig } from 'keycloak-js';
+import React, { useEffect, useState } from 'react';
 import ReportPage from './components/ReportPage';
+import LoginPage from './components/LoginPage';
 
-const keycloakConfig: KeycloakConfig = {
-  url: process.env.REACT_APP_KEYCLOAK_URL || "http://localhost:8080",
-  realm: process.env.REACT_APP_KEYCLOAK_REALM || "reports-realm",
-  clientId: process.env.REACT_APP_KEYCLOAK_CLIENT_ID || "reports-frontend"
-};
-
-const keycloak = new Keycloak(keycloakConfig);
+const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:8081';
 
 const App: React.FC = () => {
-  return (
-    <ReactKeycloakProvider 
-      authClient={keycloak}  
-      initOptions={{
-        pkceMethod: 'S256',
-        onLoad: 'check-sso',
-      }}
-      LoadingComponent={<div>Loading...</div>}
-    >
-      <div className="App">
-        <ReportPage />
-      </div>
-    </ReactKeycloakProvider>
-  );
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/auth/session`, {
+          credentials: 'include',
+        });
+        setIsAuthenticated(res.ok);
+      } catch {
+        setIsAuthenticated(false);
+      }
+    };
+
+    checkSession();
+  }, []);
+
+  if (isAuthenticated === null) {
+    return <div>Loading...</div>;
+  }
+
+  if (!isAuthenticated) {
+    return <LoginPage />;
+  }
+
+  return <ReportPage />;
 };
 
 export default App;

@@ -1,0 +1,6 @@
+user_id,user_name,user_email,phone,region,prosthesis_model,purchase_date,total_steps,total_active_minutes,avg_battery,error_count,report_date
+1,Алексей Иванов,alex.ivanov@bionicapro.com,79001234567,Москва,BionicPro-2024,2025-01-15,855,115,80.75,0,2026-07-24
+2,Мария Петрова,maria.petr@bionicapro.com,79007654321,СПБ,BionicPro-2023,2024-11-20,1000,125,88.33333333333333,0,2026-07-24
+3,Иван Смирнов,ivan.smir@bionicapro.com,79111234567,Екатеринбург,BionicPro-2024,2025-03-10,1170,140,88.75,0,2026-07-24
+4,Елена Козлова,elena.koz@bionicapro.com,79117654321,Новосибирск,BionicPro-2023,2024-09-05,520,65,88.66666666666667,0,2026-07-24
+5,Дмитрий Соколов,dmitry.sok@bionicapro.com,79119876543,Казань,BionicPro-2025,2025-06-01,740,88,90.33333333333333,0,2026-07-24

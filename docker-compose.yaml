@@ -27,7 +27,7 @@ services:
     volumes:
       - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
     ports:
-      - "8080:8080"
+      - "8089:8080"
     depends_on:
       - keycloak_db
       - openldap
@@ -44,28 +44,11 @@ services:
       LDAP_DOMAIN: "example.com"
       LDAP_ADMIN_PASSWORD: "admin123"
       LDAP_TLS: "false"
-    # volumes:
-    #   - ./ldap/config.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/01-bootstrap.ldif
+    volumes:
+      - ./ldap/config.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/01-bootstrap.ldif
     networks:
       - bionic-network
     restart: unless-stopped
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
-    environment:
-      REACT_APP_API_URL: http://bionicpro-auth:80
-      REACT_APP_KEYCLOAK_URL: http://keycloak:8080
-      REACT_APP_KEYCLOAK_REALM: reports-realm
-      REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
-    depends_on:
-      - keycloak
-      - bionicpro-auth
-    networks:
-      - bionic-network
 
   redis:
     image: redis:alpine
@@ -87,7 +70,7 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:80
       - Redis__ConnectionString=redis:6379
-      - Keycloak__AuthServerUrl=http://keycloak:8080
+      - Keycloak__AuthServerUrl=http://keycloak:8089
       - Keycloak__Realm=reports-realm
       - Keycloak__ClientId=reports-frontend
     depends_on:
@@ -97,9 +80,61 @@ services:
       - bionic-network
     restart: "no"
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      REACT_APP_API_URL: http://bionicpro-auth:80
+      REACT_APP_KEYCLOAK_URL: http://keycloak:8089
+      REACT_APP_KEYCLOAK_REALM: reports-realm
+      REACT_APP_KEYCLOAK_CLIENT_ID: reports-frontend
+    depends_on:
+      - keycloak
+      - bionicpro-auth
+    networks:
+      - bionic-network
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: clickhouse
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - ./clickhouse_data:/var/lib/clickhouse
+      - ./db/init-clickhouse-db.sql:/docker-entrypoint-initdb.d/init.sql
+    environment:
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+    networks:
+      - bionic-network
+    restart: unless-stopped
+
+  report-service:
+    build:
+      context: ./microservices/report-service
+      dockerfile: Dockerfile
+    container_name: report-service
+    ports:
+      - "8086:8080"
+    environment:
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__ClickHouse=Host=clickhouse;Port=8123;Database=bionicpro;User=report;Password=report;
+      - Auth__Authority=http://keycloak:8089/realms/reports-realm
+    depends_on:
+      - clickhouse
+      - keycloak
+    networks:
+      - bionic-network
+    restart: unless-stopped
+
 volumes:
   redis-data:
   postgres-keycloak-data:
+  clickhouse_data:
 
 networks:
   bionic-network:

@@ -1,0 +1,6 @@
+user_id,user_name,user_email,phone,region,prosthesis_model,purchase_date
+1,Алексей Иванов,alex.ivanov@bionicapro.com,+79001234567,Москва,BionicPro-2024,2025-01-15
+2,Мария Петрова,maria.petr@bionicapro.com,+79007654321,СПБ,BionicPro-2023,2024-11-20
+3,Иван Смирнов,ivan.smir@bionicapro.com,+79111234567,Екатеринбург,BionicPro-2024,2025-03-10
+4,Елена Козлова,elena.koz@bionicapro.com,+79117654321,Новосибирск,BionicPro-2023,2024-09-05
+5,Дмитрий Соколов,dmitry.sok@bionicapro.com,+79119876543,Казань,BionicPro-2025,2025-06-01

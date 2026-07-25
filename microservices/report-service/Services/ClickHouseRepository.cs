@@ -67,9 +67,6 @@ public class ClickHouseRepository : IClickHouseRepository, IDisposable
         }
         catch (Exception ex)
         {
-            var error = $"!!! EXCEPTION: {ex.Message}\n{ex.StackTrace}";
-            Console.WriteLine(error);
-            File.WriteAllText("/app/error.log", error);
             throw;
         }
     }

@@ -10,7 +10,6 @@ public class ReportService(IClickHouseRepository repository, ILogger<ReportServi
 
     public async Task<UserReport?> GetReportByUserAsync(string userId)
     {
-        _logger.LogInformation("Getting report for user {UserId}", userId);
         return await _repository.GetLatestReportByUserAsync(userId);
     }
 }

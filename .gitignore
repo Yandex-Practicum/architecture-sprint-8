@@ -23,6 +23,8 @@ out/
 /clickhouse_data/
 /clickhouse_tmp/
 
+*/.minio.sys
+
 ## Logs
 logs/
 *.log

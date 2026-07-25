@@ -20,6 +20,7 @@ builder.Services.AddAuthorization();
 builder.Services.AddControllers();
 builder.Services.AddScoped<IClickHouseRepository, ClickHouseRepository>();
 builder.Services.AddScoped<IReportService, ReportService>();
+builder.Services.AddScoped<IS3Service, S3Service>();
 
 var app = builder.Build();
 
@@ -28,4 +29,4 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-app.Run();
+app.Run("http://0.0.0.0:8086");

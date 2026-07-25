@@ -24,20 +24,33 @@ public class ClickHouseRepository : IClickHouseRepository, IDisposable
             _connection = new ClickHouseConnection(connectionString);
             await _connection.OpenAsync();
 
-            var command = _connection.CreateCommand();
             command.CommandText = @"
                 SELECT 
-                    user_id AS UserId,
-                    user_email AS UserEmail,
-                    user_name AS UserName,
-                    total_steps AS TotalSteps,
-                    total_active_minutes AS TotalActiveMinutes,
-                    battery_avg_usage AS AvgBattery,
-                    error_count AS ErrorCount,
-                    report_date AS ReportDate
-                FROM bionicpro.user_report_mart
-                WHERE user_id = @userId
-                ORDER BY report_date DESC
+                    c.user_id AS UserId,
+                    c.user_email AS UserEmail,
+                    c.user_name AS UserName,
+                    c.phone AS UserPhone,
+                    c.region AS Region,
+                    c.prosthesis_model AS ProsthesisModel,
+                    c.purchase_date AS PurchaseDate,
+                    s.total_steps AS TotalSteps,
+                    s.total_active_minutes AS TotalActiveMinutes,
+                    s.avg_battery AS AvgBattery,
+                    s.error_count AS ErrorCount,
+                    now() AS ReportDate
+                FROM crm_clients c
+                LEFT JOIN (
+                    SELECT 
+                        user_id,
+                        sum(steps) AS total_steps,
+                        sum(active_minutes) AS total_active_minutes,
+                        avg(battery_level) AS avg_battery,
+                        count(error_code) AS error_count
+                    FROM sensor_data
+                    WHERE timestamp >= now() - interval 7 day
+                    GROUP BY user_id
+                ) s ON c.user_id = s.user_id
+                WHERE c.user_id = @userId
                 LIMIT 1
             ";
 

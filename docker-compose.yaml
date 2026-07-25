@@ -177,6 +177,71 @@ services:
       - bionic-network
     restart: unless-stopped
 
+  crm-db:
+    image: postgres:14
+    container_name: crm-db
+    environment:
+      POSTGRES_DB: crm
+      POSTGRES_USER: crm_user
+      POSTGRES_PASSWORD: crm_password
+    volumes:
+      - ./crm_data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    networks:
+      - bionic-network
+    restart: unless-stopped
+    
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - bionic-network
+    restart: unless-stopped
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+    networks:
+      - bionic-network
+    restart: unless-stopped
+
+  kafka-connect:
+    image: debezium/connect:latest
+    container_name: kafka-connect
+    depends_on:
+      - kafka
+      - crm-db
+    ports:
+      - "8083:8083"
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: 1
+      CONFIG_STORAGE_TOPIC: my_connect_configs
+      OFFSET_STORAGE_TOPIC: my_connect_offsets
+      STATUS_STORAGE_TOPIC: my_connect_statuses
+    volumes:
+      - ./debezium:/kafka/connect/debezium
+    networks:
+      - bionic-network
+    restart: unless-stopped
+
 volumes:
   redis-data:
   postgres-keycloak-data:

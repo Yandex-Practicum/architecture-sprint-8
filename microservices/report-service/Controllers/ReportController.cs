@@ -17,7 +17,7 @@ public class ReportController(IReportService reportService, ILogger<ReportContro
     [HttpGet("{userId}")]
     public async Task<IActionResult> GetUserReport(string userId)
     {
-        /*var currentUserId = User.FindFirst("sub")?.Value;
+        var currentUserId = User.FindFirst("sub")?.Value;
         if (string.IsNullOrEmpty(currentUserId))
         {
             return Unauthorized(new { error = "User not authenticated" });
@@ -26,7 +26,7 @@ public class ReportController(IReportService reportService, ILogger<ReportContro
         if (currentUserId != userId)
         {
             return Forbid(); 
-        }*/
+        }
 
         var s3Key = $"reports/{userId}/latest.json";
         

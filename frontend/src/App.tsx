@@ -14,6 +14,7 @@ const keycloak = new Keycloak(keycloakConfig);
 const App: React.FC = () => {
   const initOptions = {
     onLoad: 'check-sso',
+    scope: 'openid profile email',
     pkceMethod: 'S256' as const
   };
 

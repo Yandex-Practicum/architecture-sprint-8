@@ -1,0 +1,104 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="C4-Container-Reports" id="reports-pipeline">
+    <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1300" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="BionicPRO — Задания 2-4: сервис отчётов, S3/CDN, CDC" style="text;html=1;fontSize=18;fontStyle=1;align=left;" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="900" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="user" value="Пользователь протеза&#10;[Person]" style="shape=actor;whiteSpace=wrap;html=1;fillColor=#08427b;strokeColor=#073B6F;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="40" y="140" width="110" height="90" as="geometry" />
+        </mxCell>
+
+        <mxCell id="spa" value="Frontend SPA&#10;[Container: React]&#10;Кнопка «Получить отчёт», рендерит JSON по ссылке из ответа" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1168bd;strokeColor=#0b4884;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="200" y="130" width="220" height="90" as="geometry" />
+        </mxCell>
+
+        <mxCell id="bff" value="bionicpro-auth&#10;[Container, Задание 1]&#10;Владелец сессии; /internal/session — интроспекция без ротации" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#8a8a8a;strokeColor=#5c5c5c;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="200" y="270" width="220" height="90" as="geometry" />
+        </mxCell>
+
+        <mxCell id="reportsapi" value="reports-api&#10;[Container: Spring Boot]&#10;GET /reports — username только из сессии, никаких user-параметров" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1168bd;strokeColor=#0b4884;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="500" y="200" width="240" height="100" as="geometry" />
+        </mxCell>
+
+        <mxCell id="clickhouse" value="ClickHouse (OLAP)&#10;[Container]&#10;customer_mart_v2 — единственное, что читает reports-api. Никаких вычислений на лету." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1168bd;strokeColor=#0b4884;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="820" y="130" width="260" height="100" as="geometry" />
+        </mxCell>
+
+        <mxCell id="minio" value="MinIO (S3)&#10;[Container]&#10;reports/{username}/{period}.json — неизменяемый ключ на период" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#438dd5;strokeColor=#2e6295;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="500" y="360" width="200" height="110" as="geometry" />
+        </mxCell>
+
+        <mxCell id="nginx" value="Nginx «CDN»&#10;[Container]&#10;proxy_cache перед MinIO. Ключ иммутабелен → кеш без инвалидации (30d)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1168bd;strokeColor=#0b4884;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="760" y="360" width="220" height="110" as="geometry" />
+        </mxCell>
+
+        <mxCell id="airflow" value="Airflow&#10;[Container]&#10;@hourly: только агрегация telemetry_events → telemetry_agg (без чтения customers)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1168bd;strokeColor=#0b4884;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="820" y="560" width="260" height="100" as="geometry" />
+        </mxCell>
+
+        <mxCell id="crmdb" value="crm_db (CRM, OLTP)&#10;[Container: PostgreSQL]&#10;customers, telemetry_events. wal_level=logical для CDC" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#438dd5;strokeColor=#2e6295;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="1160" y="560" width="220" height="110" as="geometry" />
+        </mxCell>
+
+        <mxCell id="debezium" value="Kafka Connect + Debezium&#10;[Container, Задание 4]&#10;Читает WAL crm_db.customers — не таблицу, снимает нагрузку с OLTP" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1168bd;strokeColor=#0b4884;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="1160" y="400" width="260" height="100" as="geometry" />
+        </mxCell>
+
+        <mxCell id="kafka" value="Kafka&#10;[Container]&#10;topic crm.public.customers" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1168bd;strokeColor=#0b4884;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="1160" y="260" width="260" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="mvnote" value="ClickHouse: customers_kafka (Kafka Engine) → MV → customers_cdc.&#10;customer_mart_v2_mv триггерится на INSERT в telemetry_agg,&#10;джойнит на customers_cdc (актуальную на момент срабатывания)." style="text;html=1;fontSize=11;fontColor=#666666;align=left;whiteSpace=wrap;" vertex="1" parent="1">
+          <mxGeometry x="820" y="250" width="320" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Relationships -->
+        <mxCell id="e1" value="открывает" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="user" target="spa">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="GET /reports&#10;[session cookie]" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="spa" target="reportsapi">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2b" value="GET reportUrl&#10;[без auth, публичный CDN]" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;" edge="1" parent="1" source="spa" target="nginx">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="GET /internal/session&#10;[Cookie forward]" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="reportsapi" target="bff">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="SELECT ... LIMIT 1&#10;только если нет в S3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="reportsapi" target="clickhouse">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="HEAD/PUT object" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="reportsapi" target="minio">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="proxy_pass" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="nginx" target="minio">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="INSERT telemetry_agg" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="airflow" target="clickhouse">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" value="SELECT telemetry_events&#10;(агрегаты, без customers)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="airflow" target="crmdb">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" value="WAL / pgoutput&#10;(логическая репликация)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="debezium" target="crmdb">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e10" value="publish" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="debezium" target="kafka">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e11" value="consume&#10;(Kafka Engine)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="kafka" target="clickhouse">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="legend" value="Сплошная линия = синхронный вызов. Пунктир = публичный CDN-путь (без аутентификации, отчёт отдаётся по неизменяемой ссылке)." style="text;html=1;fontSize=11;fontColor=#666666;align=left;" vertex="1" parent="1">
+          <mxGeometry x="200" y="700" width="700" height="20" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

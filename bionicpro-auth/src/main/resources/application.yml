@@ -1,0 +1,47 @@
+server:
+  port: 8081
+  servlet:
+    session:
+      cookie:
+        name: SESSION
+        http-only: true
+        secure: true
+        same-site: lax
+      timeout: 10m
+
+spring:
+  application:
+    name: bionicpro-auth
+
+  session:
+    store-type: redis
+    redis:
+      namespace: bionicpro:session
+      flush-mode: on_save
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+# Keycloak is reached under two different names depending on who's asking: the
+# browser only knows the host-published address, while this container has to use
+# the Docker Compose service name. Keycloak's dev-mode issuer tracks whatever host
+# the *original* /auth redirect used (i.e. the public URL, since that's what the
+# browser hits) -- see KeycloakClientRegistrationConfig, which builds the
+# ClientRegistration by hand instead of via OIDC discovery so the two addresses
+# don't have to agree on a single issuer. Deliberately NOT under
+# spring.security.oauth2.client.registration.* -- Boot validates every entry there
+# (non-empty client-id etc.) even when nothing consumes it, which fights a
+# hand-built registration.
+keycloak:
+  public-base-url: ${KEYCLOAK_PUBLIC_BASE_URL:http://localhost:8080}
+  internal-base-url: ${KEYCLOAK_INTERNAL_BASE_URL:http://keycloak:8080}
+  realm: ${KEYCLOAK_REALM:reports-realm}
+  client-id: ${KEYCLOAK_CLIENT_ID:reports-frontend}
+  redirect-uri: "${AUTH_BASE_URL:http://localhost:8081}/login/oauth2/code/keycloak"
+
+bionicpro:
+  frontend-url: ${FRONTEND_URL:http://localhost:3000}
+  # Session lifetime above MUST stay longer than the Keycloak client's access-token
+  # lifespan (<=2 min, set via kcadm) so a refresh always has a live session to land in.

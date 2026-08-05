@@ -1,4 +1,3 @@
-# Организационные подразделения (OU)
 dn: ou=People,dc=example,dc=com
 objectClass: top
 objectClass: organizationalUnit
@@ -9,7 +8,6 @@ objectClass: top
 objectClass: organizationalUnit
 ou: Groups
 
-# Пользователи
 dn: uid=john.doe,ou=People,dc=example,dc=com
 objectClass: top
 objectClass: inetOrgPerson
@@ -28,7 +26,7 @@ uid: jane.smith
 mail: jane@example.com
 userPassword: password
 
-dn: uid=alex,ou=People,dc=example,dc=com
+dn: uid=alex.johnson,ou=People,dc=example,dc=com
 objectClass: inetOrgPerson
 cn: Alex
 sn: Johnson
@@ -36,7 +34,6 @@ uid: alex.johnson
 mail: alex@example.com
 userPassword: password
 
-# Роли
 dn: cn=user,ou=Groups,dc=example,dc=com
 objectClass: groupOfNames
 cn: user

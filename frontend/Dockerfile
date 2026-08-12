@@ -1,31 +1,36 @@
-# Build stage
+# Стадия сборки
 FROM node:16-alpine as build
 
 WORKDIR /app
 
-# Copy package files
+# Копируем файлы пакета
 COPY package.json package-lock.json ./
 
-# Install dependencies
+# Устанавливаем зависимости
 RUN npm ci
 
-# Copy source code
+# Копируем исходный код
 COPY . .
 
-# Build the app
+# Переменные REACT_APP_* вшиваются в статический бандл на этапе сборки,
+# поэтому их нужно передавать как build args, а не как env-переменные контейнера.
+ARG REACT_APP_AUTH_URL
+ENV REACT_APP_AUTH_URL=$REACT_APP_AUTH_URL
+
+# Собираем приложение
 RUN npm run build
 
-# Production stage
+# Продакшн-стадия
 FROM nginx:alpine
 
-# Copy built assets from build stage
+# Копируем собранные файлы со стадии сборки
 COPY --from=build /app/build /usr/share/nginx/html
 
-# Copy nginx configuration
+# Копируем конфигурацию nginx
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Expose port
+# Открываем порт
 EXPOSE 3000
 
-# Start nginx
+# Запускаем nginx
 CMD ["nginx", "-g", "daemon off;"]

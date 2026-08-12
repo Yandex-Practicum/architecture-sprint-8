@@ -1,6 +1,5 @@
-version: '3.8'
-
 services:
+  # === СУЩЕСТВУЮЩИЕ СЕРВИСЫ ===
   keycloak_db:
     image: postgres:14
     environment:
@@ -8,7 +7,7 @@ services:
       POSTGRES_USER: keycloak_user
       POSTGRES_PASSWORD: keycloak_password
     volumes:
-      - ./postgres-keycloak-data:/var/lib/postgresql/data
+      - postgres-keycloak-data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
     networks:
@@ -51,7 +50,8 @@ services:
     networks:
       - bionicpro
 
-  # 1. Основная БД приложения (телеметрия)
+  # === СЕРВИСЫ ДЛЯ ЗАДАНИЯ 2 (ОТЧЁТЫ) ===
+
   postgres_app:
     image: postgres:14
     container_name: postgres_app
@@ -62,12 +62,11 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - ./postgres-app-data:/var/lib/postgresql/data
-      - ./init_pg.sql:/docker-entrypoint-initdb.d/init.sql # Скрипт инициализации
+      - postgres-app-data:/var/lib/postgresql/data
+      - ./init_pg.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - bionicpro
 
-  # 2. ClickHouse (OLAP для отчетов)
   clickhouse:
     image: clickhouse/clickhouse-server:23.8
     container_name: clickhouse
@@ -80,42 +79,10 @@ services:
       CLICKHOUSE_PASSWORD: secret
     volumes:
       - clickhouse_data:/var/lib/clickhouse
-      - ./init_ch.sql:/docker-entrypoint-initdb.d/init.sql # Скрипт инициализации
+      - ./init_ch.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - bionicpro
 
-  # 3. Airflow (ETL оркестратор)
-  airflow:
-    image: apache/airflow:2.7.0
-    container_name: airflow
-    environment:
-      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@airflow_db:5432/airflow
-      - AIRFLOW__CORE__LOAD_EXAMPLES=False
-      - AIRFLOW__CORE__FERNET_KEY=''
-      - AIRFLOW__WEBSERVER__SECRET_KEY=supersecretkey
-    ports:
-      - "8081:8080"
-    volumes:
-      - ./airflow/dags:/opt/airflow/dags
-    depends_on:
-      - airflow_db
-      - postgres_app
-      - clickhouse
-    networks:
-      - bionicpro
-    command: >
-      bash -c "
-      echo 'Waiting for DB to be ready...' &&
-      sleep 10 &&
-      airflow db migrate &&
-      airflow connections create-default-connections &&
-      airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com &&
-      airflow scheduler &
-      airflow webserver
-      "
-
-  # 4. БД для метаданных Airflow
   airflow_db:
     image: postgres:14
     container_name: airflow_db
@@ -123,8 +90,63 @@ services:
       POSTGRES_USER: airflow
       POSTGRES_PASSWORD: airflow
       POSTGRES_DB: airflow
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     networks:
       - bionicpro
+
+  airflow-init:
+    image: apache/airflow:2.9.3
+    container_name: airflow-init
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@airflow_db:5432/airflow
+      - _PIP_ADDITIONAL_REQUIREMENTS=clickhouse-connect
+    depends_on:
+      airflow_db:
+        condition: service_healthy
+    networks:
+      - bionicpro
+    command: >
+      bash -c "
+      echo 'Running DB migrate...' &&
+      airflow db migrate &&
+      echo 'Creating admin user...' &&
+      airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com
+      "
+
+  airflow:
+    image: apache/airflow:2.9.3
+    container_name: airflow
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@airflow_db:5432/airflow
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__CORE__FERNET_KEY=578a-tMS9ZcBowGZgJTuFNwdC6IAQky3TI7M7yc8-3U=
+      - AIRFLOW__WEBSERVER__SECRET_KEY=supersecretkey
+      - _PIP_ADDITIONAL_REQUIREMENTS=clickhouse-connect
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+      postgres_app:
+        condition: service_started
+      clickhouse:
+        condition: service_started
+    networks:
+      - bionicpro
+    command: >
+      bash -c "
+      echo 'Starting scheduler and webserver...' &&
+      airflow scheduler &
+      airflow webserver
+      "
 
 volumes:
   postgres-keycloak-data:

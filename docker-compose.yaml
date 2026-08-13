@@ -147,6 +147,28 @@ services:
       airflow scheduler &
       airflow webserver
       "
+      
+  report-service:
+    build:
+      context: ./report-service
+      dockerfile: Dockerfile
+    container_name: report-service
+    ports:
+      - "8000:8000"
+    environment:
+      - CLICKHOUSE_HOST=clickhouse
+      - CLICKHOUSE_PORT=8123
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=secret
+      - CLICKHOUSE_DB=bionicpro
+      - KEYCLOAK_URL=http://keycloak:8080
+      - KEYCLOAK_REALM=reports-realm
+      - KEYCLOAK_CLIENT_ID=reports-frontend
+    depends_on:
+      - clickhouse
+      - keycloak
+    networks:
+      - bionicpro
 
 volumes:
   postgres-keycloak-data:

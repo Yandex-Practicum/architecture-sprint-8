@@ -1,10 +1,28 @@
 import React, { useState } from 'react';
 import { useKeycloak } from '@react-keycloak/web';
 
+interface Report {
+  user_id: string;
+  processed_up_to: string | null;
+  rows: unknown[];
+}
+
+const saveReport = (report: Report) => {
+  const url = URL.createObjectURL(
+    new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' })
+  );
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `report-${report.user_id}-${report.processed_up_to}.json`;
+  link.click();
+  URL.revokeObjectURL(url);
+};
+
 const ReportPage: React.FC = () => {
   const { keycloak, initialized } = useKeycloak();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [report, setReport] = useState<Report | null>(null);
 
   const downloadReport = async () => {
     if (!keycloak?.token) {
@@ -15,6 +33,7 @@ const ReportPage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
+      setReport(null);
 
       const response = await fetch(`${process.env.REACT_APP_API_URL}/reports`, {
         headers: {
@@ -22,7 +41,24 @@ const ReportPage: React.FC = () => {
         }
       });
 
-      
+      if (response.status === 401) {
+        setError('Your session has expired, please log in again');
+        return;
+      }
+      if (response.status === 403) {
+        setError('Your account has no access to prosthesis reports');
+        return;
+      }
+      if (!response.ok) {
+        throw new Error(`Report request failed with status ${response.status}`);
+      }
+
+      const report: Report = await response.json();
+      setReport(report);
+
+      if (report.rows.length > 0) {
+        saveReport(report);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -65,6 +101,14 @@ const ReportPage: React.FC = () => {
         {error && (
           <div className="mt-4 p-4 bg-red-100 text-red-700 rounded">
             {error}
+          </div>
+        )}
+
+        {report && report.rows.length === 0 && (
+          <div className="mt-4 p-4 bg-yellow-100 text-yellow-800 rounded">
+            {report.processed_up_to
+              ? `No data for the requested period: Airflow has processed data up to ${report.processed_up_to}`
+              : 'The report is not ready yet: Airflow has not loaded any data into OLAP'}
           </div>
         )}
       </div>

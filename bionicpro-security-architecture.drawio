@@ -1,0 +1,76 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Page-1" id="SveFb5IS6NJhSykg4a9Y">
+    <mxGraphModel dx="1215" dy="746" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1654" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="user" parent="1" style="shape=mxgraph.cisco.computers_and_peripherals.pc;fillColor=#036897;strokeColor=#ffffff;fontColor=#ffffff;verticalLabelPosition=bottom;verticalAlign=top;" value="Пользователь" vertex="1">
+          <mxGeometry height="50" width="60" x="40" y="200" as="geometry" />
+        </mxCell>
+        <mxCell id="frontend" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="Frontend&#xa;(React)" vertex="1">
+          <mxGeometry height="60" width="140" x="180" y="200" as="geometry" />
+        </mxCell>
+        <mxCell id="auth" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" value="bionicpro-auth&#xa;(новый бэкенд)" vertex="1">
+          <mxGeometry height="60" width="160" x="420" y="200" as="geometry" />
+        </mxCell>
+        <mxCell id="session" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" value="Session Store&#xa;(Redis)" vertex="1">
+          <mxGeometry height="60" width="160" x="420" y="340" as="geometry" />
+        </mxCell>
+        <mxCell id="keycloak" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;" value="Keycloak&#xa;(IdP)" vertex="1">
+          <mxGeometry height="60" width="160" x="700" y="200" as="geometry" />
+        </mxCell>
+        <mxCell id="ldap_ru" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" value="OpenLDAP&#xa;(Россия)" vertex="1">
+          <mxGeometry height="60" width="160" x="700" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="ldap_ext" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" value="OpenLDAP&#xa;(Представительство&#xa;в другой стране)" vertex="1">
+          <mxGeometry height="70" width="160" x="700" y="340" as="geometry" />
+        </mxCell>
+        <mxCell id="yandex" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" value="Яндекс ID&#xa;(внешний IdP)" vertex="1">
+          <mxGeometry height="60" width="160" x="700" y="460" as="geometry" />
+        </mxCell>
+        <mxCell id="db_ru" parent="1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="PostgreSQL&#xa;(данные пользователей RU)" vertex="1">
+          <mxGeometry height="70" width="140" x="980" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="db_ext" parent="1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#e1d5e7;strokeColor=#9673a6;" value="PostgreSQL&#xa;(данные пользователей&#xa;представительства)" vertex="1">
+          <mxGeometry height="70" width="140" x="980" y="340" as="geometry" />
+        </mxCell>
+        <mxCell id="pkce" parent="1" style="text;html=1;strokeColor=#d6b656;fillColor=#fffacd;align=left;verticalAlign=top;" value="PKCE Code Grant&#xa;(без передачи токенов фронтенду)" vertex="1">
+          <mxGeometry height="50" width="220" x="420" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="cookie" parent="1" style="text;html=1;strokeColor=#82b366;fillColor=#d5e8d4;align=left;verticalAlign=top;" value="session cookie&#xa;(HTTP-only, Secure)" vertex="1">
+          <mxGeometry height="50" width="180" x="180" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" edge="1" parent="1" source="user" style="edgeStyle=orthogonalEdgeStyle;" target="frontend">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" edge="1" label="REST + session cookie" parent="1" source="frontend" style="edgeStyle=orthogonalEdgeStyle;" target="auth">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" edge="1" label="PKCE Code Grant" parent="1" source="auth" style="edgeStyle=orthogonalEdgeStyle;" target="keycloak">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" edge="1" label="хранение токенов" parent="1" source="auth" style="edgeStyle=orthogonalEdgeStyle;" target="session">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" edge="1" label="LDAP federation" parent="1" source="keycloak" style="edgeStyle=orthogonalEdgeStyle;" target="ldap_ru">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" edge="1" label="LDAP federation" parent="1" source="keycloak" style="edgeStyle=orthogonalEdgeStyle;" target="ldap_ext">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" edge="1" label="Identity Brokering&#xa;OAuth 2.0" parent="1" source="keycloak" style="edgeStyle=orthogonalEdgeStyle;" target="yandex">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" edge="1" label="хранение локально" parent="1" source="ldap_ru" style="edgeStyle=orthogonalEdgeStyle;" target="db_ru">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" edge="1" label="хранение локально" parent="1" source="ldap_ext" style="edgeStyle=orthogonalEdgeStyle;" target="db_ext">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e10" edge="1" label="session cookie&#xa;HTTP-only Secure" parent="1" source="auth" style="edgeStyle=orthogonalEdgeStyle;dashed=1;" target="frontend">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

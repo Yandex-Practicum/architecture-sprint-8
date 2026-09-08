@@ -1,10 +1,13 @@
 import os
 import uuid
+import json
 import httpx
 import clickhouse_connect
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+import boto3
+from botocore.client import Config
 
 app = FastAPI()
 
@@ -22,6 +25,19 @@ KEYCLOAK_URL = os.getenv("KEYCLOAK_URL", "http://keycloak:8080")
 KEYCLOAK_REALM = os.getenv("KEYCLOAK_REALM", "reports-realm")
 CLIENT_ID = os.getenv("CLIENT_ID", "reports-frontend")
 CLICKHOUSE_HOST = os.getenv("CLICKHOUSE_HOST", "clickhouse")
+MINIO_HOST = os.getenv("MINIO_HOST", "minio")
+CDN_URL = os.getenv("CDN_URL", "http://localhost:8082")
+
+
+def get_s3_client():
+    return boto3.client(
+        's3',
+        endpoint_url=f'http://{MINIO_HOST}:9000',
+        aws_access_key_id='minioadmin',
+        aws_secret_access_key='minioadmin',
+        config=Config(signature_version='s3v4'),
+        region_name='us-east-1'
+    )
 
 
 class LoginRequest(BaseModel):
@@ -88,7 +104,18 @@ async def get_report(request: Request):
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     username = sessions[session_id]["username"]
+    s3_key = f"{username}/report.json"
 
+    # Проверяем есть ли отчёт в S3
+    s3 = get_s3_client()
+    try:
+        s3.head_object(Bucket='reports', Key=s3_key)
+        cdn_url = f"{CDN_URL}/reports/{s3_key}"
+        return {"username": username, "url": cdn_url, "cached": True}
+    except Exception:
+        pass
+
+    # Генерируем отчёт из ClickHouse
     try:
         client = clickhouse_connect.get_client(
             host=CLICKHOUSE_HOST,
@@ -102,10 +129,10 @@ async def get_report(request: Request):
         )
 
         if not result.result_rows:
-            raise HTTPException(status_code=404, detail="No report found for this user")
+            raise HTTPException(status_code=404, detail="No report found")
 
         row = result.result_rows[0]
-        return {
+        report_data = {
             "username": row[0],
             "full_name": row[1],
             "prosthesis_id": row[2],
@@ -117,6 +144,18 @@ async def get_report(request: Request):
                 "last_recorded_at": str(row[6])
             }
         }
+
+        # Сохраняем в S3
+        s3.put_object(
+            Bucket='reports',
+            Key=s3_key,
+            Body=json.dumps(report_data),
+            ContentType='application/json'
+        )
+
+        cdn_url = f"{CDN_URL}/reports/{s3_key}"
+        return {**report_data, "url": cdn_url, "cached": False}
+
     except HTTPException:
         raise
     except Exception as e:

@@ -53,8 +53,10 @@ services:
       KEYCLOAK_URL: "http://keycloak:8080"
       KEYCLOAK_REALM: "reports-realm"
       CLIENT_ID: "reports-frontend"
+      CLICKHOUSE_HOST: "clickhouse"
     depends_on:
       - keycloak
+      - clickhouse
 
   openldap:
     image: osixia/openldap:1.5.0
@@ -77,6 +79,49 @@ services:
     depends_on:
       - openldap
 
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.8
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    environment:
+      CLICKHOUSE_DB: bionicpro
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+
+  crm_db:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: crm_db
+      POSTGRES_USER: crm_user
+      POSTGRES_PASSWORD: crm_password
+    volumes:
+      - crm_data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+
+  airflow:
+    image: apache/airflow:2.7.0
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://crm_user:crm_password@crm_db/crm_db
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__WEBSERVER__SECRET_KEY: "bionicpro_secret"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+    ports:
+      - "8081:8080"
+    depends_on:
+      - crm_db
+    command: >
+      bash -c "airflow db init &&
+               airflow users create --username admin --password admin --firstname Admin --lastname Admin --role Admin --email admin@example.com &&
+               airflow webserver & airflow scheduler"
+
 volumes:
   ldap_data:
   ldap_config:
+  clickhouse_data:
+  crm_data:

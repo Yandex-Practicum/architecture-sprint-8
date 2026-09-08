@@ -1,7 +1,8 @@
 import os
 import uuid
 import httpx
-from fastapi import FastAPI, HTTPException, Request, Response, Depends
+import clickhouse_connect
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -15,13 +16,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Хранилище сессий в памяти
 sessions = {}
 
 KEYCLOAK_URL = os.getenv("KEYCLOAK_URL", "http://keycloak:8080")
 KEYCLOAK_REALM = os.getenv("KEYCLOAK_REALM", "reports-realm")
 CLIENT_ID = os.getenv("CLIENT_ID", "reports-frontend")
-CLIENT_SECRET = os.getenv("CLIENT_SECRET", "")
+CLICKHOUSE_HOST = os.getenv("CLICKHOUSE_HOST", "clickhouse")
+
 
 class LoginRequest(BaseModel):
     username: str
@@ -44,13 +45,10 @@ async def login(body: LoginRequest, response: Response):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     tokens = resp.json()
-    access_token = tokens["access_token"]
-    refresh_token = tokens["refresh_token"]
-
     session_id = str(uuid.uuid4())
     sessions[session_id] = {
-        "access_token": access_token,
-        "refresh_token": refresh_token,
+        "access_token": tokens["access_token"],
+        "refresh_token": tokens["refresh_token"],
         "username": body.username
     }
 
@@ -71,7 +69,6 @@ async def logout(request: Request, response: Response):
     session_id = request.cookies.get("session_id")
     if session_id and session_id in sessions:
         del sessions[session_id]
-
     response.delete_cookie("session_id")
     return {"status": "ok"}
 
@@ -81,9 +78,7 @@ async def me(request: Request):
     session_id = request.cookies.get("session_id")
     if not session_id or session_id not in sessions:
         raise HTTPException(status_code=401, detail="Not authenticated")
-
-    session = sessions[session_id]
-    return {"username": session["username"]}
+    return {"username": sessions[session_id]["username"]}
 
 
 @app.get("/reports")
@@ -92,19 +87,40 @@ async def get_report(request: Request):
     if not session_id or session_id not in sessions:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
-    session = sessions[session_id]
-    username = session["username"]
+    username = sessions[session_id]["username"]
 
-    return {
-        "username": username,
-        "url": f"http://localhost:8000/reports/download/{username}",
-        "data": {
-            "prosthesis_id": "PROS-001",
-            "usage_hours": 120,
-            "battery_cycles": 45,
-            "movements_count": 15000
+    try:
+        client = clickhouse_connect.get_client(
+            host=CLICKHOUSE_HOST,
+            port=8123,
+            database='bionicpro'
+        )
+
+        result = client.query(
+            "SELECT username, full_name, prosthesis_id, total_usage_hours, total_battery_cycles, total_movements, last_recorded_at FROM prosthesis_report WHERE username = {username:String} LIMIT 1",
+            parameters={"username": username}
+        )
+
+        if not result.result_rows:
+            raise HTTPException(status_code=404, detail="No report found for this user")
+
+        row = result.result_rows[0]
+        return {
+            "username": row[0],
+            "full_name": row[1],
+            "prosthesis_id": row[2],
+            "data": {
+                "prosthesis_id": row[2],
+                "usage_hours": row[3],
+                "battery_cycles": row[4],
+                "movements_count": row[5],
+                "last_recorded_at": str(row[6])
+            }
         }
-    }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/health")

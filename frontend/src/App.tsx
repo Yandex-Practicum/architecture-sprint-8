@@ -4,21 +4,28 @@ import Keycloak, { KeycloakConfig } from 'keycloak-js';
 import ReportPage from './components/ReportPage';
 
 const keycloakConfig: KeycloakConfig = {
-  url: process.env.REACT_APP_KEYCLOAK_URL,
-  realm: process.env.REACT_APP_KEYCLOAK_REALM||"",
-  clientId: process.env.REACT_APP_KEYCLOAK_CLIENT_ID||""
+    url: process.env.REACT_APP_KEYCLOAK_URL,
+    realm: process.env.REACT_APP_KEYCLOAK_REALM || "",
+    clientId: process.env.REACT_APP_KEYCLOAK_CLIENT_ID || ""
 };
 
 const keycloak = new Keycloak(keycloakConfig);
 
 const App: React.FC = () => {
-  return (
-    <ReactKeycloakProvider authClient={keycloak}>
-      <div className="App">
-        <ReportPage />
-      </div>
-    </ReactKeycloakProvider>
-  );
+    return (
+        <ReactKeycloakProvider
+            authClient={keycloak}
+            initOptions={{
+                pkceMethod: 'S256',
+                onLoad: 'check-sso',
+                silentCheckSsoRedirectUri: window.location.origin + '/silent-check-sso.html'
+            }}
+        >
+            <div className="App">
+                <ReportPage />
+            </div>
+        </ReactKeycloakProvider>
+    );
 };
 
 export default App;
